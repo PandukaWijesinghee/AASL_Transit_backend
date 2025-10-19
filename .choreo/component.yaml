@@ -3,7 +3,7 @@ endpoints:
     - name: sms-auth-api-858
       displayName: sms-auth-api
       service:
-        basePath: /api
+        basePath: /
         port: 8080
       type: REST
       networkVisibilities:
