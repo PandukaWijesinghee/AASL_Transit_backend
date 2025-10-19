@@ -1,0 +1,13 @@
+# WSO2 Choreo Endpoints Configuration
+# This file defines how your API endpoints are exposed in Choreo
+
+version: 0.1
+
+# Define your API endpoints
+endpoints:
+  - name: sms-auth-api
+    type: REST
+    networkVisibility: Public
+    context: /api
+    schemaFilePath: swagger.yaml
+    port: 8080

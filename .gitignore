@@ -1,0 +1,65 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/main
+/server
+/sms-auth-backend
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# Air live reload
+tmp/
+
+# Database
+*.db
+*.sqlite
+
+# Secrets and credentials
+secrets/
+*.pem
+*.key
+
+# Build artifacts
+dist/
+build/
+
+# Choreo specific
+.choreo/tmp/
+
+*.md
+*.txt
