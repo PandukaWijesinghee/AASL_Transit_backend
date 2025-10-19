@@ -47,8 +47,8 @@ COPY --from=builder /app/server .
 # Change ownership
 RUN chown -R appuser:appuser /home/appuser
 
-# Switch to non-root user
-USER appuser
+# Switch to non-root user (use numeric UID for Choreo security requirement)
+USER 10001
 
 # Expose port
 EXPOSE 8080
