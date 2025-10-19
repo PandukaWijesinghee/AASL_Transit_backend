@@ -98,7 +98,7 @@ func main() {
 	// Get both app hashes for SMS auto-read
 	driverAppHash := cfg.SMS.DriverAppHash
 	passengerAppHash := cfg.SMS.PassengerAppHash
-	
+
 	if driverAppHash != "" || passengerAppHash != "" {
 		logger.Info("SMS auto-read enabled:")
 		if driverAppHash != "" {
