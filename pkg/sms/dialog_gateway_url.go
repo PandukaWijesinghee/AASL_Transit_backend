@@ -28,17 +28,14 @@ func NewDialogURLGateway(apiKey, mask, driverHash, passengerHash string) *Dialog
 	}
 }
 
-// SendOTP sends an OTP via Dialog's URL-based SMS API (uses passenger hash by default)
+// SendOTP sends an OTP via Dialog's URL-based SMS API with BOTH app hashes
+// This allows both Driver and Passenger apps to auto-read the same SMS
 func (d *DialogURLGateway) SendOTP(phone, otpCode string) (int64, error) {
-	return d.SendOTPWithHash(phone, otpCode, d.passengerAppHash)
+	return d.SendOTPWithHash(phone, otpCode, "")
 }
 
-// SendOTPStaff sends an OTP for staff users (driver/conductor) using driver hash
-func (d *DialogURLGateway) SendOTPStaff(phone, otpCode string) (int64, error) {
-	return d.SendOTPWithHash(phone, otpCode, d.driverAppHash)
-}
-
-// SendOTPWithHash sends an OTP with a specific app hash
+// SendOTPWithHash sends an OTP - hash parameter is ignored as we always send both hashes
+// Kept for backward compatibility
 func (d *DialogURLGateway) SendOTPWithHash(phone, otpCode, appHash string) (int64, error) {
 	fmt.Printf("📱 SendOTP (URL method) called - Phone: %s, OTP: %s\n", phone, otpCode)
 
@@ -51,16 +48,15 @@ func (d *DialogURLGateway) SendOTPWithHash(phone, otpCode, appHash string) (int6
 
 	fmt.Printf("📞 Formatted phone: %s\n", formattedPhone)
 
-	// Create the message with app hash for Android SMS auto-read
-	var message string
-	if appHash != "" {
-		// Format for Android SMS auto-read
-		message = fmt.Sprintf("Your SmartTransit OTP is: %s\n\nPlease use the above OTP to complete your action.\n\nRegards,\nSmartTransit\n%s", otpCode, appHash)
-		fmt.Printf("📱 Using app hash: %s\n", appHash)
-	} else {
-		// Fallback message without app hash
-		message = fmt.Sprintf("Your OTP code is: %s. Valid for 5 minutes. Do not share this code.", otpCode)
-	}
+	// Create the message with BOTH app hashes for Android SMS auto-read
+	// This allows both Driver and Passenger apps to auto-read from the same SMS
+	// Android SMS Retriever API will automatically match the correct hash
+	message := fmt.Sprintf("Your SmartTransit OTP is: %s\n\nPlease use the above OTP to complete your action.\n\nRegards,\nSmartTransit\n%s\n%s",
+		otpCode,
+		d.driverAppHash,    // For Driver/Conductor app
+		d.passengerAppHash) // For Passenger app
+
+	fmt.Printf("📱 Using BOTH app hashes - Driver: %s, Passenger: %s\n", d.driverAppHash, d.passengerAppHash)
 	fmt.Printf("💬 Message: %s\n", message)
 
 	// Build the URL with query parameters
