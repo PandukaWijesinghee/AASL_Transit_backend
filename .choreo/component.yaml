@@ -7,6 +7,5 @@ endpoints:
         port: 8080
       type: REST
       networkVisibilities:
-        - Project
         - Public
       schemaFilePath: swagger.yaml
