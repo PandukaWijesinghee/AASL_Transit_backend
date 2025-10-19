@@ -1,0 +1,965 @@
+openapi: 3.0.3
+info:
+  title: SmartTransit SMS Authentication API
+  description: |
+    SMS-based authentication backend for SmartTransit mobile applications.
+
+    ## Features
+    - SMS OTP authentication for passengers
+    - Staff registration and verification
+    - JWT token-based authorization
+    - Profile management
+    - Rate limiting and security
+
+    ## Authentication Flow
+    1. Request OTP via `/auth/send-otp`
+    2. Verify OTP via `/auth/verify-otp` or `/auth/verify-otp-staff`
+    3. Receive JWT access & refresh tokens
+    4. Use access token for protected endpoints
+    5. Refresh token when access token expires
+
+  version: 1.0.0
+  contact:
+    name: SmartTransit Development Team
+    email: dev@smarttransit.lk
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://your-choreo-id.choreo.dev
+    description: Production server (Choreo)
+  - url: http://localhost:8080
+    description: Development server
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Authentication
+    description: SMS OTP authentication endpoints
+  - name: User
+    description: User profile management
+  - name: Staff
+    description: Staff registration and management
+
+paths:
+  # ============================================================================
+  # Health Check Endpoints
+  # ============================================================================
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns service health status and database connectivity
+      operationId: getHealth
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  database:
+                    type: string
+                    example: healthy
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  timestamp:
+                    type: integer
+                    format: int64
+                    example: 1729340000
+        "503":
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: unhealthy
+                  database:
+                    type: string
+                    example: unhealthy
+                  error:
+                    type: string
+                    example: database connection failed
+
+  # ============================================================================
+  # Authentication Endpoints
+  # ============================================================================
+  /api/v1/auth/send-otp:
+    post:
+      summary: Send OTP to phone number
+      description: |
+        Sends a 6-digit OTP via SMS to the provided phone number.
+
+        **Rate Limiting:** Maximum 3 requests per 10 minutes per phone number.
+
+        **Development Mode:** If SMS_MODE=dev, OTP is returned in response.
+
+        **Production Mode:** OTP is sent via Dialog SMS Gateway.
+      operationId: sendOtp
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+              properties:
+                phone:
+                  type: string
+                  description: Sri Lankan phone number in E.164 format
+                  pattern: '^\+94[0-9]{9}$'
+                  example: "+94771234567"
+      responses:
+        "200":
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: OTP sent successfully
+                  otp:
+                    type: string
+                    description: Only present in development mode
+                    example: "123456"
+                  expires_at:
+                    type: string
+                    format: date-time
+                    example: "2025-10-19T08:05:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/auth/verify-otp:
+    post:
+      summary: Verify OTP and login (Passenger)
+      description: |
+        Verifies the OTP for passenger users and returns JWT tokens.
+
+        **Maximum Attempts:** 3 invalid attempts allowed.
+
+        **OTP Expiry:** 5 minutes from generation.
+
+        **Auto-Registration:** If phone number doesn't exist, creates new passenger account.
+      operationId: verifyOtp
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+                - otp
+              properties:
+                phone:
+                  type: string
+                  pattern: '^\+94[0-9]{9}$'
+                  example: "+94771234567"
+                otp:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  example: "123456"
+      responses:
+        "200":
+          description: OTP verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/InvalidOtp"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/auth/verify-otp-staff:
+    post:
+      summary: Verify OTP and login (Staff)
+      description: |
+        Verifies the OTP for staff users (drivers/conductors) and returns JWT tokens.
+
+        **Staff Only:** User must be registered as staff (driver or conductor).
+
+        **Employment Status Check:** Staff must have employment_status = 'active'.
+
+        **Profile Completion:** Staff must have completed their profile.
+      operationId: verifyOtpStaff
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+                - otp
+              properties:
+                phone:
+                  type: string
+                  pattern: '^\+94[0-9]{9}$'
+                  example: "+94771234567"
+                otp:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  example: "123456"
+      responses:
+        "200":
+          description: OTP verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffAuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/InvalidOtp"
+        "403":
+          description: Staff not authorized (inactive or incomplete profile)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Staff member is not active or profile incomplete
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/auth/otp-status/{phone}:
+    get:
+      summary: Get OTP status for phone number
+      description: Check if OTP exists and is valid for a phone number
+      operationId: getOtpStatus
+      tags:
+        - Authentication
+      security: []
+      parameters:
+        - name: phone
+          in: path
+          required: true
+          description: Phone number in E.164 format
+          schema:
+            type: string
+            pattern: '^\+94[0-9]{9}$'
+            example: "+94771234567"
+      responses:
+        "200":
+          description: OTP status retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exists:
+                    type: boolean
+                    example: true
+                  valid:
+                    type: boolean
+                    example: true
+                  expires_at:
+                    type: string
+                    format: date-time
+                    example: "2025-10-19T08:05:00Z"
+                  attempts_remaining:
+                    type: integer
+                    example: 2
+        "404":
+          description: No OTP found for phone number
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: No OTP found
+
+  /api/v1/auth/refresh-token:
+    post:
+      summary: Refresh access token
+      description: |
+        Use refresh token to obtain a new access token.
+
+        **Token Rotation:** Old refresh token is invalidated, new one is issued.
+      operationId: refreshToken
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        "200":
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  refresh_token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  expires_in:
+                    type: integer
+                    description: Access token expiry in seconds
+                    example: 3600
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/auth/refresh:
+    post:
+      summary: Refresh access token (Alias)
+      description: Alias endpoint for mobile compatibility
+      operationId: refreshTokenAlias
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        "200":
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  refresh_token:
+                    type: string
+                  expires_in:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/auth/logout:
+    post:
+      summary: Logout user
+      description: Invalidates the current refresh token
+      operationId: logout
+      tags:
+        - Authentication
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logout successful
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ============================================================================
+  # User Profile Endpoints
+  # ============================================================================
+  /api/v1/user/profile:
+    get:
+      summary: Get user profile
+      description: Retrieve the authenticated user's profile information
+      operationId: getUserProfile
+      tags:
+        - User
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    put:
+      summary: Update user profile
+      description: Update the authenticated user's profile information
+      operationId: updateUserProfile
+      tags:
+        - User
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: John Doe
+                email:
+                  type: string
+                  format: email
+                  example: john.doe@example.com
+                nic:
+                  type: string
+                  example: "199512345678"
+                address:
+                  type: string
+                  example: "123 Main St, Colombo"
+      responses:
+        "200":
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Profile updated successfully
+                  user:
+                    $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================================
+  # Staff Endpoints
+  # ============================================================================
+  /api/v1/staff/check-registration:
+    post:
+      summary: Check staff registration status
+      description: Check if a phone number is registered as staff and get registration details
+      operationId: checkStaffRegistration
+      tags:
+        - Staff
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+              properties:
+                phone:
+                  type: string
+                  pattern: '^\+94[0-9]{9}$'
+                  example: "+94771234567"
+      responses:
+        "200":
+          description: Registration status retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  is_registered:
+                    type: boolean
+                    example: true
+                  staff:
+                    $ref: "#/components/schemas/BusStaff"
+        "404":
+          description: Phone number not registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  is_registered:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: Phone number not registered as staff
+
+  /api/v1/staff/register:
+    post:
+      summary: Register new staff member
+      description: |
+        Register a new driver or conductor.
+
+        **Requirements:**
+        - Valid phone number (not already registered)
+        - Valid bus owner ID
+        - Staff role (driver or conductor)
+        - Initial employment status will be 'pending'
+      operationId: registerStaff
+      tags:
+        - Staff
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+                - name
+                - role
+                - bus_owner_id
+              properties:
+                phone:
+                  type: string
+                  pattern: '^\+94[0-9]{9}$'
+                  example: "+94771234567"
+                name:
+                  type: string
+                  example: "John Driver"
+                nic:
+                  type: string
+                  example: "199512345678"
+                role:
+                  type: string
+                  enum: [driver, conductor]
+                  example: driver
+                bus_owner_id:
+                  type: integer
+                  example: 1
+                license_number:
+                  type: string
+                  description: Required for drivers
+                  example: "B1234567"
+      responses:
+        "201":
+          description: Staff registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Staff registered successfully
+                  staff:
+                    $ref: "#/components/schemas/BusStaff"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/staff/bus-owners/search:
+    get:
+      summary: Search bus owners
+      description: Search for bus owners by name or NIC
+      operationId: searchBusOwners
+      tags:
+        - Staff
+      security: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: Search query (name or NIC)
+          schema:
+            type: string
+            example: "Perera"
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of results
+          schema:
+            type: integer
+            default: 10
+            example: 10
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bus_owners:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BusOwner"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/staff/profile:
+    get:
+      summary: Get staff profile
+      description: Retrieve the authenticated staff member's profile
+      operationId: getStaffProfile
+      tags:
+        - Staff
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Staff profile retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    put:
+      summary: Update staff profile
+      description: Update the authenticated staff member's profile
+      operationId: updateStaffProfile
+      tags:
+        - Staff
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "John Driver"
+                nic:
+                  type: string
+                  example: "199512345678"
+                license_number:
+                  type: string
+                  example: "B1234567"
+                address:
+                  type: string
+                  example: "123 Main St, Colombo"
+      responses:
+        "200":
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Profile updated successfully
+                  staff:
+                    $ref: "#/components/schemas/BusStaff"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+# ============================================================================
+# Components (Schemas, Responses, SecuritySchemes)
+# ============================================================================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT access token obtained from `/auth/verify-otp` or `/auth/verify-otp-staff`.
+
+        Include in Authorization header as: `Bearer <token>`
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        phone:
+          type: string
+          example: "+94771234567"
+        name:
+          type: string
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          example: "john.doe@example.com"
+        nic:
+          type: string
+          example: "199512345678"
+        address:
+          type: string
+          example: "123 Main St, Colombo"
+        role:
+          type: string
+          enum: [passenger, driver, conductor]
+          example: passenger
+        is_verified:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-10-19T07:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2025-10-19T07:00:00Z"
+
+    BusStaff:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        user_id:
+          type: integer
+          example: 1
+        bus_owner_id:
+          type: integer
+          example: 1
+        role:
+          type: string
+          enum: [driver, conductor]
+          example: driver
+        license_number:
+          type: string
+          example: "B1234567"
+        employment_status:
+          type: string
+          enum: [pending, active, inactive, suspended]
+          example: active
+        profile_completed:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    BusOwner:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        user_id:
+          type: integer
+          example: 2
+        company_name:
+          type: string
+          example: "Express Transport Ltd"
+        nic:
+          type: string
+          example: "197512345678"
+        created_at:
+          type: string
+          format: date-time
+
+    StaffProfile:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        staff:
+          $ref: "#/components/schemas/BusStaff"
+        bus_owner:
+          $ref: "#/components/schemas/BusOwner"
+
+    AuthResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Login successful
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refresh_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        expires_in:
+          type: integer
+          description: Access token expiry in seconds
+          example: 3600
+        user:
+          $ref: "#/components/schemas/User"
+
+    StaffAuthResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Login successful
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refresh_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        expires_in:
+          type: integer
+          example: 3600
+        user:
+          $ref: "#/components/schemas/User"
+        staff:
+          $ref: "#/components/schemas/BusStaff"
+        bus_owner:
+          $ref: "#/components/schemas/BusOwner"
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Invalid request
+        details:
+          type: string
+          example: Phone number is required
+
+  responses:
+    BadRequest:
+      description: Bad request - Invalid input
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            invalidPhone:
+              value:
+                error: Invalid phone number
+                details: Phone number must be in E.164 format (+94XXXXXXXXX)
+            missingField:
+              value:
+                error: Missing required field
+                details: Field 'phone' is required
+
+    Unauthorized:
+      description: Unauthorized - Invalid or expired token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            invalidToken:
+              value:
+                error: Unauthorized
+                details: Invalid or expired token
+            missingToken:
+              value:
+                error: Unauthorized
+                details: Authorization header required
+
+    InvalidOtp:
+      description: Invalid OTP
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            invalidOtp:
+              value:
+                error: Invalid OTP
+                details: The OTP you entered is incorrect
+            expiredOtp:
+              value:
+                error: OTP expired
+                details: OTP has expired, please request a new one
+            maxAttemptsExceeded:
+              value:
+                error: Maximum attempts exceeded
+                details: You have exceeded the maximum number of OTP verification attempts
+
+    Conflict:
+      description: Conflict - Resource already exists
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            phoneExists:
+              value:
+                error: Phone number already registered
+                details: This phone number is already in use
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            tooManyRequests:
+              value:
+                error: Rate limit exceeded
+                details: Maximum 3 OTP requests per 10 minutes. Please try again later.
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            serverError:
+              value:
+                error: Internal server error
+                details: An unexpected error occurred
