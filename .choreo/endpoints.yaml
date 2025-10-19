@@ -9,5 +9,5 @@ endpoints:
     type: REST
     networkVisibility: Public
     context: /api
-    schemaFilePath: swagger.yaml
+    # schemaFilePath: swagger.yaml  # Optional: Add OpenAPI/Swagger spec later
     port: 8080
