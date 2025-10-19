@@ -95,10 +95,18 @@ func main() {
 	// Initialize SMS Gateway (Dialog)
 	var smsGateway sms.SMSGateway
 
-	// Use driver app hash by default (can be made dynamic based on user type later)
-	appHash := cfg.SMS.DriverAppHash
-	if appHash != "" {
-		logger.Info("SMS auto-read enabled - App hash: " + appHash)
+	// Get both app hashes for SMS auto-read
+	driverAppHash := cfg.SMS.DriverAppHash
+	passengerAppHash := cfg.SMS.PassengerAppHash
+	
+	if driverAppHash != "" || passengerAppHash != "" {
+		logger.Info("SMS auto-read enabled:")
+		if driverAppHash != "" {
+			logger.Info("  Driver app hash: " + driverAppHash)
+		}
+		if passengerAppHash != "" {
+			logger.Info("  Passenger app hash: " + passengerAppHash)
+		}
 	}
 
 	if cfg.SMS.Mode == "production" {
@@ -107,7 +115,7 @@ func main() {
 		// Choose gateway based on method
 		if cfg.SMS.Method == "url" {
 			logger.Info("Using Dialog URL method (GET request with esmsqk)")
-			urlGateway := sms.NewDialogURLGateway(cfg.SMS.ESMSQK, cfg.SMS.Mask, appHash)
+			urlGateway := sms.NewDialogURLGateway(cfg.SMS.ESMSQK, cfg.SMS.Mask, driverAppHash, passengerAppHash)
 			smsGateway = urlGateway
 		} else {
 			logger.Info("Using Dialog API v2 method (POST with authentication)")
@@ -116,7 +124,7 @@ func main() {
 				Username: cfg.SMS.Username,
 				Password: cfg.SMS.Password,
 				Mask:     cfg.SMS.Mask,
-				AppHash:  appHash,
+				AppHash:  passengerAppHash, // Use passenger hash as default
 			})
 			smsGateway = apiGateway
 		}
@@ -130,7 +138,7 @@ func main() {
 			Username: cfg.SMS.Username,
 			Password: cfg.SMS.Password,
 			Mask:     cfg.SMS.Mask,
-			AppHash:  appHash,
+			AppHash:  passengerAppHash,
 		})
 	}
 
