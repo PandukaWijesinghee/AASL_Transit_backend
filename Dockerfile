@@ -34,9 +34,9 @@ FROM alpine:latest
 # Install runtime dependencies
 RUN apk --no-cache add ca-certificates tzdata
 
-# Create non-root user
-RUN addgroup -g 1000 appuser && \
-    adduser -D -u 1000 -G appuser appuser
+# Create non-root user (UID between 10000-20000 for Choreo security)
+RUN addgroup -g 10001 appuser && \
+    adduser -D -u 10001 -G appuser appuser
 
 # Set working directory
 WORKDIR /home/appuser
