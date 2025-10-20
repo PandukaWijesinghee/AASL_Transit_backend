@@ -476,21 +476,15 @@ func (h *AuthHandler) VerifyOTPStaff(c *gin.Context) {
 	isNew := false
 
 	if existingUser != nil {
-		// EXISTING USER - Validate they can use staff app
+		// EXISTING USER - Allow them to use staff app regardless of current roles
 		user = existingUser
 
-		// Check if user is a passenger - passengers cannot use staff app
-		if h.userRepository.HasRole(user, "passenger") {
-			c.JSON(http.StatusForbidden, ErrorResponse{
-				Error:   "invalid_user_type",
-				Message: "You are registered as a passenger. Please use the Passenger app.",
-				Code:    "PASSENGER_USER",
-			})
-			return
-		}
+		// Multi-role system: Users can be BOTH passenger AND driver/conductor
+		// If they only have 'passenger' role → They'll select staff role (driver/conductor) next
+		// If they have driver/conductor role → They go directly to dashboard
+		// No blocking based on existing roles!
 
-		// User already exists and is either staff or has no role - allow login
-		log.Printf("INFO: Existing staff user logged in: %s (roles: %v)", phone, user.Roles)
+		log.Printf("INFO: Existing user logged in to staff app: %s (roles: %v)", phone, user.Roles)
 	} else {
 		// NEW USER - Create without role
 		user, err = h.userRepository.CreateUserWithoutRole(phone)
