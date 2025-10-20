@@ -82,6 +82,7 @@ func main() {
 	otpService := services.NewOTPService(db)
 	phoneValidator := validator.NewPhoneValidator()
 	rateLimitService := services.NewRateLimitService(db)
+	auditService := services.NewAuditService(db)
 	userRepository := database.NewUserRepository(db)
 	refreshTokenRepository := database.NewRefreshTokenRepository(db)
 
@@ -150,6 +151,7 @@ func main() {
 		otpService,
 		phoneValidator,
 		rateLimitService,
+		auditService,
 		userRepository,
 		refreshTokenRepository,
 		smsGateway,
