@@ -8,6 +8,7 @@
 /server
 /sms-auth-backend
 
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -63,3 +64,5 @@ build/
 
 *.md
 *.txt
+
+dbINFOScripts/
