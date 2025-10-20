@@ -52,8 +52,8 @@ func NewOTPService(db database.DB) *OTPService {
 }
 
 // GenerateOTP generates a new 6-digit OTP for the given phone number
-// It invalidates any existing OTPs for the phone number
-func (s *OTPService) GenerateOTP(phone string) (string, error) {
+// It invalidates any existing OTPs for the phone number and stores IP/User-Agent for security tracking
+func (s *OTPService) GenerateOTP(phone, ipAddress, userAgent string) (string, error) {
 	// Invalidate any existing OTPs for this phone
 	if err := s.InvalidateOTP(phone); err != nil {
 		return "", fmt.Errorf("failed to invalidate existing OTP: %w", err)
@@ -68,13 +68,13 @@ func (s *OTPService) GenerateOTP(phone string) (string, error) {
 	// Calculate expiry time
 	expiresAt := time.Now().Add(OTPExpiryDuration)
 
-	// Store in database
+	// Store in database with IP address and user agent for security tracking
 	query := `
-		INSERT INTO otp_verifications (phone, otp_code, purpose, expires_at, attempts, max_attempts)
-		VALUES ($1, $2, 'authentication', $3, 0, $4)
+		INSERT INTO otp_verifications (phone, otp_code, purpose, expires_at, attempts, max_attempts, ip_address, user_agent)
+		VALUES ($1, $2, 'authentication', $3, 0, $4, $5, $6)
 	`
 
-	_, err = s.db.Exec(query, phone, otp, expiresAt, MaxOTPAttempts)
+	_, err = s.db.Exec(query, phone, otp, expiresAt, MaxOTPAttempts, ipAddress, userAgent)
 	if err != nil {
 		return "", fmt.Errorf("failed to store OTP: %w", err)
 	}
@@ -309,8 +309,8 @@ func generateRandomOTP() (string, error) {
 
 // ResendOTP generates a new OTP for the phone number
 // This is an alias for GenerateOTP for clarity in API handlers
-func (s *OTPService) ResendOTP(phone string) (string, error) {
-	return s.GenerateOTP(phone)
+func (s *OTPService) ResendOTP(phone, ipAddress, userAgent string) (string, error) {
+	return s.GenerateOTP(phone, ipAddress, userAgent)
 }
 
 // VerifyAndInvalidate validates the OTP and immediately invalidates it

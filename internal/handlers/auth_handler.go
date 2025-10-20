@@ -11,6 +11,7 @@ import (
 	"github.com/smarttransit/sms-auth-backend/internal/middleware"
 	"github.com/smarttransit/sms-auth-backend/internal/models"
 	"github.com/smarttransit/sms-auth-backend/internal/services"
+	"github.com/smarttransit/sms-auth-backend/internal/utils"
 	"github.com/smarttransit/sms-auth-backend/pkg/jwt"
 	"github.com/smarttransit/sms-auth-backend/pkg/sms"
 	"github.com/smarttransit/sms-auth-backend/pkg/validator"
@@ -22,6 +23,7 @@ type AuthHandler struct {
 	otpService             *services.OTPService
 	phoneValidator         *validator.PhoneValidator
 	rateLimitService       *services.RateLimitService
+	auditService           *services.AuditService
 	userRepository         *database.UserRepository
 	refreshTokenRepository *database.RefreshTokenRepository
 	smsGateway             sms.SMSGateway
@@ -34,6 +36,7 @@ func NewAuthHandler(
 	otpService *services.OTPService,
 	phoneValidator *validator.PhoneValidator,
 	rateLimitService *services.RateLimitService,
+	auditService *services.AuditService,
 	userRepository *database.UserRepository,
 	refreshTokenRepository *database.RefreshTokenRepository,
 	smsGateway sms.SMSGateway,
@@ -44,6 +47,7 @@ func NewAuthHandler(
 		otpService:             otpService,
 		phoneValidator:         phoneValidator,
 		rateLimitService:       rateLimitService,
+		auditService:           auditService,
 		userRepository:         userRepository,
 		refreshTokenRepository: refreshTokenRepository,
 		smsGateway:             smsGateway,
@@ -110,10 +114,16 @@ func (h *AuthHandler) SendOTP(c *gin.Context) {
 		return
 	}
 
+	// Get real client IP and user agent
+	clientIP := utils.GetRealIP(c)
+	userAgent := utils.GetUserAgent(c)
+
 	// Check rate limiting
-	clientIP := c.ClientIP()
 	if err := h.rateLimitService.CheckOTPRateLimit(phone, clientIP); err != nil {
 		if rateLimitErr, ok := err.(*services.RateLimitError); ok {
+			// Log rate limit violation
+			h.auditService.LogRateLimitViolation(phone, clientIP, userAgent, rateLimitErr.Type, rateLimitErr.RetryAfter)
+
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error":       "rate_limit_exceeded",
 				"message":     rateLimitErr.Message,
@@ -130,9 +140,12 @@ func (h *AuthHandler) SendOTP(c *gin.Context) {
 		return
 	}
 
-	// Generate OTP
-	otp, err := h.otpService.GenerateOTP(phone)
+	// Generate OTP with IP and user agent tracking
+	otp, err := h.otpService.GenerateOTP(phone, clientIP, userAgent)
 	if err != nil {
+		// Log failed OTP request
+		h.auditService.LogOTPRequest(phone, clientIP, userAgent, false, "generation_failed")
+
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "otp_generation_failed",
 			Message: "Failed to generate OTP",
@@ -146,6 +159,9 @@ func (h *AuthHandler) SendOTP(c *gin.Context) {
 		// The OTP is already generated and stored
 		c.Error(err) // This logs the error in Gin
 	}
+
+	// Log successful OTP request
+	h.auditService.LogOTPRequest(phone, clientIP, userAgent, true, "")
 
 	// Get expiry time
 	expiresAt, _ := h.otpService.GetOTPExpiry(phone)
@@ -212,9 +228,20 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 		return
 	}
 
+	// Get real client IP and user agent
+	clientIP := utils.GetRealIP(c)
+	userAgent := utils.GetUserAgent(c)
+
+	// Get current attempts before validation
+	remainingBefore, _ := h.otpService.GetRemainingAttempts(phone)
+
 	// Validate OTP
 	valid, err := h.otpService.ValidateOTP(phone, req.OTP)
 	if err != nil {
+		// Log failed verification
+		attempts := 3 - remainingBefore + 1 // Calculated attempts made
+		h.auditService.LogOTPVerification(nil, phone, false, attempts, clientIP, userAgent, err.Error())
+
 		// Check specific error types
 		switch err {
 		case services.ErrOTPExpired:
@@ -259,6 +286,10 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 	}
 
 	if !valid {
+		// Log invalid OTP
+		attempts := 3 - remainingBefore + 1
+		h.auditService.LogOTPVerification(nil, phone, false, attempts, clientIP, userAgent, "invalid_code")
+
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "otp_invalid",
 			Message: "Invalid OTP code",
@@ -302,8 +333,6 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 	}
 
 	// Store refresh token in database
-	ipAddress := c.ClientIP()
-	userAgent := c.Request.UserAgent()
 	expiresAt := time.Now().Add(7 * 24 * time.Hour) // 7 days
 
 	// Get device info from request if provided
@@ -315,7 +344,7 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 		refreshToken,
 		deviceID,
 		deviceType,
-		ipAddress,
+		clientIP,
 		userAgent,
 		expiresAt,
 	)
@@ -323,6 +352,10 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 		// Log error but don't fail the login
 		// In production, you'd want proper logging here
 	}
+
+	// Log successful OTP verification and login
+	h.auditService.LogOTPVerification(&user.ID, phone, true, 3-remainingBefore+1, clientIP, userAgent, "")
+	h.auditService.LogLogin(user.ID, phone, clientIP, userAgent, deviceID, deviceType)
 
 	c.JSON(http.StatusOK, VerifyOTPResponse{
 		Message:         "OTP verified successfully",
@@ -359,9 +392,20 @@ func (h *AuthHandler) VerifyOTPStaff(c *gin.Context) {
 		return
 	}
 
+	// Get real client IP and user agent
+	clientIP := utils.GetRealIP(c)
+	userAgent := utils.GetUserAgent(c)
+
+	// Get current attempts before validation
+	remainingBefore, _ := h.otpService.GetRemainingAttempts(phone)
+
 	// Validate OTP
 	valid, err := h.otpService.ValidateOTP(phone, req.OTP)
 	if err != nil {
+		// Log failed verification
+		attempts := 3 - remainingBefore + 1
+		h.auditService.LogOTPVerification(nil, phone, false, attempts, clientIP, userAgent, err.Error())
+
 		// Check specific error types
 		switch err {
 		case services.ErrOTPExpired:
@@ -406,6 +450,10 @@ func (h *AuthHandler) VerifyOTPStaff(c *gin.Context) {
 	}
 
 	if !valid {
+		// Log invalid OTP
+		attempts := 3 - remainingBefore + 1
+		h.auditService.LogOTPVerification(nil, phone, false, attempts, clientIP, userAgent, "invalid_code")
+
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "otp_invalid",
 			Message: "Invalid OTP code",
@@ -483,8 +531,6 @@ func (h *AuthHandler) VerifyOTPStaff(c *gin.Context) {
 	}
 
 	// Store refresh token in database
-	ipAddress := c.ClientIP()
-	userAgent := c.Request.UserAgent()
 	expiresAt := time.Now().Add(7 * 24 * time.Hour) // 7 days
 
 	// Get device info from request if provided
@@ -496,7 +542,7 @@ func (h *AuthHandler) VerifyOTPStaff(c *gin.Context) {
 		refreshToken,
 		deviceID,
 		deviceType,
-		ipAddress,
+		clientIP,
 		userAgent,
 		expiresAt,
 	)
@@ -504,6 +550,10 @@ func (h *AuthHandler) VerifyOTPStaff(c *gin.Context) {
 		// Log error but don't fail the login
 		log.Printf("WARNING: Failed to store refresh token for user %s: %v", user.ID, err)
 	}
+
+	// Log successful OTP verification and login (staff app)
+	h.auditService.LogOTPVerification(&user.ID, phone, true, 3-remainingBefore+1, clientIP, userAgent, "")
+	h.auditService.LogLogin(user.ID, phone, clientIP, userAgent, deviceID, deviceType)
 
 	c.JSON(http.StatusOK, VerifyOTPResponse{
 		Message:         "OTP verified successfully",
@@ -872,8 +922,8 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	}
 
 	// Store new refresh token in database
-	ipAddress := c.ClientIP()
-	userAgent := c.Request.UserAgent()
+	clientIP := utils.GetRealIP(c)
+	userAgent := utils.GetUserAgent(c)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour) // 7 days
 
 	err = h.refreshTokenRepository.StoreRefreshToken(
@@ -881,17 +931,23 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		newRefreshToken,
 		req.DeviceID,
 		req.DeviceType,
-		ipAddress,
+		clientIP,
 		userAgent,
 		expiresAt,
 	)
 	if err != nil {
+		// Log failed token refresh
+		h.auditService.LogTokenRefresh(user.ID, clientIP, userAgent, false)
+
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "token_storage_failed",
 			Message: "Failed to store new refresh token",
 		})
 		return
 	}
+
+	// Log successful token refresh
+	h.auditService.LogTokenRefresh(user.ID, clientIP, userAgent, true)
 
 	c.JSON(http.StatusOK, RefreshTokenResponse{
 		AccessToken:  accessToken,
@@ -919,6 +975,10 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		return
 	}
 
+	// Get real client IP and user agent for audit logging
+	clientIP := utils.GetRealIP(c)
+	userAgent := utils.GetUserAgent(c)
+
 	var req LogoutRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		// If no body provided, default to single device logout
@@ -943,6 +1003,9 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 			return
 		}
 
+		// Log logout from all devices
+		h.auditService.LogLogout(userCtx.UserID, clientIP, userAgent, true)
+
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Successfully logged out from all devices",
 		})
@@ -963,6 +1026,9 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 			return
 		}
 
+		// Log single device logout
+		h.auditService.LogLogout(userCtx.UserID, clientIP, userAgent, false)
+
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Successfully logged out",
 		})
@@ -978,6 +1044,9 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		// Don't fail the logout - client-side logout is still valid
 		log.Printf("WARN: Server-side token revocation failed, but allowing logout")
 	}
+
+	// Log logout
+	h.auditService.LogLogout(userCtx.UserID, clientIP, userAgent, false)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Successfully logged out",
