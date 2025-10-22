@@ -85,6 +85,7 @@ func main() {
 	auditService := services.NewAuditService(db)
 	userRepository := database.NewUserRepository(db)
 	refreshTokenRepository := database.NewRefreshTokenRepository(db)
+	userSessionRepository := database.NewUserSessionRepository(db)
 
 	// Initialize staff-related repositories
 	staffRepository := database.NewBusStaffRepository(db)
@@ -154,6 +155,7 @@ func main() {
 		auditService,
 		userRepository,
 		refreshTokenRepository,
+		userSessionRepository,
 		smsGateway,
 		cfg,
 	)

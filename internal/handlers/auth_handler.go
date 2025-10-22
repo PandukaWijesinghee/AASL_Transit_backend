@@ -26,6 +26,7 @@ type AuthHandler struct {
 	auditService           *services.AuditService
 	userRepository         *database.UserRepository
 	refreshTokenRepository *database.RefreshTokenRepository
+	userSessionRepository  *database.UserSessionRepository
 	smsGateway             sms.SMSGateway
 	config                 *config.Config
 }
@@ -39,6 +40,7 @@ func NewAuthHandler(
 	auditService *services.AuditService,
 	userRepository *database.UserRepository,
 	refreshTokenRepository *database.RefreshTokenRepository,
+	userSessionRepository *database.UserSessionRepository,
 	smsGateway sms.SMSGateway,
 	cfg *config.Config,
 ) *AuthHandler {
@@ -50,6 +52,7 @@ func NewAuthHandler(
 		auditService:           auditService,
 		userRepository:         userRepository,
 		refreshTokenRepository: refreshTokenRepository,
+		userSessionRepository:  userSessionRepository,
 		smsGateway:             smsGateway,
 		config:                 cfg,
 	}
@@ -357,6 +360,29 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 	h.auditService.LogOTPVerification(&user.ID, phone, true, 3-remainingBefore+1, clientIP, userAgent, "")
 	h.auditService.LogLogin(user.ID, phone, clientIP, userAgent, deviceID, deviceType)
 
+	// Create or update user session
+	deviceModel := c.GetHeader("X-Device-Model")
+	appVersion := c.GetHeader("X-App-Version")
+	osVersion := c.GetHeader("X-OS-Version")
+	fcmToken := c.GetHeader("X-FCM-Token")
+
+	if deviceID != "" && deviceType != "" {
+		_, err = h.userSessionRepository.CreateOrUpdateSession(
+			user.ID,
+			deviceID,
+			deviceType,
+			deviceModel,
+			appVersion,
+			osVersion,
+			clientIP,
+			fcmToken,
+		)
+		if err != nil {
+			// Log error but don't fail the login
+			log.Printf("WARNING: Failed to create/update session for user %s: %v", user.ID, err)
+		}
+	}
+
 	c.JSON(http.StatusOK, VerifyOTPResponse{
 		Message:         "OTP verified successfully",
 		AccessToken:     accessToken,
@@ -548,6 +574,29 @@ func (h *AuthHandler) VerifyOTPStaff(c *gin.Context) {
 	// Log successful OTP verification and login (staff app)
 	h.auditService.LogOTPVerification(&user.ID, phone, true, 3-remainingBefore+1, clientIP, userAgent, "")
 	h.auditService.LogLogin(user.ID, phone, clientIP, userAgent, deviceID, deviceType)
+
+	// Create or update user session
+	deviceModel := c.GetHeader("X-Device-Model")
+	appVersion := c.GetHeader("X-App-Version")
+	osVersion := c.GetHeader("X-OS-Version")
+	fcmToken := c.GetHeader("X-FCM-Token")
+
+	if deviceID != "" && deviceType != "" {
+		_, err = h.userSessionRepository.CreateOrUpdateSession(
+			user.ID,
+			deviceID,
+			deviceType,
+			deviceModel,
+			appVersion,
+			osVersion,
+			clientIP,
+			fcmToken,
+		)
+		if err != nil {
+			// Log error but don't fail the login
+			log.Printf("WARNING: Failed to create/update session for user %s: %v", user.ID, err)
+		}
+	}
 
 	c.JSON(http.StatusOK, VerifyOTPResponse{
 		Message:         "OTP verified successfully",
@@ -997,6 +1046,13 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 			return
 		}
 
+		// Deactivate all user sessions
+		err = h.userSessionRepository.DeactivateAllUserSessions(userCtx.UserID)
+		if err != nil {
+			log.Printf("WARNING: Failed to deactivate all sessions for user %s: %v", userCtx.UserID, err)
+			// Don't fail the logout
+		}
+
 		// Log logout from all devices
 		h.auditService.LogLogout(userCtx.UserID, clientIP, userAgent, true)
 
@@ -1020,6 +1076,16 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 			return
 		}
 
+		// Deactivate session for this device
+		deviceID := c.GetHeader("X-Device-ID")
+		if deviceID != "" {
+			err = h.userSessionRepository.DeactivateSession(userCtx.UserID, deviceID)
+			if err != nil {
+				log.Printf("WARNING: Failed to deactivate session for user %s device %s: %v", userCtx.UserID, deviceID, err)
+				// Don't fail the logout
+			}
+		}
+
 		// Log single device logout
 		h.auditService.LogLogout(userCtx.UserID, clientIP, userAgent, false)
 
@@ -1037,6 +1103,16 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		log.Printf("ERROR: Failed to revoke most recent token for user %s: %v", userCtx.UserID, err)
 		// Don't fail the logout - client-side logout is still valid
 		log.Printf("WARN: Server-side token revocation failed, but allowing logout")
+	}
+
+	// Deactivate session for this device
+	deviceID := c.GetHeader("X-Device-ID")
+	if deviceID != "" {
+		err = h.userSessionRepository.DeactivateSession(userCtx.UserID, deviceID)
+		if err != nil {
+			log.Printf("WARNING: Failed to deactivate session for user %s device %s: %v", userCtx.UserID, deviceID, err)
+			// Don't fail the logout
+		}
 	}
 
 	// Log logout
