@@ -184,6 +184,9 @@ func main() {
 	// Health check endpoint
 	router.GET("/health", healthCheckHandler(db))
 
+	// Debug endpoint - shows all request headers and IP detection
+	router.GET("/debug/headers", debugHeadersHandler())
+
 	// Set environment in context for development mode
 	router.Use(func(c *gin.Context) {
 		c.Set("environment", cfg.Server.Environment)
@@ -372,6 +375,32 @@ func healthCheckHandler(db database.DB) gin.HandlerFunc {
 			"database":  dbStatus,
 			"version":   version,
 			"timestamp": time.Now().Unix(),
+		})
+	}
+}
+
+// debugHeadersHandler shows all request headers for debugging IP issues
+func debugHeadersHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Collect all headers
+		headers := make(map[string]string)
+		for name, values := range c.Request.Header {
+			headers[name] = values[0] // Take first value
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Debug information for IP detection",
+			"headers": headers,
+			"ip_detection": gin.H{
+				"gin_clientip":     c.ClientIP(),
+				"remote_addr":      c.Request.RemoteAddr,
+				"x_real_ip":        c.Request.Header.Get("X-Real-IP"),
+				"x_forwarded_for":  c.Request.Header.Get("X-Forwarded-For"),
+				"x_forwarded_host": c.Request.Header.Get("X-Forwarded-Host"),
+				"x_forwarded_proto": c.Request.Header.Get("X-Forwarded-Proto"),
+			},
+			"user_agent": c.Request.UserAgent(),
+			"timestamp":  time.Now().Unix(),
 		})
 	}
 }
