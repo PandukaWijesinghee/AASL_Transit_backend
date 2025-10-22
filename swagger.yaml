@@ -91,6 +91,71 @@ paths:
                     example: database connection failed
 
   # ============================================================================
+  # Debug Endpoints
+  # ============================================================================
+  /api/v1/debug/headers:
+    get:
+      summary: Debug request headers and IP detection
+      description: |
+        Shows all incoming request headers and IP detection results.
+
+        **Use Case:** Troubleshooting IP forwarding issues with reverse proxies.
+
+        **Returns:**
+        - All HTTP headers received
+        - IP detection from various headers (X-Real-IP, X-Forwarded-For)
+        - User-Agent information
+      operationId: debugHeaders
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Debug information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Debug information for IP detection
+                  headers:
+                    type: object
+                    additionalProperties:
+                      type: string
+                    example:
+                      X-Forwarded-For: "203.94.123.45, 10.100.1.1"
+                      User-Agent: "SmartTransit-Staff/1.0.0+1 (Android 13; Samsung SM-G998B)"
+                  ip_detection:
+                    type: object
+                    properties:
+                      gin_clientip:
+                        type: string
+                        example: "203.94.123.45"
+                      remote_addr:
+                        type: string
+                        example: "10.100.1.1:54321"
+                      x_real_ip:
+                        type: string
+                        example: ""
+                      x_forwarded_for:
+                        type: string
+                        example: "203.94.123.45, 10.100.1.1"
+                      x_forwarded_host:
+                        type: string
+                        example: "api.smarttransit.lk"
+                      x_forwarded_proto:
+                        type: string
+                        example: "https"
+                  user_agent:
+                    type: string
+                    example: "SmartTransit-Staff/1.0.0+1 (Android 13; Samsung SM-G998B)"
+                  timestamp:
+                    type: integer
+                    format: int64
+                    example: 1729340000
+
+  # ============================================================================
   # Authentication Endpoints
   # ============================================================================
   /api/v1/auth/send-otp:
