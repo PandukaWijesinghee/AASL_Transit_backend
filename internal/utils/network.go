@@ -13,27 +13,40 @@ import (
 // Priority order:
 // 1. X-Real-IP header (most specific, set by reverse proxies like Nginx)
 // 2. X-Forwarded-For header (comma-separated list, first IP is the client)
+//    - Used by Choreo platform and standard load balancers
 // 3. Gin's ClientIP() (fallback for direct connections)
 //
 // Examples:
 //   - Direct connection: returns actual IP
 //   - Behind Nginx: reads X-Real-IP
+//   - Behind Choreo/WSO2: reads first IP from X-Forwarded-For
 //   - Behind load balancer: reads first IP from X-Forwarded-For
 //   - Development (localhost): returns 127.0.0.1
 func GetRealIP(c *gin.Context) string {
 	// Try X-Real-IP header first (most specific)
 	realIP := c.Request.Header.Get("X-Real-IP")
-	if realIP != "" && isValidIP(realIP) {
+	if realIP != "" && isValidIP(realIP) && !isPrivateIP(net.ParseIP(realIP)) {
 		return strings.TrimSpace(realIP)
 	}
 
 	// Try X-Forwarded-For header (comma-separated list)
 	// Format: X-Forwarded-For: client, proxy1, proxy2
-	// We want the first (client) IP
+	// We want the first NON-PRIVATE IP (the real client)
 	forwarded := c.Request.Header.Get("X-Forwarded-For")
 	if forwarded != "" {
-		// Split by comma and get the first IP
+		// Split by comma and get the first valid public IP
 		ips := strings.Split(forwarded, ",")
+		for _, ipStr := range ips {
+			clientIP := strings.TrimSpace(ipStr)
+			if isValidIP(clientIP) {
+				ip := net.ParseIP(clientIP)
+				// Skip private IPs (10.x, 172.16.x, 192.168.x) and use first public IP
+				if !isPrivateIP(ip) && !IsLocalhost(clientIP) {
+					return clientIP
+				}
+			}
+		}
+		// If all IPs are private, return the first valid one
 		if len(ips) > 0 {
 			clientIP := strings.TrimSpace(ips[0])
 			if isValidIP(clientIP) {
