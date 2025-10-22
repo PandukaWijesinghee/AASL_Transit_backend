@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -205,8 +206,18 @@ func (s *AuditService) logEvent(event AuditEvent) error {
 		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
 	`
 
-	// Convert details map to JSONB (Postgres will handle the conversion)
-	_, err := s.db.Exec(
+	// Marshal details map to JSON bytes for JSONB column
+	// lib/pq driver requires JSON bytes for JSONB fields, not raw map[string]interface{}
+	var detailsJSON []byte
+	var err error
+	if event.Details != nil {
+		detailsJSON, err = json.Marshal(event.Details)
+		if err != nil {
+			return fmt.Errorf("failed to marshal audit details to JSON: %w", err)
+		}
+	}
+
+	_, err = s.db.Exec(
 		query,
 		event.UserID,
 		event.Action,
@@ -214,7 +225,7 @@ func (s *AuditService) logEvent(event AuditEvent) error {
 		event.EntityID,
 		event.IPAddress,
 		event.UserAgent,
-		event.Details,
+		detailsJSON, // Pass JSON bytes instead of raw map
 	)
 
 	if err != nil {

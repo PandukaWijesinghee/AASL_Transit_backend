@@ -22,6 +22,11 @@ import (
 //   - Behind Choreo/WSO2: reads first IP from X-Forwarded-For
 //   - Behind load balancer: reads first IP from X-Forwarded-For
 //   - Development (localhost): returns 127.0.0.1
+//
+// KNOWN LIMITATION (Choreo Cloud Platform):
+// Choreo managed platform may not forward X-Forwarded-For headers.
+// In this case, the function returns Choreo's internal proxy IP (10.100.x.x).
+// This is a platform limitation - contact Choreo support to enable IP forwarding.
 func GetRealIP(c *gin.Context) string {
 	// Try X-Real-IP header first (most specific)
 	realIP := c.Request.Header.Get("X-Real-IP")
@@ -56,6 +61,8 @@ func GetRealIP(c *gin.Context) string {
 	}
 
 	// Fallback to Gin's ClientIP (handles RemoteAddr)
+	// NOTE: On Choreo cloud platform, this will return internal proxy IP (10.100.x.x)
+	// until Choreo enables X-Forwarded-For header forwarding
 	return c.ClientIP()
 }
 
