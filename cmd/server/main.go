@@ -184,9 +184,6 @@ func main() {
 	// Health check endpoint
 	router.GET("/health", healthCheckHandler(db))
 
-	// Debug endpoint - shows all request headers and IP detection
-	router.GET("/debug/headers", debugHeadersHandler())
-
 	// Set environment in context for development mode
 	router.Use(func(c *gin.Context) {
 		c.Set("environment", cfg.Server.Environment)
@@ -196,6 +193,9 @@ func main() {
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
+		// Debug endpoint - shows all request headers and IP detection (public)
+		v1.GET("/debug/headers", debugHeadersHandler())
+
 		// Authentication routes (public)
 		auth := v1.Group("/auth")
 		{
