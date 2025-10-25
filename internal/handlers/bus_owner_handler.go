@@ -105,23 +105,7 @@ func (h *BusOwnerHandler) CompleteOnboarding(c *gin.Context) {
 		return
 	}
 
-	// Get or create bus owner record
-	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
-	if err != nil {
-		if err == sql.ErrNoRows {
-			// Bus owner record doesn't exist, create it
-			busOwner, err = h.busOwnerRepo.Create(userCtx.UserID.String(), userCtx.Phone)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create bus owner profile"})
-				return
-			}
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch profile"})
-			return
-		}
-	}
-
-	// Parse request
+	// Parse request first (need company_name for bus_owner creation)
 	var req CompleteOnboardingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -134,16 +118,37 @@ func (h *BusOwnerHandler) CompleteOnboarding(c *gin.Context) {
 		return
 	}
 
-	// Update bus owner profile
-	err = h.busOwnerRepo.UpdateProfile(
-		busOwner.ID,
-		req.CompanyName,
-		req.IdentityOrIncorporationNo,
-		req.BusinessEmail,
-	)
+	// Get or create bus owner record (with company_name)
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
-		return
+		if err == sql.ErrNoRows {
+			// Bus owner record doesn't exist, create it with company info
+			busOwner, err = h.busOwnerRepo.CreateWithCompany(
+				userCtx.UserID.String(),
+				req.CompanyName,
+				req.IdentityOrIncorporationNo,
+				req.BusinessEmail,
+			)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create bus owner profile"})
+				return
+			}
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch profile"})
+			return
+		}
+	} else {
+		// Bus owner exists, update profile
+		err = h.busOwnerRepo.UpdateProfile(
+			busOwner.ID,
+			req.CompanyName,
+			req.IdentityOrIncorporationNo,
+			req.BusinessEmail,
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+			return
+		}
 	}
 
 	// Create permits (trigger will auto-set profile_completed)

@@ -18,20 +18,26 @@ func NewBusOwnerRepository(db DB) *BusOwnerRepository {
 	return &BusOwnerRepository{db: db}
 }
 
-// Create creates a new bus owner record
-func (r *BusOwnerRepository) Create(userID, phone string) (*models.BusOwner, error) {
+// CreateWithCompany creates a new bus owner record with company information
+func (r *BusOwnerRepository) CreateWithCompany(userID, companyName, identityNo string, businessEmail *string) (*models.BusOwner, error) {
 	owner := &models.BusOwner{
-		ID:                 uuid.New().String(),
-		UserID:             userID,
-		VerificationStatus: "pending",
-		ProfileCompleted:   false,
+		ID:                        uuid.New().String(),
+		UserID:                    userID,
+		VerificationStatus:        "pending",
+		ProfileCompleted:          false,
 	}
+
+	// Set company info
+	owner.CompanyName = &companyName
+	owner.IdentityOrIncorporationNo = &identityNo
+	owner.BusinessEmail = businessEmail
 
 	query := `
 		INSERT INTO bus_owners (
-			id, user_id, verification_status, profile_completed,
+			id, user_id, company_name, identity_or_incorporation_no,
+			business_email, verification_status, profile_completed,
 			created_at, updated_at
-		) VALUES ($1, $2, $3, $4, NOW(), NOW())
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
 		RETURNING created_at, updated_at
 	`
 
@@ -39,6 +45,9 @@ func (r *BusOwnerRepository) Create(userID, phone string) (*models.BusOwner, err
 		query,
 		owner.ID,
 		owner.UserID,
+		owner.CompanyName,
+		owner.IdentityOrIncorporationNo,
+		owner.BusinessEmail,
 		owner.VerificationStatus,
 		owner.ProfileCompleted,
 	).Scan(&owner.CreatedAt, &owner.UpdatedAt)
