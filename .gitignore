@@ -58,6 +58,7 @@ secrets/
 # Build artifacts
 dist/
 build/
+bin/
 
 # Choreo specific
 .choreo/tmp/

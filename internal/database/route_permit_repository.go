@@ -72,9 +72,6 @@ func (r *RoutePermitRepository) GetByID(permitID string) (*models.RoutePermit, e
 	)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("permit not found")
-		}
 		return nil, err
 	}
 
@@ -147,9 +144,6 @@ func (r *RoutePermitRepository) GetByPermitNumber(permitNumber string, busOwnerI
 	)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("permit not found")
-		}
 		return nil, err
 	}
 
@@ -293,7 +287,7 @@ func (r *RoutePermitRepository) Delete(permitID string, busOwnerID string) error
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("permit not found or unauthorized")
+		return sql.ErrNoRows
 	}
 
 	return nil
