@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/smarttransit/sms-auth-backend/internal/database"
+	"github.com/smarttransit/sms-auth-backend/internal/middleware"
 	"github.com/smarttransit/sms-auth-backend/internal/models"
 )
 
@@ -24,15 +25,15 @@ func NewPermitHandler(permitRepo *database.RoutePermitRepository, busOwnerRepo *
 // GetAllPermits retrieves all permits for the authenticated bus owner
 // GET /api/v1/permits
 func (h *PermitHandler) GetAllPermits(c *gin.Context) {
-	// Get user_id from JWT context
-	userID, exists := c.Get("user_id")
+	// Get user context from JWT middleware
+	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
 	// Get bus owner by user_id
-	busOwner, err := h.busOwnerRepo.GetByUserID(userID.(string))
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
@@ -55,15 +56,15 @@ func (h *PermitHandler) GetAllPermits(c *gin.Context) {
 // GetValidPermits retrieves only valid (non-expired) permits
 // GET /api/v1/permits/valid
 func (h *PermitHandler) GetValidPermits(c *gin.Context) {
-	// Get user_id from JWT context
-	userID, exists := c.Get("user_id")
+	// Get user context from JWT middleware
+	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
 	// Get bus owner by user_id
-	busOwner, err := h.busOwnerRepo.GetByUserID(userID.(string))
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
@@ -86,15 +87,15 @@ func (h *PermitHandler) GetValidPermits(c *gin.Context) {
 // GetPermitByID retrieves a specific permit by ID
 // GET /api/v1/permits/:id
 func (h *PermitHandler) GetPermitByID(c *gin.Context) {
-	// Get user_id from JWT context
-	userID, exists := c.Get("user_id")
+	// Get user context from JWT middleware
+	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
 	// Get bus owner by user_id
-	busOwner, err := h.busOwnerRepo.GetByUserID(userID.(string))
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
@@ -130,15 +131,15 @@ func (h *PermitHandler) GetPermitByID(c *gin.Context) {
 // CreatePermit creates a new route permit
 // POST /api/v1/permits
 func (h *PermitHandler) CreatePermit(c *gin.Context) {
-	// Get user_id from JWT context
-	userID, exists := c.Get("user_id")
+	// Get user context from JWT middleware
+	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
 	// Get bus owner by user_id
-	busOwner, err := h.busOwnerRepo.GetByUserID(userID.(string))
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
@@ -175,15 +176,15 @@ func (h *PermitHandler) CreatePermit(c *gin.Context) {
 // UpdatePermit updates an existing permit
 // PUT /api/v1/permits/:id
 func (h *PermitHandler) UpdatePermit(c *gin.Context) {
-	// Get user_id from JWT context
-	userID, exists := c.Get("user_id")
+	// Get user context from JWT middleware
+	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
 	// Get bus owner by user_id
-	busOwner, err := h.busOwnerRepo.GetByUserID(userID.(string))
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
@@ -239,15 +240,15 @@ func (h *PermitHandler) UpdatePermit(c *gin.Context) {
 // DeletePermit deletes a permit
 // DELETE /api/v1/permits/:id
 func (h *PermitHandler) DeletePermit(c *gin.Context) {
-	// Get user_id from JWT context
-	userID, exists := c.Get("user_id")
+	// Get user context from JWT middleware
+	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
 	// Get bus owner by user_id
-	busOwner, err := h.busOwnerRepo.GetByUserID(userID.(string))
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})

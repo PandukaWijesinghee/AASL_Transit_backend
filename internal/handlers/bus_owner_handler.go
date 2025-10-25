@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/smarttransit/sms-auth-backend/internal/database"
+	"github.com/smarttransit/sms-auth-backend/internal/middleware"
 	"github.com/smarttransit/sms-auth-backend/internal/models"
 )
 
@@ -24,15 +25,15 @@ func NewBusOwnerHandler(busOwnerRepo *database.BusOwnerRepository, permitRepo *d
 // GetProfile retrieves the bus owner profile
 // GET /api/v1/bus-owner/profile
 func (h *BusOwnerHandler) GetProfile(c *gin.Context) {
-	// Get user_id from JWT context
-	userID, exists := c.Get("user_id")
+	// Get user context from JWT middleware
+	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
 	// Get bus owner by user_id
-	busOwner, err := h.busOwnerRepo.GetByUserID(userID.(string))
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
@@ -48,15 +49,15 @@ func (h *BusOwnerHandler) GetProfile(c *gin.Context) {
 // CheckProfileStatus checks if bus owner has completed onboarding
 // GET /api/v1/bus-owner/profile-status
 func (h *BusOwnerHandler) CheckProfileStatus(c *gin.Context) {
-	// Get user_id from JWT context
-	userID, exists := c.Get("user_id")
+	// Get user context from JWT middleware
+	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
 	// Get bus owner by user_id
-	busOwner, err := h.busOwnerRepo.GetByUserID(userID.(string))
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
@@ -97,15 +98,15 @@ type CompleteOnboardingRequest struct {
 // CompleteOnboarding handles the complete onboarding process
 // POST /api/v1/bus-owner/complete-onboarding
 func (h *BusOwnerHandler) CompleteOnboarding(c *gin.Context) {
-	// Get user_id from JWT context
-	userID, exists := c.Get("user_id")
+	// Get user context from JWT middleware
+	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
 	// Get bus owner by user_id
-	busOwner, err := h.busOwnerRepo.GetByUserID(userID.(string))
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
@@ -159,7 +160,7 @@ func (h *BusOwnerHandler) CompleteOnboarding(c *gin.Context) {
 	}
 
 	// Fetch updated profile (should have profile_completed = true now)
-	updatedProfile, err := h.busOwnerRepo.GetByUserID(userID.(string))
+	updatedProfile, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch updated profile"})
 		return
