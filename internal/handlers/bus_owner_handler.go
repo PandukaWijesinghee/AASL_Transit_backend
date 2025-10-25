@@ -105,15 +105,20 @@ func (h *BusOwnerHandler) CompleteOnboarding(c *gin.Context) {
 		return
 	}
 
-	// Get bus owner by user_id
+	// Get or create bus owner record
 	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
 	if err != nil {
 		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
+			// Bus owner record doesn't exist, create it
+			busOwner, err = h.busOwnerRepo.Create(userCtx.UserID.String(), userCtx.Phone)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create bus owner profile"})
+				return
+			}
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch profile"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch profile"})
-		return
 	}
 
 	// Parse request

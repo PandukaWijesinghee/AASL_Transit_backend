@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/smarttransit/sms-auth-backend/internal/models"
 )
 
@@ -15,6 +16,38 @@ type BusOwnerRepository struct {
 // NewBusOwnerRepository creates a new BusOwnerRepository
 func NewBusOwnerRepository(db DB) *BusOwnerRepository {
 	return &BusOwnerRepository{db: db}
+}
+
+// Create creates a new bus owner record
+func (r *BusOwnerRepository) Create(userID, phone string) (*models.BusOwner, error) {
+	owner := &models.BusOwner{
+		ID:                 uuid.New().String(),
+		UserID:             userID,
+		VerificationStatus: "pending",
+		ProfileCompleted:   false,
+	}
+
+	query := `
+		INSERT INTO bus_owners (
+			id, user_id, verification_status, profile_completed,
+			created_at, updated_at
+		) VALUES ($1, $2, $3, $4, NOW(), NOW())
+		RETURNING created_at, updated_at
+	`
+
+	err := r.db.QueryRow(
+		query,
+		owner.ID,
+		owner.UserID,
+		owner.VerificationStatus,
+		owner.ProfileCompleted,
+	).Scan(&owner.CreatedAt, &owner.UpdatedAt)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create bus owner: %w", err)
+	}
+
+	return owner, nil
 }
 
 // GetByID retrieves bus owner by ID
@@ -76,9 +109,6 @@ func (r *BusOwnerRepository) GetByUserID(userID string) (*models.BusOwner, error
 	)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("bus owner not found")
-		}
 		return nil, err
 	}
 
