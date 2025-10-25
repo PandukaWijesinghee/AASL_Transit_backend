@@ -40,6 +40,10 @@ tags:
     description: User profile management
   - name: Staff
     description: Staff registration and management
+  - name: Bus Owner
+    description: Bus owner profile and onboarding management
+  - name: Permits
+    description: Route permit management
 
 paths:
   # ============================================================================
@@ -774,6 +778,342 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  # ============================================================================
+  # Bus Owner Endpoints
+  # ============================================================================
+  /api/v1/bus-owner/profile:
+    get:
+      summary: Get bus owner profile
+      description: Retrieve the authenticated bus owner's profile
+      operationId: getBusOwnerProfile
+      tags:
+        - Bus Owner
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusOwnerProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/bus-owner/profile-status:
+    get:
+      summary: Check bus owner profile completion status
+      description: Check if the bus owner has completed onboarding
+      operationId: checkBusOwnerProfileStatus
+      tags:
+        - Bus Owner
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile_completed:
+                    type: boolean
+                    example: false
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/bus-owner/complete-onboarding:
+    post:
+      summary: Complete bus owner onboarding
+      description: Submit company information and route permits to complete onboarding
+      operationId: completeBusOwnerOnboarding
+      tags:
+        - Bus Owner
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - company_name
+                - identity_or_incorporation_no
+                - permits
+              properties:
+                company_name:
+                  type: string
+                  example: "ABC Transport Services"
+                identity_or_incorporation_no:
+                  type: string
+                  example: "PV-2023-1234"
+                business_email:
+                  type: string
+                  format: email
+                  example: "info@abctransport.lk"
+                permits:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - permit_number
+                      - bus_registration_number
+                      - route_number
+                      - from_city
+                      - to_city
+                      - approved_fare
+                      - validity_from
+                      - validity_to
+                    properties:
+                      permit_number:
+                        type: string
+                        example: "PERMIT-2025-001"
+                      bus_registration_number:
+                        type: string
+                        example: "WP CAB-1234"
+                      route_number:
+                        type: string
+                        example: "138"
+                      from_city:
+                        type: string
+                        example: "Colombo"
+                      to_city:
+                        type: string
+                        example: "Kandy"
+                      via:
+                        type: string
+                        example: "Kadawatha, Kegalle"
+                      approved_fare:
+                        type: number
+                        example: 250.00
+                      validity_from:
+                        type: string
+                        format: date
+                        example: "2025-01-01"
+                      validity_to:
+                        type: string
+                        format: date
+                        example: "2025-12-31"
+      responses:
+        "200":
+          description: Onboarding completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Onboarding completed successfully
+                  profile_completed:
+                    type: boolean
+                    example: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================================
+  # Permit Endpoints
+  # ============================================================================
+  /api/v1/permits:
+    get:
+      summary: Get all permits
+      description: Retrieve all route permits for authenticated bus owner
+      operationId: getAllPermits
+      tags:
+        - Permits
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Permits retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  permits:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RoutePermit"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      summary: Create new permit
+      description: Create a new route permit
+      operationId: createPermit
+      tags:
+        - Permits
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePermitRequest"
+      responses:
+        "201":
+          description: Permit created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Permit created successfully
+                  permit:
+                    $ref: "#/components/schemas/RoutePermit"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/permits/valid:
+    get:
+      summary: Get valid permits
+      description: Retrieve only valid (non-expired) route permits
+      operationId: getValidPermits
+      tags:
+        - Permits
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Valid permits retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  permits:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RoutePermit"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/permits/{id}:
+    get:
+      summary: Get permit by ID
+      description: Retrieve a specific route permit by ID
+      operationId: getPermitById
+      tags:
+        - Permits
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Permit retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutePermit"
+        "404":
+          description: Permit not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    put:
+      summary: Update permit
+      description: Update an existing route permit
+      operationId: updatePermit
+      tags:
+        - Permits
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePermitRequest"
+      responses:
+        "200":
+          description: Permit updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Permit updated successfully
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: Permit not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      summary: Delete permit
+      description: Delete a route permit
+      operationId: deletePermit
+      tags:
+        - Permits
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Permit deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Permit deleted successfully
+        "404":
+          description: Permit not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 # ============================================================================
 # Components (Schemas, Responses, SecuritySchemes)
 # ============================================================================
@@ -939,6 +1279,152 @@ components:
         details:
           type: string
           example: Phone number is required
+
+    BusOwnerProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        user_id:
+          type: string
+          format: uuid
+        company_name:
+          type: string
+          example: "ABC Transport Services"
+        identity_or_incorporation_no:
+          type: string
+          example: "PV-2023-1234"
+        business_email:
+          type: string
+          format: email
+          example: "info@abctransport.lk"
+        profile_completed:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    RoutePermit:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        bus_owner_id:
+          type: string
+          format: uuid
+        permit_number:
+          type: string
+          example: "PERMIT-2025-001"
+        bus_registration_number:
+          type: string
+          example: "WP CAB-1234"
+        route_number:
+          type: string
+          example: "138"
+        route_name:
+          type: string
+          example: "Colombo - Kandy Express"
+        full_origin_city:
+          type: string
+          example: "Colombo"
+        full_destination_city:
+          type: string
+          example: "Kandy"
+        via:
+          type: array
+          items:
+            type: string
+          example: ["Kadawatha", "Kegalle"]
+        approved_fare:
+          type: number
+          format: double
+          example: 250.00
+        issue_date:
+          type: string
+          format: date
+          example: "2025-01-01"
+        expiry_date:
+          type: string
+          format: date
+          example: "2025-12-31"
+        status:
+          type: string
+          enum: [pending, verified, rejected]
+          example: "verified"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreatePermitRequest:
+      type: object
+      required:
+        - permit_number
+        - bus_registration_number
+        - route_number
+        - from_city
+        - to_city
+        - approved_fare
+        - validity_from
+        - validity_to
+      properties:
+        permit_number:
+          type: string
+          example: "PERMIT-2025-001"
+        bus_registration_number:
+          type: string
+          example: "WP CAB-1234"
+        route_number:
+          type: string
+          example: "138"
+        from_city:
+          type: string
+          example: "Colombo"
+        to_city:
+          type: string
+          example: "Kandy"
+        via:
+          type: string
+          example: "Kadawatha, Kegalle"
+        approved_fare:
+          type: number
+          format: double
+          example: 250.00
+        validity_from:
+          type: string
+          format: date
+          example: "2025-01-01"
+        validity_to:
+          type: string
+          format: date
+          example: "2025-12-31"
+
+    UpdatePermitRequest:
+      type: object
+      properties:
+        bus_registration_number:
+          type: string
+          example: "WP CAB-1234"
+        via:
+          type: string
+          example: "Kadawatha, Kegalle"
+        approved_fare:
+          type: number
+          format: double
+          example: 250.00
+        validity_to:
+          type: string
+          format: date
+          example: "2025-12-31"
 
   responses:
     BadRequest:
