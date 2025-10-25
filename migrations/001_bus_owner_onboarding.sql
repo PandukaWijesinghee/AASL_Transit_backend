@@ -194,10 +194,10 @@ BEGIN
     SET profile_completed = TRUE
     WHERE id = NEW.bus_owner_id
     AND profile_completed = FALSE
-    AND EXISTS (
-        SELECT 1 FROM route_permits
+    AND (
+        SELECT COUNT(*) FROM route_permits
         WHERE bus_owner_id = NEW.bus_owner_id
-    );
+    ) = 1;
 
     RETURN NEW;
 END;

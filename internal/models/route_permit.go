@@ -3,6 +3,7 @@ package models
 import (
 	"database/sql/driver"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/lib/pq"
@@ -57,7 +58,7 @@ func (p *RoutePermit) IsValid() bool {
 	now := time.Now()
 	return p.Status == VerificationVerified &&
 		now.After(p.IssueDate) &&
-		now.Before(p.ExpiryDate)
+		!now.After(p.ExpiryDate)
 }
 
 // IsExpiringSoon checks if the permit is expiring within 30 days
@@ -241,7 +242,7 @@ func NewRoutePermitFromRequest(busOwnerID string, req *CreateRoutePermitRequest)
 func splitAndTrim(s string, delimiter string) []string {
 	parts := make([]string, 0)
 	for _, part := range split(s, delimiter) {
-		trimmed := trimSpace(part)
+		trimmed := strings.TrimSpace(part)
 		if trimmed != "" {
 			parts = append(parts, trimmed)
 		}
@@ -265,22 +266,4 @@ func split(s, sep string) []string {
 	}
 	result = append(result, s[start:])
 	return result
-}
-
-// Helper to trim whitespace
-func trimSpace(s string) string {
-	start := 0
-	end := len(s)
-
-	// Trim leading whitespace
-	for start < end && (s[start] == ' ' || s[start] == '\t' || s[start] == '\n' || s[start] == '\r') {
-		start++
-	}
-
-	// Trim trailing whitespace
-	for end > start && (s[end-1] == ' ' || s[end-1] == '\t' || s[end-1] == '\n' || s[end-1] == '\r') {
-		end--
-	}
-
-	return s[start:end]
 }
