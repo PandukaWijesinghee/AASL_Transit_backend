@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
 
@@ -215,6 +216,7 @@ func NewRoutePermitFromRequest(busOwnerID string, req *CreateRoutePermitRequest)
 	}
 
 	return &RoutePermit{
+		ID:                       uuid.New().String(),
 		BusOwnerID:               busOwnerID,
 		PermitNumber:             req.PermitNumber,
 		BusRegistrationNumber:    req.BusRegistrationNumber,
