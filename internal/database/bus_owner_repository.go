@@ -20,11 +20,12 @@ func NewBusOwnerRepository(db DB) *BusOwnerRepository {
 // GetByID retrieves bus owner by ID
 func (r *BusOwnerRepository) GetByID(ownerID string) (*models.BusOwner, error) {
 	query := `
-		SELECT 
+		SELECT
 			id, user_id, company_name, license_number, contact_person,
 			address, city, state, country, postal_code, verification_status,
 			verification_documents, business_email, business_phone, tax_id,
-			bank_account_details, total_buses, created_at, updated_at
+			bank_account_details, total_buses, profile_completed,
+			identity_or_incorporation_no, created_at, updated_at
 		FROM bus_owners
 		WHERE id = $1
 	`
@@ -36,6 +37,7 @@ func (r *BusOwnerRepository) GetByID(ownerID string) (*models.BusOwner, error) {
 		&owner.Country, &owner.PostalCode, &owner.VerificationStatus,
 		&owner.VerificationDocuments, &owner.BusinessEmail, &owner.BusinessPhone,
 		&owner.TaxID, &owner.BankAccountDetails, &owner.TotalBuses,
+		&owner.ProfileCompleted, &owner.IdentityOrIncorporationNo,
 		&owner.CreatedAt, &owner.UpdatedAt,
 	)
 
@@ -52,11 +54,12 @@ func (r *BusOwnerRepository) GetByID(ownerID string) (*models.BusOwner, error) {
 // GetByUserID retrieves bus owner by user_id
 func (r *BusOwnerRepository) GetByUserID(userID string) (*models.BusOwner, error) {
 	query := `
-		SELECT 
+		SELECT
 			id, user_id, company_name, license_number, contact_person,
 			address, city, state, country, postal_code, verification_status,
 			verification_documents, business_email, business_phone, tax_id,
-			bank_account_details, total_buses, created_at, updated_at
+			bank_account_details, total_buses, profile_completed,
+			identity_or_incorporation_no, created_at, updated_at
 		FROM bus_owners
 		WHERE user_id = $1
 	`
@@ -68,6 +71,7 @@ func (r *BusOwnerRepository) GetByUserID(userID string) (*models.BusOwner, error
 		&owner.Country, &owner.PostalCode, &owner.VerificationStatus,
 		&owner.VerificationDocuments, &owner.BusinessEmail, &owner.BusinessPhone,
 		&owner.TaxID, &owner.BankAccountDetails, &owner.TotalBuses,
+		&owner.ProfileCompleted, &owner.IdentityOrIncorporationNo,
 		&owner.CreatedAt, &owner.UpdatedAt,
 	)
 
@@ -84,11 +88,12 @@ func (r *BusOwnerRepository) GetByUserID(userID string) (*models.BusOwner, error
 // GetByLicenseNumber retrieves bus owner by license number (can be used as "code")
 func (r *BusOwnerRepository) GetByLicenseNumber(licenseNumber string) (*models.BusOwner, error) {
 	query := `
-		SELECT 
+		SELECT
 			id, user_id, company_name, license_number, contact_person,
 			address, city, state, country, postal_code, verification_status,
 			verification_documents, business_email, business_phone, tax_id,
-			bank_account_details, total_buses, created_at, updated_at
+			bank_account_details, total_buses, profile_completed,
+			identity_or_incorporation_no, created_at, updated_at
 		FROM bus_owners
 		WHERE license_number = $1 AND verification_status = 'verified'
 	`
@@ -100,6 +105,7 @@ func (r *BusOwnerRepository) GetByLicenseNumber(licenseNumber string) (*models.B
 		&owner.Country, &owner.PostalCode, &owner.VerificationStatus,
 		&owner.VerificationDocuments, &owner.BusinessEmail, &owner.BusinessPhone,
 		&owner.TaxID, &owner.BankAccountDetails, &owner.TotalBuses,
+		&owner.ProfileCompleted, &owner.IdentityOrIncorporationNo,
 		&owner.CreatedAt, &owner.UpdatedAt,
 	)
 
@@ -116,11 +122,12 @@ func (r *BusOwnerRepository) GetByLicenseNumber(licenseNumber string) (*models.B
 // SearchByCompanyName searches bus owners by company name
 func (r *BusOwnerRepository) SearchByCompanyName(name string) ([]*models.BusOwner, error) {
 	query := `
-		SELECT 
+		SELECT
 			id, user_id, company_name, license_number, contact_person,
 			address, city, state, country, postal_code, verification_status,
 			verification_documents, business_email, business_phone, tax_id,
-			bank_account_details, total_buses, created_at, updated_at
+			bank_account_details, total_buses, profile_completed,
+			identity_or_incorporation_no, created_at, updated_at
 		FROM bus_owners
 		WHERE company_name ILIKE $1 AND verification_status = 'verified'
 		ORDER BY company_name
@@ -142,6 +149,7 @@ func (r *BusOwnerRepository) SearchByCompanyName(name string) ([]*models.BusOwne
 			&owner.Country, &owner.PostalCode, &owner.VerificationStatus,
 			&owner.VerificationDocuments, &owner.BusinessEmail, &owner.BusinessPhone,
 			&owner.TaxID, &owner.BankAccountDetails, &owner.TotalBuses,
+			&owner.ProfileCompleted, &owner.IdentityOrIncorporationNo,
 			&owner.CreatedAt, &owner.UpdatedAt,
 		)
 		if err != nil {
@@ -156,11 +164,12 @@ func (r *BusOwnerRepository) SearchByCompanyName(name string) ([]*models.BusOwne
 // GetAllVerified retrieves all verified bus owners
 func (r *BusOwnerRepository) GetAllVerified() ([]*models.BusOwner, error) {
 	query := `
-		SELECT 
+		SELECT
 			id, user_id, company_name, license_number, contact_person,
 			address, city, state, country, postal_code, verification_status,
 			verification_documents, business_email, business_phone, tax_id,
-			bank_account_details, total_buses, created_at, updated_at
+			bank_account_details, total_buses, profile_completed,
+			identity_or_incorporation_no, created_at, updated_at
 		FROM bus_owners
 		WHERE verification_status = 'verified'
 		ORDER BY company_name
@@ -181,6 +190,7 @@ func (r *BusOwnerRepository) GetAllVerified() ([]*models.BusOwner, error) {
 			&owner.Country, &owner.PostalCode, &owner.VerificationStatus,
 			&owner.VerificationDocuments, &owner.BusinessEmail, &owner.BusinessPhone,
 			&owner.TaxID, &owner.BankAccountDetails, &owner.TotalBuses,
+			&owner.ProfileCompleted, &owner.IdentityOrIncorporationNo,
 			&owner.CreatedAt, &owner.UpdatedAt,
 		)
 		if err != nil {
@@ -190,4 +200,32 @@ func (r *BusOwnerRepository) GetAllVerified() ([]*models.BusOwner, error) {
 	}
 
 	return owners, nil
+}
+
+// UpdateProfile updates bus owner's company profile information
+func (r *BusOwnerRepository) UpdateProfile(busOwnerID string, companyName, identityNo string, businessEmail *string) error {
+	query := `
+		UPDATE bus_owners
+		SET company_name = $1,
+		    identity_or_incorporation_no = $2,
+		    business_email = $3,
+		    updated_at = NOW()
+		WHERE id = $4
+	`
+
+	result, err := r.db.Exec(query, companyName, identityNo, businessEmail, busOwnerID)
+	if err != nil {
+		return fmt.Errorf("failed to update bus owner profile: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("bus owner not found")
+	}
+
+	return nil
 }
