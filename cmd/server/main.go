@@ -91,6 +91,7 @@ func main() {
 	staffRepository := database.NewBusStaffRepository(db)
 	ownerRepository := database.NewBusOwnerRepository(db)
 	permitRepository := database.NewRoutePermitRepository(db)
+	busRepository := database.NewBusRepository(db)
 
 	// Initialize staff service
 	staffService := services.NewStaffService(staffRepository, ownerRepository, userRepository)
@@ -167,6 +168,7 @@ func main() {
 	// Initialize bus owner and permit handlers
 	busOwnerHandler := handlers.NewBusOwnerHandler(ownerRepository, permitRepository)
 	permitHandler := handlers.NewPermitHandler(permitRepository, ownerRepository)
+	busHandler := handlers.NewBusHandler(busRepository, permitRepository)
 
 	// Initialize Gin router
 	router := gin.New()
@@ -263,6 +265,18 @@ func main() {
 			permits.POST("", permitHandler.CreatePermit)
 			permits.PUT("/:id", permitHandler.UpdatePermit)
 			permits.DELETE("/:id", permitHandler.DeletePermit)
+		}
+
+		// Bus routes (all protected)
+		buses := v1.Group("/buses")
+		buses.Use(middleware.AuthMiddleware(jwtService))
+		{
+			buses.GET("", busHandler.GetAllBuses)
+			buses.GET("/:id", busHandler.GetBusByID)
+			buses.POST("", busHandler.CreateBus)
+			buses.PUT("/:id", busHandler.UpdateBus)
+			buses.DELETE("/:id", busHandler.DeleteBus)
+			buses.GET("/status/:status", busHandler.GetBusesByStatus)
 		}
 	}
 

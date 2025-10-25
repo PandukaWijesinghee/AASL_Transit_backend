@@ -44,6 +44,8 @@ tags:
     description: Bus owner profile and onboarding management
   - name: Permits
     description: Route permit management
+  - name: Buses
+    description: Bus registration and management
 
 paths:
   # ============================================================================
@@ -1114,6 +1116,200 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  # ============================================================================
+  # Bus Endpoints
+  # ============================================================================
+  /api/v1/buses:
+    get:
+      summary: Get all buses
+      description: Retrieve all buses owned by the authenticated bus owner
+      operationId: getAllBuses
+      tags:
+        - Buses
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of buses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      summary: Create new bus
+      description: Register a new bus under a route permit
+      operationId: createBus
+      tags:
+        - Buses
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBusRequest"
+      responses:
+        "201":
+          description: Bus created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bus"
+        "400":
+          description: Invalid request or validation error
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Permit not found
+        "409":
+          description: Bus already registered under this permit
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/buses/{id}:
+    get:
+      summary: Get bus by ID
+      description: Retrieve a specific bus by ID
+      operationId: getBusById
+      tags:
+        - Buses
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Bus details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Permission denied (bus belongs to another owner)
+        "404":
+          description: Bus not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    put:
+      summary: Update bus
+      description: Update bus information
+      operationId: updateBus
+      tags:
+        - Buses
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBusRequest"
+      responses:
+        "200":
+          description: Bus updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bus"
+        "400":
+          description: Invalid request
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Permission denied
+        "404":
+          description: Bus not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      summary: Delete bus
+      description: Delete a bus
+      operationId: deleteBus
+      tags:
+        - Buses
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Bus deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Bus deleted successfully
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Bus not found or permission denied
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/buses/status/{status}:
+    get:
+      summary: Get buses by status
+      description: Retrieve buses filtered by operational status
+      operationId: getBusesByStatus
+      tags:
+        - Buses
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [active, maintenance, inactive]
+      responses:
+        "200":
+          description: List of buses with specified status
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bus"
+        "400":
+          description: Invalid status parameter
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 # ============================================================================
 # Components (Schemas, Responses, SecuritySchemes)
 # ============================================================================
@@ -1425,6 +1621,191 @@ components:
           type: string
           format: date
           example: "2025-12-31"
+
+    Bus:
+      type: object
+      required:
+        - id
+        - bus_owner_id
+        - permit_id
+        - bus_number
+        - license_plate
+        - bus_type
+        - total_seats
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        bus_owner_id:
+          type: string
+          format: uuid
+          example: "b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        permit_id:
+          type: string
+          format: uuid
+          example: "c2eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        bus_number:
+          type: string
+          example: "BUS-001"
+        license_plate:
+          type: string
+          example: "WP CAB-1234"
+        bus_type:
+          type: string
+          enum: [normal, luxury, semi_luxury, super_luxury]
+          example: "luxury"
+        total_seats:
+          type: integer
+          example: 45
+        manufacturing_year:
+          type: integer
+          example: 2020
+        last_maintenance_date:
+          type: string
+          format: date
+          example: "2025-01-15"
+        insurance_expiry:
+          type: string
+          format: date
+          example: "2025-12-31"
+        status:
+          type: string
+          enum: [active, maintenance, inactive]
+          example: "active"
+        has_wifi:
+          type: boolean
+          example: true
+        has_ac:
+          type: boolean
+          example: true
+        has_charging_ports:
+          type: boolean
+          example: true
+        has_entertainment:
+          type: boolean
+          example: false
+        has_refreshments:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-01-01T10:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2025-01-01T10:00:00Z"
+
+    CreateBusRequest:
+      type: object
+      required:
+        - permit_id
+        - bus_number
+        - bus_type
+        - total_seats
+      properties:
+        permit_id:
+          type: string
+          format: uuid
+          example: "c2eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        bus_number:
+          type: string
+          example: "BUS-001"
+        bus_type:
+          type: string
+          enum: [normal, luxury, semi_luxury, super_luxury]
+          example: "luxury"
+        total_seats:
+          type: integer
+          minimum: 1
+          example: 45
+        manufacturing_year:
+          type: integer
+          minimum: 1900
+          example: 2020
+        last_maintenance_date:
+          type: string
+          format: date
+          example: "2025-01-15"
+        insurance_expiry:
+          type: string
+          format: date
+          example: "2025-12-31"
+        status:
+          type: string
+          enum: [active, maintenance, inactive]
+          default: active
+          example: "active"
+        has_wifi:
+          type: boolean
+          default: false
+          example: true
+        has_ac:
+          type: boolean
+          default: false
+          example: true
+        has_charging_ports:
+          type: boolean
+          default: false
+          example: true
+        has_entertainment:
+          type: boolean
+          default: false
+          example: false
+        has_refreshments:
+          type: boolean
+          default: false
+          example: true
+
+    UpdateBusRequest:
+      type: object
+      properties:
+        bus_number:
+          type: string
+          example: "BUS-001"
+        bus_type:
+          type: string
+          enum: [normal, luxury, semi_luxury, super_luxury]
+          example: "luxury"
+        total_seats:
+          type: integer
+          minimum: 1
+          example: 45
+        manufacturing_year:
+          type: integer
+          minimum: 1900
+          example: 2020
+        last_maintenance_date:
+          type: string
+          format: date
+          example: "2025-01-15"
+        insurance_expiry:
+          type: string
+          format: date
+          example: "2025-12-31"
+        status:
+          type: string
+          enum: [active, maintenance, inactive]
+          example: "maintenance"
+        has_wifi:
+          type: boolean
+          example: true
+        has_ac:
+          type: boolean
+          example: true
+        has_charging_ports:
+          type: boolean
+          example: true
+        has_entertainment:
+          type: boolean
+          example: false
+        has_refreshments:
+          type: boolean
+          example: true
 
   responses:
     BadRequest:
