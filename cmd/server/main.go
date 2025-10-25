@@ -90,6 +90,7 @@ func main() {
 	// Initialize staff-related repositories
 	staffRepository := database.NewBusStaffRepository(db)
 	ownerRepository := database.NewBusOwnerRepository(db)
+	permitRepository := database.NewRoutePermitRepository(db)
 
 	// Initialize staff service
 	staffService := services.NewStaffService(staffRepository, ownerRepository, userRepository)
@@ -162,6 +163,10 @@ func main() {
 
 	// Initialize staff handler
 	staffHandler := handlers.NewStaffHandler(staffService, userRepository, staffRepository)
+
+	// Initialize bus owner and permit handlers
+	busOwnerHandler := handlers.NewBusOwnerHandler(ownerRepository, permitRepository)
+	permitHandler := handlers.NewPermitHandler(permitRepository, ownerRepository)
 
 	// Initialize Gin router
 	router := gin.New()
@@ -237,6 +242,27 @@ func main() {
 				staffProtected.GET("/profile", staffHandler.GetProfile)
 				staffProtected.PUT("/profile", staffHandler.UpdateProfile)
 			}
+		}
+
+		// Bus Owner routes (all protected)
+		busOwner := v1.Group("/bus-owner")
+		busOwner.Use(middleware.AuthMiddleware(jwtService))
+		{
+			busOwner.GET("/profile", busOwnerHandler.GetProfile)
+			busOwner.GET("/profile-status", busOwnerHandler.CheckProfileStatus)
+			busOwner.POST("/complete-onboarding", busOwnerHandler.CompleteOnboarding)
+		}
+
+		// Permit routes (all protected)
+		permits := v1.Group("/permits")
+		permits.Use(middleware.AuthMiddleware(jwtService))
+		{
+			permits.GET("", permitHandler.GetAllPermits)
+			permits.GET("/valid", permitHandler.GetValidPermits)
+			permits.GET("/:id", permitHandler.GetPermitByID)
+			permits.POST("", permitHandler.CreatePermit)
+			permits.PUT("/:id", permitHandler.UpdatePermit)
+			permits.DELETE("/:id", permitHandler.DeletePermit)
 		}
 	}
 

@@ -43,7 +43,8 @@ func (j *JSONB) Scan(value interface{}) error {
 type BusOwner struct {
 	ID                         string             `json:"id" db:"id"`
 	UserID                     string             `json:"user_id" db:"user_id"`
-	CompanyName                string             `json:"company_name" db:"company_name"`
+	CompanyName                *string            `json:"company_name,omitempty" db:"company_name"`
+	LicenseNumber              *string            `json:"license_number,omitempty" db:"license_number"` // DEPRECATED: Use IdentityOrIncorporationNo
 	IdentityOrIncorporationNo  *string            `json:"identity_or_incorporation_no,omitempty" db:"identity_or_incorporation_no"`
 	ContactPerson              *string            `json:"contact_person,omitempty" db:"contact_person"`
 	Address                    *string            `json:"address,omitempty" db:"address"`
@@ -66,7 +67,7 @@ type BusOwner struct {
 // BusOwnerPublicInfo represents public information about a bus owner (for search results)
 type BusOwnerPublicInfo struct {
 	ID                 string             `json:"id"`
-	CompanyName        string             `json:"company_name"`
+	CompanyName        *string            `json:"company_name,omitempty"`
 	ContactPerson      *string            `json:"contact_person,omitempty"`
 	City               *string            `json:"city,omitempty"`
 	VerificationStatus VerificationStatus `json:"verification_status"`

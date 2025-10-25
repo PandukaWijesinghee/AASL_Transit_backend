@@ -2,7 +2,6 @@ package models
 
 import (
 	"database/sql/driver"
-	"encoding/json"
 	"errors"
 	"time"
 
@@ -166,4 +165,122 @@ type RoutePermitStop struct {
 	ArrivalTimeOffsetMins  *int       `json:"arrival_time_offset_minutes,omitempty" db:"arrival_time_offset_minutes"`
 	IsMajorStop            bool       `json:"is_major_stop" db:"is_major_stop"`
 	CreatedAt              time.Time  `json:"created_at" db:"created_at"`
+}
+
+// NewRoutePermitFromRequest creates a RoutePermit from a CreateRoutePermitRequest
+func NewRoutePermitFromRequest(busOwnerID string, req *CreateRoutePermitRequest) (*RoutePermit, error) {
+	// Validate request
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	// Parse dates
+	issueDate, err := time.Parse("2006-01-02", req.ValidityFrom)
+	if err != nil {
+		return nil, errors.New("invalid validity_from date format")
+	}
+
+	expiryDate, err := time.Parse("2006-01-02", req.ValidityTo)
+	if err != nil {
+		return nil, errors.New("invalid validity_to date format")
+	}
+
+	// Parse via string to array
+	var via StringArray
+	if req.Via != nil && *req.Via != "" {
+		// Split by comma and trim spaces
+		parts := make([]string, 0)
+		for _, part := range splitAndTrim(*req.Via, ",") {
+			if part != "" {
+				parts = append(parts, part)
+			}
+		}
+		via = StringArray(parts)
+	}
+
+	// Default permit type
+	permitType := "regular"
+	if req.PermitType != nil && *req.PermitType != "" {
+		permitType = *req.PermitType
+	}
+
+	// Create route name from origin and destination
+	routeName := req.FromCity + " - " + req.ToCity
+
+	// Convert allowed bus types
+	var allowedBusTypes StringArray
+	if len(req.AllowedBusTypes) > 0 {
+		allowedBusTypes = StringArray(req.AllowedBusTypes)
+	}
+
+	return &RoutePermit{
+		BusOwnerID:               busOwnerID,
+		PermitNumber:             req.PermitNumber,
+		BusRegistrationNumber:    req.BusRegistrationNumber,
+		RouteNumber:              req.RouteNumber,
+		RouteName:                routeName,
+		FullOriginCity:           req.FromCity,
+		FullDestinationCity:      req.ToCity,
+		Via:                      via,
+		ApprovedFare:             req.ApprovedFare,
+		IssueDate:                issueDate,
+		ExpiryDate:               expiryDate,
+		PermitType:               permitType,
+		TotalDistanceKm:          req.TotalDistanceKm,
+		EstimatedDurationMinutes: req.EstimatedDuration,
+		MaxTripsPerDay:           req.MaxTripsPerDay,
+		AllowedBusTypes:          allowedBusTypes,
+		Restrictions:             req.Restrictions,
+		Status:                   VerificationPending,
+		CreatedAt:                time.Now(),
+		UpdatedAt:                time.Now(),
+	}, nil
+}
+
+// Helper function to split string by delimiter and trim spaces
+func splitAndTrim(s string, delimiter string) []string {
+	parts := make([]string, 0)
+	for _, part := range split(s, delimiter) {
+		trimmed := trimSpace(part)
+		if trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return parts
+}
+
+// Helper to split string
+func split(s, sep string) []string {
+	if s == "" {
+		return []string{}
+	}
+	result := make([]string, 0)
+	start := 0
+	for i := 0; i < len(s); i++ {
+		if i+len(sep) <= len(s) && s[i:i+len(sep)] == sep {
+			result = append(result, s[start:i])
+			start = i + len(sep)
+			i += len(sep) - 1
+		}
+	}
+	result = append(result, s[start:])
+	return result
+}
+
+// Helper to trim whitespace
+func trimSpace(s string) string {
+	start := 0
+	end := len(s)
+
+	// Trim leading whitespace
+	for start < end && (s[start] == ' ' || s[start] == '\t' || s[start] == '\n' || s[start] == '\r') {
+		start++
+	}
+
+	// Trim trailing whitespace
+	for end > start && (s[end-1] == ' ' || s[end-1] == '\t' || s[end-1] == '\n' || s[end-1] == '\r') {
+		end--
+	}
+
+	return s[start:end]
 }
