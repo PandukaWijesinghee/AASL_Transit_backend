@@ -70,6 +70,17 @@ func (h *BusHandler) GetBusByID(c *gin.Context) {
 
 	busID := c.Param("id")
 
+	// Get bus owner record for this user
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get bus owner profile"})
+		return
+	}
+
 	// Get bus
 	bus, err := h.busRepo.GetByID(busID)
 	if err != nil {
@@ -81,8 +92,8 @@ func (h *BusHandler) GetBusByID(c *gin.Context) {
 		return
 	}
 
-	// Verify ownership
-	if bus.BusOwnerID != userCtx.UserID.String() {
+	// Verify ownership (compare bus_owner_id with bus_owner_id)
+	if bus.BusOwnerID != busOwner.ID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to access this bus"})
 		return
 	}
@@ -184,7 +195,7 @@ func (h *BusHandler) CreateBus(c *gin.Context) {
 	// Create bus
 	bus := &models.Bus{
 		ID:                  uuid.New().String(),
-		BusOwnerID:          userCtx.UserID.String(),
+		BusOwnerID:          busOwner.ID, // Use bus_owner_id, NOT user_id!
 		PermitID:            req.PermitID,
 		BusNumber:           req.BusNumber,
 		LicensePlate:        permit.BusRegistrationNumber, // Get from permit
@@ -234,6 +245,17 @@ func (h *BusHandler) UpdateBus(c *gin.Context) {
 		return
 	}
 
+	// Get bus owner record for this user
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get bus owner profile"})
+		return
+	}
+
 	// Verify bus exists and belongs to this owner
 	bus, err := h.busRepo.GetByID(busID)
 	if err != nil {
@@ -245,8 +267,8 @@ func (h *BusHandler) UpdateBus(c *gin.Context) {
 		return
 	}
 
-	// Verify ownership
-	if bus.BusOwnerID != userCtx.UserID.String() {
+	// Verify ownership (compare bus_owner_id with bus_owner_id)
+	if bus.BusOwnerID != busOwner.ID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to update this bus"})
 		return
 	}
@@ -280,8 +302,19 @@ func (h *BusHandler) DeleteBus(c *gin.Context) {
 
 	busID := c.Param("id")
 
-	// Delete bus (repository verifies ownership)
-	err := h.busRepo.Delete(busID, userCtx.UserID.String())
+	// Get bus owner record for this user
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get bus owner profile"})
+		return
+	}
+
+	// Delete bus (repository verifies ownership using bus_owner_id)
+	err = h.busRepo.Delete(busID, busOwner.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Bus not found or you don't have permission to delete it"})
@@ -314,8 +347,20 @@ func (h *BusHandler) GetBusesByStatus(c *gin.Context) {
 		return
 	}
 
-	// Get buses by status
-	buses, err := h.busRepo.GetByStatus(userCtx.UserID.String(), status)
+	// Get bus owner record for this user
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// Bus owner doesn't exist yet, return empty list
+			c.JSON(http.StatusOK, []interface{}{})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get bus owner profile"})
+		return
+	}
+
+	// Get buses by status (using bus_owner_id, NOT user_id!)
+	buses, err := h.busRepo.GetByStatus(busOwner.ID, status)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch buses"})
 		return
