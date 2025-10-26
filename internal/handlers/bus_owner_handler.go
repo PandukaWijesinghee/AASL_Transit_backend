@@ -2,9 +2,12 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/smarttransit/sms-auth-backend/internal/database"
 	"github.com/smarttransit/sms-auth-backend/internal/middleware"
 	"github.com/smarttransit/sms-auth-backend/internal/models"
@@ -14,13 +17,15 @@ type BusOwnerHandler struct {
 	busOwnerRepo *database.BusOwnerRepository
 	permitRepo   *database.RoutePermitRepository
 	userRepo     *database.UserRepository
+	staffRepo    *database.BusStaffRepository
 }
 
-func NewBusOwnerHandler(busOwnerRepo *database.BusOwnerRepository, permitRepo *database.RoutePermitRepository, userRepo *database.UserRepository) *BusOwnerHandler {
+func NewBusOwnerHandler(busOwnerRepo *database.BusOwnerRepository, permitRepo *database.RoutePermitRepository, userRepo *database.UserRepository, staffRepo *database.BusStaffRepository) *BusOwnerHandler {
 	return &BusOwnerHandler{
 		busOwnerRepo: busOwnerRepo,
 		permitRepo:   permitRepo,
 		userRepo:     userRepo,
+		staffRepo:    staffRepo,
 	}
 }
 
@@ -208,5 +213,137 @@ func (h *BusOwnerHandler) CompleteOnboarding(c *gin.Context) {
 		"message": "Onboarding completed successfully",
 		"profile": updatedProfile,
 		"permits": createdPermits,
+	})
+}
+
+// AddStaff allows bus owner to add driver or conductor to their organization
+// POST /api/v1/bus-owner/staff
+func (h *BusOwnerHandler) AddStaff(c *gin.Context) {
+	// Get user context from JWT middleware
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// Get bus owner record
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found. Please complete onboarding first."})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get bus owner profile"})
+		return
+	}
+
+	// Parse request
+	var req models.AddStaffRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate staff type
+	if req.StaffType != models.StaffTypeDriver && req.StaffType != models.StaffTypeConductor {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid staff_type. Must be 'driver' or 'conductor'"})
+		return
+	}
+
+	// Validate and parse license expiry date
+	expiryDate, err := time.Parse("2006-01-02", req.LicenseExpiryDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid license_expiry_date format. Use YYYY-MM-DD"})
+		return
+	}
+
+	// Check if license has expired
+	if expiryDate.Before(time.Now()) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "NTC license has already expired"})
+		return
+	}
+
+	// Check if user exists by phone number
+	existingUser, err := h.userRepo.GetUserByPhone(req.PhoneNumber)
+	var userID uuid.UUID
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// User doesn't exist - create new user account
+			newUser, err := h.userRepo.CreateUserWithoutRole(req.PhoneNumber)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create user account: %v", err)})
+				return
+			}
+
+			// Update user's first and last name (since CreateUserWithoutRole doesn't set these)
+			err = h.userRepo.UpdateProfile(newUser.ID, req.FirstName, req.LastName, "", "", "", "")
+			if err != nil {
+				// Log but don't fail - user is created, name can be updated on first login
+				fmt.Printf("WARNING: Failed to update user name: %v\n", err)
+			}
+
+			userID = newUser.ID
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check user existence"})
+			return
+		}
+	} else {
+		// User exists - check if already registered as staff
+		existingStaff, _ := h.staffRepo.GetByUserID(existingUser.ID.String())
+		if existingStaff != nil {
+			c.JSON(http.StatusConflict, gin.H{
+				"error": fmt.Sprintf("This phone number is already registered as %s", existingStaff.StaffType),
+				"staff_type": existingStaff.StaffType,
+			})
+			return
+		}
+
+		userID = existingUser.ID
+	}
+
+	// Create bus_staff record
+	now := time.Now()
+	staff := &models.BusStaff{
+		UserID:                userID.String(),
+		BusOwnerID:            &busOwner.ID,
+		StaffType:             req.StaffType,
+		LicenseNumber:         &req.NTCLicenseNumber,
+		LicenseExpiryDate:     &expiryDate,
+		ExperienceYears:       req.ExperienceYears,
+		EmploymentStatus:      models.EmploymentStatusActive, // Pre-approved by bus owner
+		BackgroundCheckStatus: models.BackgroundCheckPending,
+		HireDate:              &now,
+		ProfileCompleted:      true, // Profile is complete since bus owner provided all info
+	}
+
+	if req.EmergencyContact != "" {
+		staff.EmergencyContact = &req.EmergencyContact
+	}
+	if req.EmergencyContactName != "" {
+		staff.EmergencyContactName = &req.EmergencyContactName
+	}
+
+	// Create staff record in database
+	err = h.staffRepo.Create(staff)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create staff record: %v", err)})
+		return
+	}
+
+	// Add role to user (driver or conductor)
+	roleToAdd := string(req.StaffType)
+	err = h.userRepo.AddUserRole(userID, roleToAdd)
+	if err != nil {
+		// Log but don't fail - staff record is created
+		fmt.Printf("WARNING: Failed to add role %s to user %s: %v\n", roleToAdd, userID, err)
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message":    fmt.Sprintf("%s added successfully", req.StaffType),
+		"user_id":    userID.String(),
+		"staff_id":   staff.ID,
+		"staff_type": staff.StaffType,
+		"instructions": fmt.Sprintf("Staff member can now login using phone number %s", req.PhoneNumber),
 	})
 }

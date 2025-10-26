@@ -923,6 +923,134 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/bus-owner/staff:
+    post:
+      summary: Add driver or conductor to organization
+      description: |
+        Allows bus owner to add a driver or conductor directly to their organization.
+        NTC license number and expiry date are mandatory for both drivers and conductors.
+        If the phone number doesn't exist, a new user account will be created.
+        Staff members are pre-approved (employment_status = 'active') and can immediately login via driver/conductor app.
+      operationId: addStaffMember
+      tags:
+        - Bus Owner
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone_number
+                - first_name
+                - last_name
+                - staff_type
+                - ntc_license_number
+                - license_expiry_date
+              properties:
+                phone_number:
+                  type: string
+                  description: Staff member's phone number (will be used for login)
+                  example: "+94712345678"
+                first_name:
+                  type: string
+                  description: Staff member's first name
+                  example: "Kamal"
+                last_name:
+                  type: string
+                  description: Staff member's last name
+                  example: "Perera"
+                staff_type:
+                  type: string
+                  enum: [driver, conductor]
+                  description: Type of staff member
+                  example: "driver"
+                ntc_license_number:
+                  type: string
+                  description: NTC (National Transport Commission) license number - MANDATORY
+                  example: "NTC1234567"
+                license_expiry_date:
+                  type: string
+                  format: date
+                  description: NTC license expiry date (YYYY-MM-DD) - MANDATORY, must be in future
+                  example: "2026-12-31"
+                experience_years:
+                  type: integer
+                  description: Years of driving/conducting experience (optional)
+                  example: 5
+                emergency_contact:
+                  type: string
+                  description: Emergency contact phone number (optional)
+                  example: "+94777654321"
+                emergency_contact_name:
+                  type: string
+                  description: Emergency contact person name (optional)
+                  example: "Nimal Perera"
+      responses:
+        "201":
+          description: Staff member added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "driver added successfully"
+                  user_id:
+                    type: string
+                    format: uuid
+                    example: "123e4567-e89b-12d3-a456-426614174000"
+                  staff_id:
+                    type: string
+                    format: uuid
+                    example: "987e6543-e21b-98d3-a654-426614174999"
+                  staff_type:
+                    type: string
+                    example: "driver"
+                  instructions:
+                    type: string
+                    example: "Staff member can now login using phone number +94712345678"
+        "400":
+          description: Bad request - validation failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "NTC license has already expired"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Bus owner profile not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Bus owner profile not found. Please complete onboarding first."
+        "409":
+          description: Conflict - staff already registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "This phone number is already registered as driver"
+                  staff_type:
+                    type: string
+                    example: "driver"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   # ============================================================================
   # Permit Endpoints
   # ============================================================================

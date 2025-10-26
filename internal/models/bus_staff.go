@@ -92,3 +92,16 @@ type CompleteStaffProfile struct {
 	Staff    *BusStaff `json:"staff"`
 	BusOwner *BusOwner `json:"bus_owner,omitempty"`
 }
+
+// AddStaffRequest represents request from bus owner to add staff
+type AddStaffRequest struct {
+	PhoneNumber          string    `json:"phone_number" binding:"required"`
+	FirstName            string    `json:"first_name" binding:"required"`
+	LastName             string    `json:"last_name" binding:"required"`
+	StaffType            StaffType `json:"staff_type" binding:"required"`
+	NTCLicenseNumber     string    `json:"ntc_license_number" binding:"required"` // MANDATORY for both driver and conductor
+	LicenseExpiryDate    string    `json:"license_expiry_date" binding:"required"` // MANDATORY
+	ExperienceYears      int       `json:"experience_years"`
+	EmergencyContact     string    `json:"emergency_contact"`
+	EmergencyContactName string    `json:"emergency_contact_name"`
+}

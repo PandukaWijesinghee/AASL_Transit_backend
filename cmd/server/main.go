@@ -166,7 +166,7 @@ func main() {
 	staffHandler := handlers.NewStaffHandler(staffService, userRepository, staffRepository)
 
 	// Initialize bus owner and permit handlers
-	busOwnerHandler := handlers.NewBusOwnerHandler(ownerRepository, permitRepository, userRepository)
+	busOwnerHandler := handlers.NewBusOwnerHandler(ownerRepository, permitRepository, userRepository, staffRepository)
 	permitHandler := handlers.NewPermitHandler(permitRepository, ownerRepository)
 	busHandler := handlers.NewBusHandler(busRepository, permitRepository, ownerRepository)
 
@@ -253,6 +253,7 @@ func main() {
 			busOwner.GET("/profile", busOwnerHandler.GetProfile)
 			busOwner.GET("/profile-status", busOwnerHandler.CheckProfileStatus)
 			busOwner.POST("/complete-onboarding", busOwnerHandler.CompleteOnboarding)
+			busOwner.POST("/staff", busOwnerHandler.AddStaff) // Add driver or conductor
 		}
 
 		// Permit routes (all protected)
