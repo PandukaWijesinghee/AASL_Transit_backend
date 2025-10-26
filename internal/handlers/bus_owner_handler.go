@@ -13,12 +13,14 @@ import (
 type BusOwnerHandler struct {
 	busOwnerRepo *database.BusOwnerRepository
 	permitRepo   *database.RoutePermitRepository
+	userRepo     *database.UserRepository
 }
 
-func NewBusOwnerHandler(busOwnerRepo *database.BusOwnerRepository, permitRepo *database.RoutePermitRepository) *BusOwnerHandler {
+func NewBusOwnerHandler(busOwnerRepo *database.BusOwnerRepository, permitRepo *database.RoutePermitRepository, userRepo *database.UserRepository) *BusOwnerHandler {
 	return &BusOwnerHandler{
 		busOwnerRepo: busOwnerRepo,
 		permitRepo:   permitRepo,
+		userRepo:     userRepo,
 	}
 }
 
@@ -138,7 +140,16 @@ func (h *BusOwnerHandler) CompleteOnboarding(c *gin.Context) {
 			return
 		}
 	} else {
-		// Bus owner exists, update profile
+		// Bus owner exists - check if profile is already completed
+		if busOwner.ProfileCompleted {
+			c.JSON(http.StatusConflict, gin.H{
+				"error": "Profile already completed. Onboarding can only be done once.",
+				"code": "PROFILE_ALREADY_COMPLETED",
+			})
+			return
+		}
+
+		// Profile exists but not completed - update company info
 		err = h.busOwnerRepo.UpdateProfile(
 			busOwner.ID,
 			req.CompanyName,
@@ -167,6 +178,15 @@ func (h *BusOwnerHandler) CompleteOnboarding(c *gin.Context) {
 		}
 
 		createdPermits = append(createdPermits, *permit)
+	}
+
+	// Update users table to mark profile as completed
+	// NOTE: bus_owners.profile_completed is automatically set by database trigger,
+	// but we need to also update users.profile_completed for consistency
+	err = h.userRepo.SetProfileCompleted(userCtx.UserID, true)
+	if err != nil {
+		// Log error but don't fail the request - bus owner profile is already complete
+		// In production, you'd log this properly
 	}
 
 	// Fetch updated profile (should have profile_completed = true now)

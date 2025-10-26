@@ -166,7 +166,7 @@ func main() {
 	staffHandler := handlers.NewStaffHandler(staffService, userRepository, staffRepository)
 
 	// Initialize bus owner and permit handlers
-	busOwnerHandler := handlers.NewBusOwnerHandler(ownerRepository, permitRepository)
+	busOwnerHandler := handlers.NewBusOwnerHandler(ownerRepository, permitRepository, userRepository)
 	permitHandler := handlers.NewPermitHandler(permitRepository, ownerRepository)
 	busHandler := handlers.NewBusHandler(busRepository, permitRepository)
 

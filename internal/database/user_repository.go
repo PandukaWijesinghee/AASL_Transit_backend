@@ -309,6 +309,24 @@ func (r *UserRepository) UpdateProfileCompletion(id uuid.UUID) error {
 	return nil
 }
 
+// SetProfileCompleted directly sets the profile_completed status
+// Used by bus owner onboarding to sync users.profile_completed with bus_owners.profile_completed
+func (r *UserRepository) SetProfileCompleted(id uuid.UUID, completed bool) error {
+	query := `
+		UPDATE users
+		SET profile_completed = $1,
+		    updated_at = $2
+		WHERE id = $3
+	`
+
+	_, err := r.db.Exec(query, completed, time.Now(), id)
+	if err != nil {
+		return fmt.Errorf("failed to set profile completion: %w", err)
+	}
+
+	return nil
+}
+
 // GetOrCreateUser gets an existing user or creates a new one
 func (r *UserRepository) GetOrCreateUser(phone string) (*models.User, bool, error) {
 	// Try to get existing user
