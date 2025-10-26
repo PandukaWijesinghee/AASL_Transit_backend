@@ -168,7 +168,7 @@ func main() {
 	// Initialize bus owner and permit handlers
 	busOwnerHandler := handlers.NewBusOwnerHandler(ownerRepository, permitRepository, userRepository)
 	permitHandler := handlers.NewPermitHandler(permitRepository, ownerRepository)
-	busHandler := handlers.NewBusHandler(busRepository, permitRepository)
+	busHandler := handlers.NewBusHandler(busRepository, permitRepository, ownerRepository)
 
 	// Initialize Gin router
 	router := gin.New()

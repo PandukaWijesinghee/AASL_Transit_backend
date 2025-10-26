@@ -13,14 +13,16 @@ import (
 )
 
 type BusHandler struct {
-	busRepo    *database.BusRepository
-	permitRepo *database.RoutePermitRepository
+	busRepo      *database.BusRepository
+	permitRepo   *database.RoutePermitRepository
+	busOwnerRepo *database.BusOwnerRepository
 }
 
-func NewBusHandler(busRepo *database.BusRepository, permitRepo *database.RoutePermitRepository) *BusHandler {
+func NewBusHandler(busRepo *database.BusRepository, permitRepo *database.RoutePermitRepository, busOwnerRepo *database.BusOwnerRepository) *BusHandler {
 	return &BusHandler{
-		busRepo:    busRepo,
-		permitRepo: permitRepo,
+		busRepo:      busRepo,
+		permitRepo:   permitRepo,
+		busOwnerRepo: busOwnerRepo,
 	}
 }
 
@@ -34,8 +36,20 @@ func (h *BusHandler) GetAllBuses(c *gin.Context) {
 		return
 	}
 
-	// Get buses by owner ID
-	buses, err := h.busRepo.GetByOwnerID(userCtx.UserID.String())
+	// Get bus owner record for this user
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// Bus owner doesn't exist yet, return empty list
+			c.JSON(http.StatusOK, []interface{}{})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get bus owner profile"})
+		return
+	}
+
+	// Get buses by bus_owner_id (NOT user_id!)
+	buses, err := h.busRepo.GetByOwnerID(busOwner.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch buses"})
 		return
@@ -98,6 +112,17 @@ func (h *BusHandler) CreateBus(c *gin.Context) {
 		return
 	}
 
+	// Get bus owner record for this user
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found. Please complete onboarding first."})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get bus owner profile"})
+		return
+	}
+
 	// Verify permit exists and belongs to this owner
 	permit, err := h.permitRepo.GetByID(req.PermitID)
 	if err != nil {
@@ -109,8 +134,8 @@ func (h *BusHandler) CreateBus(c *gin.Context) {
 		return
 	}
 
-	// Verify permit ownership
-	if permit.BusOwnerID != userCtx.UserID.String() {
+	// Verify permit ownership (compare bus_owner_id with bus_owner_id, NOT user_id!)
+	if permit.BusOwnerID != busOwner.ID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Permit does not belong to you"})
 		return
 	}
