@@ -391,10 +391,11 @@ func (r *UserRepository) UpdateUserStatus(id uuid.UUID, status string) error {
 func (r *UserRepository) AddUserRole(id uuid.UUID, role string) error {
 	// Validate role
 	validRoles := map[string]bool{
-		"passenger": true,
-		"driver":    true,
-		"conductor": true,
-		"admin":     true,
+		"passenger":  true,
+		"driver":     true,
+		"conductor":  true,
+		"bus_owner":  true, // Added for bus owner onboarding
+		"admin":      true,
 	}
 
 	if !validRoles[role] {

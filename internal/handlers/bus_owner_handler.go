@@ -189,6 +189,14 @@ func (h *BusOwnerHandler) CompleteOnboarding(c *gin.Context) {
 		// In production, you'd log this properly
 	}
 
+	// Add "bus_owner" role to user's roles array
+	// This ensures JWT tokens include the role for authorization
+	err = h.userRepo.AddUserRole(userCtx.UserID, "bus_owner")
+	if err != nil {
+		// Log error but don't fail the request
+		// Role might already exist (AddUserRole prevents duplicates)
+	}
+
 	// Fetch updated profile (should have profile_completed = true now)
 	updatedProfile, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
 	if err != nil {
