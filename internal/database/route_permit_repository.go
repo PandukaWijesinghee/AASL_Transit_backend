@@ -62,17 +62,50 @@ func (r *RoutePermitRepository) GetByID(permitID string) (*models.RoutePermit, e
 	`
 
 	permit := &models.RoutePermit{}
+	var masterRouteID sql.NullString
+	var totalDistanceKm sql.NullFloat64
+	var estimatedDurationMinutes sql.NullInt64
+	var maxTripsPerDay sql.NullInt64
+	var restrictions sql.NullString
+	var verifiedAt sql.NullTime
+	var permitDocumentURL sql.NullString
+
 	err := r.db.QueryRow(query, permitID).Scan(
 		&permit.ID, &permit.BusOwnerID, &permit.PermitNumber, &permit.BusRegistrationNumber,
-		&permit.MasterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
-		&permit.FullDestinationCity, &permit.Via, &permit.TotalDistanceKm, &permit.EstimatedDurationMinutes,
-		&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &permit.MaxTripsPerDay,
-		&permit.AllowedBusTypes, &permit.Restrictions, &permit.Status, &permit.VerifiedAt, &permit.PermitDocumentURL,
+		&masterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
+		&permit.FullDestinationCity, &permit.Via, &totalDistanceKm, &estimatedDurationMinutes,
+		&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &maxTripsPerDay,
+		&permit.AllowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
 		&permit.CreatedAt, &permit.UpdatedAt,
 	)
 
 	if err != nil {
 		return nil, err
+	}
+
+	// Convert sql.Null* types to pointers
+	if masterRouteID.Valid {
+		permit.MasterRouteID = &masterRouteID.String
+	}
+	if totalDistanceKm.Valid {
+		permit.TotalDistanceKm = &totalDistanceKm.Float64
+	}
+	if estimatedDurationMinutes.Valid {
+		minutes := int(estimatedDurationMinutes.Int64)
+		permit.EstimatedDurationMinutes = &minutes
+	}
+	if maxTripsPerDay.Valid {
+		trips := int(maxTripsPerDay.Int64)
+		permit.MaxTripsPerDay = &trips
+	}
+	if restrictions.Valid {
+		permit.Restrictions = &restrictions.String
+	}
+	if verifiedAt.Valid {
+		permit.VerifiedAt = &verifiedAt.Time
+	}
+	if permitDocumentURL.Valid {
+		permit.PermitDocumentURL = &permitDocumentURL.String
 	}
 
 	return permit, nil
@@ -102,17 +135,51 @@ func (r *RoutePermitRepository) GetByOwnerID(busOwnerID string) ([]models.RouteP
 	permits := []models.RoutePermit{}
 	for rows.Next() {
 		var permit models.RoutePermit
+		var masterRouteID sql.NullString
+		var totalDistanceKm sql.NullFloat64
+		var estimatedDurationMinutes sql.NullInt64
+		var maxTripsPerDay sql.NullInt64
+		var restrictions sql.NullString
+		var verifiedAt sql.NullTime
+		var permitDocumentURL sql.NullString
+
 		err := rows.Scan(
 			&permit.ID, &permit.BusOwnerID, &permit.PermitNumber, &permit.BusRegistrationNumber,
-			&permit.MasterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
-			&permit.FullDestinationCity, &permit.Via, &permit.TotalDistanceKm, &permit.EstimatedDurationMinutes,
-			&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &permit.MaxTripsPerDay,
-			&permit.AllowedBusTypes, &permit.Restrictions, &permit.Status, &permit.VerifiedAt, &permit.PermitDocumentURL,
+			&masterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
+			&permit.FullDestinationCity, &permit.Via, &totalDistanceKm, &estimatedDurationMinutes,
+			&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &maxTripsPerDay,
+			&permit.AllowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
 			&permit.CreatedAt, &permit.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
+
+		// Convert sql.Null* types to pointers
+		if masterRouteID.Valid {
+			permit.MasterRouteID = &masterRouteID.String
+		}
+		if totalDistanceKm.Valid {
+			permit.TotalDistanceKm = &totalDistanceKm.Float64
+		}
+		if estimatedDurationMinutes.Valid {
+			minutes := int(estimatedDurationMinutes.Int64)
+			permit.EstimatedDurationMinutes = &minutes
+		}
+		if maxTripsPerDay.Valid {
+			trips := int(maxTripsPerDay.Int64)
+			permit.MaxTripsPerDay = &trips
+		}
+		if restrictions.Valid {
+			permit.Restrictions = &restrictions.String
+		}
+		if verifiedAt.Valid {
+			permit.VerifiedAt = &verifiedAt.Time
+		}
+		if permitDocumentURL.Valid {
+			permit.PermitDocumentURL = &permitDocumentURL.String
+		}
+
 		permits = append(permits, permit)
 	}
 
@@ -134,17 +201,50 @@ func (r *RoutePermitRepository) GetByPermitNumber(permitNumber string, busOwnerI
 	`
 
 	permit := &models.RoutePermit{}
+	var masterRouteID sql.NullString
+	var totalDistanceKm sql.NullFloat64
+	var estimatedDurationMinutes sql.NullInt64
+	var maxTripsPerDay sql.NullInt64
+	var restrictions sql.NullString
+	var verifiedAt sql.NullTime
+	var permitDocumentURL sql.NullString
+
 	err := r.db.QueryRow(query, permitNumber, busOwnerID).Scan(
 		&permit.ID, &permit.BusOwnerID, &permit.PermitNumber, &permit.BusRegistrationNumber,
-		&permit.MasterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
-		&permit.FullDestinationCity, &permit.Via, &permit.TotalDistanceKm, &permit.EstimatedDurationMinutes,
-		&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &permit.MaxTripsPerDay,
-		&permit.AllowedBusTypes, &permit.Restrictions, &permit.Status, &permit.VerifiedAt, &permit.PermitDocumentURL,
+		&masterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
+		&permit.FullDestinationCity, &permit.Via, &totalDistanceKm, &estimatedDurationMinutes,
+		&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &maxTripsPerDay,
+		&permit.AllowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
 		&permit.CreatedAt, &permit.UpdatedAt,
 	)
 
 	if err != nil {
 		return nil, err
+	}
+
+	// Convert sql.Null* types to pointers
+	if masterRouteID.Valid {
+		permit.MasterRouteID = &masterRouteID.String
+	}
+	if totalDistanceKm.Valid {
+		permit.TotalDistanceKm = &totalDistanceKm.Float64
+	}
+	if estimatedDurationMinutes.Valid {
+		minutes := int(estimatedDurationMinutes.Int64)
+		permit.EstimatedDurationMinutes = &minutes
+	}
+	if maxTripsPerDay.Valid {
+		trips := int(maxTripsPerDay.Int64)
+		permit.MaxTripsPerDay = &trips
+	}
+	if restrictions.Valid {
+		permit.Restrictions = &restrictions.String
+	}
+	if verifiedAt.Valid {
+		permit.VerifiedAt = &verifiedAt.Time
+	}
+	if permitDocumentURL.Valid {
+		permit.PermitDocumentURL = &permitDocumentURL.String
 	}
 
 	return permit, nil
@@ -165,12 +265,20 @@ func (r *RoutePermitRepository) GetByBusRegistration(busRegistration string, bus
 	`
 
 	permit := &models.RoutePermit{}
+	var masterRouteID sql.NullString
+	var totalDistanceKm sql.NullFloat64
+	var estimatedDurationMinutes sql.NullInt64
+	var maxTripsPerDay sql.NullInt64
+	var restrictions sql.NullString
+	var verifiedAt sql.NullTime
+	var permitDocumentURL sql.NullString
+
 	err := r.db.QueryRow(query, busRegistration, busOwnerID).Scan(
 		&permit.ID, &permit.BusOwnerID, &permit.PermitNumber, &permit.BusRegistrationNumber,
-		&permit.MasterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
-		&permit.FullDestinationCity, &permit.Via, &permit.TotalDistanceKm, &permit.EstimatedDurationMinutes,
-		&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &permit.MaxTripsPerDay,
-		&permit.AllowedBusTypes, &permit.Restrictions, &permit.Status, &permit.VerifiedAt, &permit.PermitDocumentURL,
+		&masterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
+		&permit.FullDestinationCity, &permit.Via, &totalDistanceKm, &estimatedDurationMinutes,
+		&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &maxTripsPerDay,
+		&permit.AllowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
 		&permit.CreatedAt, &permit.UpdatedAt,
 	)
 
@@ -179,6 +287,31 @@ func (r *RoutePermitRepository) GetByBusRegistration(busRegistration string, bus
 			return nil, nil // Return nil if not found (not an error for checking)
 		}
 		return nil, err
+	}
+
+	// Convert sql.Null* types to pointers
+	if masterRouteID.Valid {
+		permit.MasterRouteID = &masterRouteID.String
+	}
+	if totalDistanceKm.Valid {
+		permit.TotalDistanceKm = &totalDistanceKm.Float64
+	}
+	if estimatedDurationMinutes.Valid {
+		minutes := int(estimatedDurationMinutes.Int64)
+		permit.EstimatedDurationMinutes = &minutes
+	}
+	if maxTripsPerDay.Valid {
+		trips := int(maxTripsPerDay.Int64)
+		permit.MaxTripsPerDay = &trips
+	}
+	if restrictions.Valid {
+		permit.Restrictions = &restrictions.String
+	}
+	if verifiedAt.Valid {
+		permit.VerifiedAt = &verifiedAt.Time
+	}
+	if permitDocumentURL.Valid {
+		permit.PermitDocumentURL = &permitDocumentURL.String
 	}
 
 	return permit, nil
@@ -319,17 +452,51 @@ func (r *RoutePermitRepository) GetValidPermits(busOwnerID string) ([]models.Rou
 	permits := []models.RoutePermit{}
 	for rows.Next() {
 		var permit models.RoutePermit
+		var masterRouteID sql.NullString
+		var totalDistanceKm sql.NullFloat64
+		var estimatedDurationMinutes sql.NullInt64
+		var maxTripsPerDay sql.NullInt64
+		var restrictions sql.NullString
+		var verifiedAt sql.NullTime
+		var permitDocumentURL sql.NullString
+
 		err := rows.Scan(
 			&permit.ID, &permit.BusOwnerID, &permit.PermitNumber, &permit.BusRegistrationNumber,
-			&permit.MasterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
-			&permit.FullDestinationCity, &permit.Via, &permit.TotalDistanceKm, &permit.EstimatedDurationMinutes,
-			&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &permit.MaxTripsPerDay,
-			&permit.AllowedBusTypes, &permit.Restrictions, &permit.Status, &permit.VerifiedAt, &permit.PermitDocumentURL,
+			&masterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
+			&permit.FullDestinationCity, &permit.Via, &totalDistanceKm, &estimatedDurationMinutes,
+			&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &maxTripsPerDay,
+			&permit.AllowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
 			&permit.CreatedAt, &permit.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
+
+		// Convert sql.Null* types to pointers
+		if masterRouteID.Valid {
+			permit.MasterRouteID = &masterRouteID.String
+		}
+		if totalDistanceKm.Valid {
+			permit.TotalDistanceKm = &totalDistanceKm.Float64
+		}
+		if estimatedDurationMinutes.Valid {
+			minutes := int(estimatedDurationMinutes.Int64)
+			permit.EstimatedDurationMinutes = &minutes
+		}
+		if maxTripsPerDay.Valid {
+			trips := int(maxTripsPerDay.Int64)
+			permit.MaxTripsPerDay = &trips
+		}
+		if restrictions.Valid {
+			permit.Restrictions = &restrictions.String
+		}
+		if verifiedAt.Valid {
+			permit.VerifiedAt = &verifiedAt.Time
+		}
+		if permitDocumentURL.Valid {
+			permit.PermitDocumentURL = &permitDocumentURL.String
+		}
+
 		permits = append(permits, permit)
 	}
 
