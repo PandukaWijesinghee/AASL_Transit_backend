@@ -28,7 +28,10 @@ func (a *StringArray) Scan(src interface{}) error {
 		*a = nil
 		return nil
 	}
-	return pq.Array(a).Scan(src)
+	// Convert *StringArray to *[]string so pq.Array can scan properly
+	// This is necessary because StringArray is a named type, not []string directly
+	slice := (*[]string)(a)
+	return pq.Array(slice).Scan(src)
 }
 
 // RoutePermit represents a government-issued route permit for a bus owner
