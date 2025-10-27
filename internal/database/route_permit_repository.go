@@ -69,19 +69,25 @@ func (r *RoutePermitRepository) GetByID(permitID string) (*models.RoutePermit, e
 	var restrictions sql.NullString
 	var verifiedAt sql.NullTime
 	var permitDocumentURL sql.NullString
+	var via models.StringArray
+	var allowedBusTypes models.StringArray
 
 	err := r.db.QueryRow(query, permitID).Scan(
 		&permit.ID, &permit.BusOwnerID, &permit.PermitNumber, &permit.BusRegistrationNumber,
 		&masterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
-		&permit.FullDestinationCity, &permit.Via, &totalDistanceKm, &estimatedDurationMinutes,
+		&permit.FullDestinationCity, &via, &totalDistanceKm, &estimatedDurationMinutes,
 		&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &maxTripsPerDay,
-		&permit.AllowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
+		&allowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
 		&permit.CreatedAt, &permit.UpdatedAt,
 	)
 
 	if err != nil {
 		return nil, err
 	}
+
+	// Assign arrays (they'll be nil if NULL in database)
+	permit.Via = via
+	permit.AllowedBusTypes = allowedBusTypes
 
 	// Convert sql.Null* types to pointers
 	if masterRouteID.Valid {
@@ -142,18 +148,24 @@ func (r *RoutePermitRepository) GetByOwnerID(busOwnerID string) ([]models.RouteP
 		var restrictions sql.NullString
 		var verifiedAt sql.NullTime
 		var permitDocumentURL sql.NullString
+		var via models.StringArray
+		var allowedBusTypes models.StringArray
 
 		err := rows.Scan(
 			&permit.ID, &permit.BusOwnerID, &permit.PermitNumber, &permit.BusRegistrationNumber,
 			&masterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
-			&permit.FullDestinationCity, &permit.Via, &totalDistanceKm, &estimatedDurationMinutes,
+			&permit.FullDestinationCity, &via, &totalDistanceKm, &estimatedDurationMinutes,
 			&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &maxTripsPerDay,
-			&permit.AllowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
+			&allowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
 			&permit.CreatedAt, &permit.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
+
+		// Assign arrays (they'll be nil if NULL in database)
+		permit.Via = via
+		permit.AllowedBusTypes = allowedBusTypes
 
 		// Convert sql.Null* types to pointers
 		if masterRouteID.Valid {
@@ -459,18 +471,24 @@ func (r *RoutePermitRepository) GetValidPermits(busOwnerID string) ([]models.Rou
 		var restrictions sql.NullString
 		var verifiedAt sql.NullTime
 		var permitDocumentURL sql.NullString
+		var via models.StringArray
+		var allowedBusTypes models.StringArray
 
 		err := rows.Scan(
 			&permit.ID, &permit.BusOwnerID, &permit.PermitNumber, &permit.BusRegistrationNumber,
 			&masterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
-			&permit.FullDestinationCity, &permit.Via, &totalDistanceKm, &estimatedDurationMinutes,
+			&permit.FullDestinationCity, &via, &totalDistanceKm, &estimatedDurationMinutes,
 			&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &maxTripsPerDay,
-			&permit.AllowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
+			&allowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
 			&permit.CreatedAt, &permit.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
+
+		// Assign arrays (they'll be nil if NULL in database)
+		permit.Via = via
+		permit.AllowedBusTypes = allowedBusTypes
 
 		// Convert sql.Null* types to pointers
 		if masterRouteID.Valid {
