@@ -924,6 +924,93 @@ paths:
           $ref: "#/components/responses/InternalServerError"
 
   /api/v1/bus-owner/staff:
+    get:
+      summary: Get all staff members (drivers and conductors)
+      description: |
+        Retrieves all drivers and conductors for the authenticated bus owner.
+        Returns enriched staff data including user information (name, phone).
+      operationId: getStaffMembers
+      tags:
+        - Bus Owner
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Staff list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  staff:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          example: "d581c281-ba77-49d2-8f68-5f7377417bf8"
+                        user_id:
+                          type: string
+                          format: uuid
+                          example: "3edeb9af-51c3-4c24-a5d0-76c9dee2d4ea"
+                        first_name:
+                          type: string
+                          example: "Kamal"
+                        last_name:
+                          type: string
+                          example: "Perera"
+                        phone:
+                          type: string
+                          example: "+94712345678"
+                        staff_type:
+                          type: string
+                          enum: [driver, conductor]
+                          example: "driver"
+                        license_number:
+                          type: string
+                          example: "NTC1234567"
+                        license_expiry_date:
+                          type: string
+                          format: date-time
+                          example: "2026-12-31T00:00:00Z"
+                        experience_years:
+                          type: integer
+                          example: 5
+                        employment_status:
+                          type: string
+                          enum: [active, inactive, suspended, terminated]
+                          example: "active"
+                        background_check_status:
+                          type: string
+                          enum: [pending, in_progress, cleared, failed]
+                          example: "pending"
+                        performance_rating:
+                          type: number
+                          format: double
+                          example: 4.5
+                        total_trips_completed:
+                          type: integer
+                          example: 150
+                  total:
+                    type: integer
+                    example: 2
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Bus owner profile not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Bus owner profile not found"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
     post:
       summary: Add driver or conductor to organization
       description: |
