@@ -348,3 +348,93 @@ func (h *BusOwnerHandler) AddStaff(c *gin.Context) {
 		"instructions": fmt.Sprintf("Staff member can now login using phone number %s", req.PhoneNumber),
 	})
 }
+
+// GetStaff retrieves all staff (drivers and conductors) for the authenticated bus owner
+// GET /api/v1/bus-owner/staff
+func (h *BusOwnerHandler) GetStaff(c *gin.Context) {
+	// Get user context from JWT middleware
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// Get bus owner record
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get bus owner profile"})
+		return
+	}
+
+	// Get all staff for this bus owner
+	staffList, err := h.staffRepo.GetAllByBusOwner(busOwner.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get staff: %v", err)})
+		return
+	}
+
+	// Enrich staff data with user information (name, phone)
+	type StaffWithUserInfo struct {
+		ID                       string                       `json:"id"`
+		UserID                   string                       `json:"user_id"`
+		FirstName                string                       `json:"first_name"`
+		LastName                 string                       `json:"last_name"`
+		Phone                    string                       `json:"phone"`
+		StaffType                models.StaffType             `json:"staff_type"`
+		LicenseNumber            *string                      `json:"license_number,omitempty"`
+		LicenseExpiryDate        *time.Time                   `json:"license_expiry_date,omitempty"`
+		ExperienceYears          int                          `json:"experience_years"`
+		EmergencyContact         *string                      `json:"emergency_contact,omitempty"`
+		EmergencyContactName     *string                      `json:"emergency_contact_name,omitempty"`
+		EmploymentStatus         models.EmploymentStatus      `json:"employment_status"`
+		BackgroundCheckStatus    models.BackgroundCheckStatus `json:"background_check_status"`
+		HireDate                 *time.Time                   `json:"hire_date,omitempty"`
+		PerformanceRating        float64                      `json:"performance_rating"`
+		TotalTripsCompleted      int                          `json:"total_trips_completed"`
+		ProfileCompleted         bool                         `json:"profile_completed"`
+		CreatedAt                time.Time                    `json:"created_at"`
+	}
+
+	enrichedStaff := []StaffWithUserInfo{}
+	for _, staff := range staffList {
+		// Get user information
+		user, err := h.userRepo.GetUserByID(uuid.MustParse(staff.UserID))
+		if err != nil {
+			// Log error but don't fail the whole request
+			fmt.Printf("WARNING: Failed to get user info for staff %s: %v\n", staff.ID, err)
+			continue
+		}
+
+		enriched := StaffWithUserInfo{
+			ID:                    staff.ID,
+			UserID:                staff.UserID,
+			FirstName:             user.FirstName.String,
+			LastName:              user.LastName.String,
+			Phone:                 user.Phone,
+			StaffType:             staff.StaffType,
+			LicenseNumber:         staff.LicenseNumber,
+			LicenseExpiryDate:     staff.LicenseExpiryDate,
+			ExperienceYears:       staff.ExperienceYears,
+			EmergencyContact:      staff.EmergencyContact,
+			EmergencyContactName:  staff.EmergencyContactName,
+			EmploymentStatus:      staff.EmploymentStatus,
+			BackgroundCheckStatus: staff.BackgroundCheckStatus,
+			HireDate:              staff.HireDate,
+			PerformanceRating:     staff.PerformanceRating,
+			TotalTripsCompleted:   staff.TotalTripsCompleted,
+			ProfileCompleted:      staff.ProfileCompleted,
+			CreatedAt:             staff.CreatedAt,
+		}
+
+		enrichedStaff = append(enrichedStaff, enriched)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"staff": enrichedStaff,
+		"total": len(enrichedStaff),
+	})
+}

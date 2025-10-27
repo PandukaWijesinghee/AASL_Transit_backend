@@ -253,7 +253,8 @@ func main() {
 			busOwner.GET("/profile", busOwnerHandler.GetProfile)
 			busOwner.GET("/profile-status", busOwnerHandler.CheckProfileStatus)
 			busOwner.POST("/complete-onboarding", busOwnerHandler.CompleteOnboarding)
-			busOwner.POST("/staff", busOwnerHandler.AddStaff) // Add driver or conductor
+			busOwner.GET("/staff", busOwnerHandler.GetStaff)   // Get all staff (drivers & conductors)
+			busOwner.POST("/staff", busOwnerHandler.AddStaff)  // Add driver or conductor
 		}
 
 		// Permit routes (all protected)
