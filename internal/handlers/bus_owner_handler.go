@@ -244,6 +244,10 @@ func (h *BusOwnerHandler) AddStaff(c *gin.Context) {
 		return
 	}
 
+	// DEBUG: Log received request data
+	fmt.Printf("DEBUG: AddStaff request received - Phone: %s, FirstName: '%s', LastName: '%s', Type: %s\n",
+		req.PhoneNumber, req.FirstName, req.LastName, req.StaffType)
+
 	// Validate staff type
 	if req.StaffType != models.StaffTypeDriver && req.StaffType != models.StaffTypeConductor {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid staff_type. Must be 'driver' or 'conductor'"})
