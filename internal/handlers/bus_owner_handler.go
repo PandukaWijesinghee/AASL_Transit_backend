@@ -286,19 +286,19 @@ func (h *BusOwnerHandler) AddStaff(c *gin.Context) {
 		}
 
 		// Update user's first and last name (since CreateUserWithoutRole doesn't set these)
-		fmt.Printf("DEBUG: Updating user profile - ID: %s, FirstName: %s, LastName: %s\n", newUser.ID, req.FirstName, req.LastName)
-		err = h.userRepo.UpdateProfile(newUser.ID, req.FirstName, req.LastName, "", "", "", "")
+		fmt.Printf("DEBUG: Updating user names - ID: %s, FirstName: %s, LastName: %s\n", newUser.ID, req.FirstName, req.LastName)
+		err = h.userRepo.UpdateUserNames(newUser.ID, req.FirstName, req.LastName)
 		if err != nil {
-			// Log but don't fail - user is created, name can be updated on first login
-			fmt.Printf("WARNING: Failed to update user name: %v\n", err)
-		} else {
-			fmt.Printf("DEBUG: Successfully updated user name for user %s\n", newUser.ID)
+			// This is critical - fail if we can't set the names
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to update user names: %v", err)})
+			return
+		}
+		fmt.Printf("DEBUG: Successfully updated user names for user %s\n", newUser.ID)
 
-			// Verify the update by re-fetching the user
-			updatedUser, err := h.userRepo.GetUserByID(newUser.ID)
-			if err == nil {
-				fmt.Printf("DEBUG: User after update - FirstName: %s, LastName: %s\n", updatedUser.FirstName.String, updatedUser.LastName.String)
-			}
+		// Verify the update by re-fetching the user
+		updatedUser, err := h.userRepo.GetUserByID(newUser.ID)
+		if err == nil {
+			fmt.Printf("DEBUG: User after update - FirstName: '%s', LastName: '%s'\n", updatedUser.FirstName.String, updatedUser.LastName.String)
 		}
 
 		userID = newUser.ID

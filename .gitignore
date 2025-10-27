@@ -65,5 +65,7 @@ bin/
 
 *.md
 *.txt
+*.sql
 
 dbINFOScripts/
+

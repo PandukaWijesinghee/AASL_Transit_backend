@@ -248,6 +248,33 @@ func (r *UserRepository) UpdateProfile(id uuid.UUID, firstName, lastName, email,
 	return nil
 }
 
+// UpdateUserNames updates only first_name and last_name (without touching email or other fields)
+func (r *UserRepository) UpdateUserNames(id uuid.UUID, firstName, lastName string) error {
+	query := `
+		UPDATE users
+		SET first_name = $1,
+		    last_name = $2,
+		    updated_at = $3
+		WHERE id = $4
+	`
+
+	result, err := r.db.Exec(query, firstName, lastName, time.Now(), id)
+	if err != nil {
+		return fmt.Errorf("failed to update user names: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("user not found")
+	}
+
+	return nil
+}
+
 // IsProfileComplete checks if user profile is complete
 func (r *UserRepository) IsProfileComplete(id uuid.UUID) (bool, error) {
 	var profileCompleted bool

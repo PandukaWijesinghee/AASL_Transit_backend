@@ -17,7 +17,7 @@ CREATE TABLE public.audit_logs (
 CREATE TABLE public.bus_owners (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   user_id uuid NOT NULL UNIQUE,
-  company_name character varying NOT NULL,
+  company_name character varying,
   license_number character varying UNIQUE,
   contact_person character varying,
   address text,
@@ -34,6 +34,8 @@ CREATE TABLE public.bus_owners (
   total_buses integer DEFAULT 0,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  profile_completed boolean DEFAULT false,
+  identity_or_incorporation_no character varying,
   CONSTRAINT bus_owners_pkey PRIMARY KEY (id),
   CONSTRAINT bus_owners_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
@@ -68,6 +70,29 @@ CREATE TABLE public.bus_staff (
   CONSTRAINT bus_staff_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
   CONSTRAINT bus_staff_bus_owner_id_fkey FOREIGN KEY (bus_owner_id) REFERENCES public.bus_owners(id),
   CONSTRAINT bus_staff_verified_by_fkey FOREIGN KEY (verified_by) REFERENCES public.users(id)
+);
+CREATE TABLE public.buses (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  bus_owner_id uuid NOT NULL,
+  permit_id uuid NOT NULL,
+  bus_number character varying NOT NULL,
+  license_plate character varying NOT NULL UNIQUE,
+  bus_type character varying NOT NULL CHECK (bus_type::text = ANY (ARRAY['normal'::character varying, 'luxury'::character varying, 'semi_luxury'::character varying, 'super_luxury'::character varying]::text[])),
+  total_seats integer NOT NULL CHECK (total_seats > 0),
+  manufacturing_year integer CHECK (manufacturing_year >= 1900 AND manufacturing_year::numeric <= (EXTRACT(year FROM CURRENT_DATE) + 1::numeric)),
+  last_maintenance_date date,
+  insurance_expiry date,
+  status character varying NOT NULL DEFAULT 'active'::character varying CHECK (status::text = ANY (ARRAY['active'::character varying, 'maintenance'::character varying, 'inactive'::character varying]::text[])),
+  has_wifi boolean NOT NULL DEFAULT false,
+  has_ac boolean NOT NULL DEFAULT false,
+  has_charging_ports boolean NOT NULL DEFAULT false,
+  has_entertainment boolean NOT NULL DEFAULT false,
+  has_refreshments boolean NOT NULL DEFAULT false,
+  created_at timestamp without time zone NOT NULL DEFAULT now(),
+  updated_at timestamp without time zone NOT NULL DEFAULT now(),
+  CONSTRAINT buses_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_bus_owner FOREIGN KEY (bus_owner_id) REFERENCES public.bus_owners(id),
+  CONSTRAINT fk_permit FOREIGN KEY (permit_id) REFERENCES public.route_permits(id)
 );
 CREATE TABLE public.lounge_owners (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -129,6 +154,36 @@ CREATE TABLE public.refresh_tokens (
   revoked_at timestamp with time zone,
   CONSTRAINT refresh_tokens_pkey PRIMARY KEY (id),
   CONSTRAINT refresh_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.route_permits (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  bus_owner_id uuid NOT NULL,
+  permit_number character varying NOT NULL,
+  bus_registration_number character varying NOT NULL,
+  route_number character varying NOT NULL,
+  full_origin_city character varying NOT NULL,
+  full_destination_city character varying NOT NULL,
+  via ARRAY,
+  approved_fare numeric NOT NULL CHECK (approved_fare > 0::numeric),
+  issue_date date NOT NULL,
+  expiry_date date NOT NULL,
+  status USER-DEFINED DEFAULT 'pending'::verification_status,
+  verification_documents jsonb,
+  notes text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  route_name character varying,
+  master_route_id uuid,
+  total_distance_km numeric,
+  estimated_duration_minutes integer,
+  permit_type character varying DEFAULT 'regular'::character varying,
+  max_trips_per_day integer,
+  allowed_bus_types ARRAY,
+  restrictions text,
+  verified_at timestamp with time zone,
+  permit_document_url text,
+  CONSTRAINT route_permits_pkey PRIMARY KEY (id),
+  CONSTRAINT route_permits_bus_owner_id_fkey FOREIGN KEY (bus_owner_id) REFERENCES public.bus_owners(id)
 );
 CREATE TABLE public.user_sessions (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
