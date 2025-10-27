@@ -268,26 +268,27 @@ func (h *BusOwnerHandler) AddStaff(c *gin.Context) {
 	var userID uuid.UUID
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			// User doesn't exist - create new user account
-			newUser, err := h.userRepo.CreateUserWithoutRole(req.PhoneNumber)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create user account: %v", err)})
-				return
-			}
+		// Database error
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check user existence"})
+		return
+	}
 
-			// Update user's first and last name (since CreateUserWithoutRole doesn't set these)
-			err = h.userRepo.UpdateProfile(newUser.ID, req.FirstName, req.LastName, "", "", "", "")
-			if err != nil {
-				// Log but don't fail - user is created, name can be updated on first login
-				fmt.Printf("WARNING: Failed to update user name: %v\n", err)
-			}
-
-			userID = newUser.ID
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check user existence"})
+	if existingUser == nil {
+		// User doesn't exist - create new user account
+		newUser, err := h.userRepo.CreateUserWithoutRole(req.PhoneNumber)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create user account: %v", err)})
 			return
 		}
+
+		// Update user's first and last name (since CreateUserWithoutRole doesn't set these)
+		err = h.userRepo.UpdateProfile(newUser.ID, req.FirstName, req.LastName, "", "", "", "")
+		if err != nil {
+			// Log but don't fail - user is created, name can be updated on first login
+			fmt.Printf("WARNING: Failed to update user name: %v\n", err)
+		}
+
+		userID = newUser.ID
 	} else {
 		// User exists - check if already registered as staff
 		existingStaff, _ := h.staffRepo.GetByUserID(existingUser.ID.String())
