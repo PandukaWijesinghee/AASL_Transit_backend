@@ -282,10 +282,19 @@ func (h *BusOwnerHandler) AddStaff(c *gin.Context) {
 		}
 
 		// Update user's first and last name (since CreateUserWithoutRole doesn't set these)
+		fmt.Printf("DEBUG: Updating user profile - ID: %s, FirstName: %s, LastName: %s\n", newUser.ID, req.FirstName, req.LastName)
 		err = h.userRepo.UpdateProfile(newUser.ID, req.FirstName, req.LastName, "", "", "", "")
 		if err != nil {
 			// Log but don't fail - user is created, name can be updated on first login
 			fmt.Printf("WARNING: Failed to update user name: %v\n", err)
+		} else {
+			fmt.Printf("DEBUG: Successfully updated user name for user %s\n", newUser.ID)
+
+			// Verify the update by re-fetching the user
+			updatedUser, err := h.userRepo.GetUserByID(newUser.ID)
+			if err == nil {
+				fmt.Printf("DEBUG: User after update - FirstName: %s, LastName: %s\n", updatedUser.FirstName.String, updatedUser.LastName.String)
+			}
 		}
 
 		userID = newUser.ID
@@ -408,6 +417,9 @@ func (h *BusOwnerHandler) GetStaff(c *gin.Context) {
 			fmt.Printf("WARNING: Failed to get user info for staff %s: %v\n", staff.ID, err)
 			continue
 		}
+
+		fmt.Printf("DEBUG: GetStaff - User ID: %s, FirstName: '%s', LastName: '%s', Phone: %s\n",
+			user.ID, user.FirstName.String, user.LastName.String, user.Phone)
 
 		enriched := StaffWithUserInfo{
 			ID:                    staff.ID,
