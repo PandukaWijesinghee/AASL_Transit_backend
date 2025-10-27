@@ -46,7 +46,9 @@ func (h *PermitHandler) GetAllPermits(c *gin.Context) {
 	// Get permits
 	permits, err := h.permitRepo.GetByOwnerID(busOwner.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch permits"})
+		// Log the actual error for debugging
+		println("ERROR fetching permits for bus_owner_id:", busOwner.ID, "- Error:", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch permits", "details": err.Error()})
 		return
 	}
 
@@ -77,7 +79,9 @@ func (h *PermitHandler) GetValidPermits(c *gin.Context) {
 	// Get valid permits
 	permits, err := h.permitRepo.GetValidPermits(busOwner.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch valid permits"})
+		// Log the actual error for debugging
+		println("ERROR fetching valid permits for bus_owner_id:", busOwner.ID, "- Error:", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch valid permits", "details": err.Error()})
 		return
 	}
 
