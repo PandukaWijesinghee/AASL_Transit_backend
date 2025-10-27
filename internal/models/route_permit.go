@@ -23,6 +23,11 @@ func (a StringArray) Value() (driver.Value, error) {
 
 // Scan implements the sql.Scanner interface
 func (a *StringArray) Scan(src interface{}) error {
+	// Handle NULL arrays from database
+	if src == nil {
+		*a = nil
+		return nil
+	}
 	return pq.Array(a).Scan(src)
 }
 
