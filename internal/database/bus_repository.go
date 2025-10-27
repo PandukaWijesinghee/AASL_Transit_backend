@@ -57,15 +57,31 @@ func (r *BusRepository) GetByID(busID string) (*models.Bus, error) {
 	`
 
 	bus := &models.Bus{}
+	var manufacturingYear sql.NullInt64
+	var lastMaintenanceDate sql.NullTime
+	var insuranceExpiry sql.NullTime
+
 	err := r.db.QueryRow(query, busID).Scan(
 		&bus.ID, &bus.BusOwnerID, &bus.PermitID, &bus.BusNumber, &bus.LicensePlate,
-		&bus.BusType, &bus.TotalSeats, &bus.ManufacturingYear, &bus.LastMaintenanceDate,
-		&bus.InsuranceExpiry, &bus.Status, &bus.HasWifi, &bus.HasAC, &bus.HasChargingPorts,
+		&bus.BusType, &bus.TotalSeats, &manufacturingYear, &lastMaintenanceDate,
+		&insuranceExpiry, &bus.Status, &bus.HasWifi, &bus.HasAC, &bus.HasChargingPorts,
 		&bus.HasEntertainment, &bus.HasRefreshments, &bus.CreatedAt, &bus.UpdatedAt,
 	)
 
 	if err != nil {
 		return nil, err
+	}
+
+	// Convert sql.Null* types to pointers
+	if manufacturingYear.Valid {
+		year := int(manufacturingYear.Int64)
+		bus.ManufacturingYear = &year
+	}
+	if lastMaintenanceDate.Valid {
+		bus.LastMaintenanceDate = &lastMaintenanceDate.Time
+	}
+	if insuranceExpiry.Valid {
+		bus.InsuranceExpiry = &insuranceExpiry.Time
 	}
 
 	return bus, nil
@@ -93,15 +109,32 @@ func (r *BusRepository) GetByOwnerID(busOwnerID string) ([]models.Bus, error) {
 	buses := []models.Bus{}
 	for rows.Next() {
 		var bus models.Bus
+		var manufacturingYear sql.NullInt64
+		var lastMaintenanceDate sql.NullTime
+		var insuranceExpiry sql.NullTime
+
 		err := rows.Scan(
 			&bus.ID, &bus.BusOwnerID, &bus.PermitID, &bus.BusNumber, &bus.LicensePlate,
-			&bus.BusType, &bus.TotalSeats, &bus.ManufacturingYear, &bus.LastMaintenanceDate,
-			&bus.InsuranceExpiry, &bus.Status, &bus.HasWifi, &bus.HasAC, &bus.HasChargingPorts,
+			&bus.BusType, &bus.TotalSeats, &manufacturingYear, &lastMaintenanceDate,
+			&insuranceExpiry, &bus.Status, &bus.HasWifi, &bus.HasAC, &bus.HasChargingPorts,
 			&bus.HasEntertainment, &bus.HasRefreshments, &bus.CreatedAt, &bus.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
+
+		// Convert sql.Null* types to pointers
+		if manufacturingYear.Valid {
+			year := int(manufacturingYear.Int64)
+			bus.ManufacturingYear = &year
+		}
+		if lastMaintenanceDate.Valid {
+			bus.LastMaintenanceDate = &lastMaintenanceDate.Time
+		}
+		if insuranceExpiry.Valid {
+			bus.InsuranceExpiry = &insuranceExpiry.Time
+		}
+
 		buses = append(buses, bus)
 	}
 
@@ -121,10 +154,14 @@ func (r *BusRepository) GetByLicensePlate(licensePlate string) (*models.Bus, err
 	`
 
 	bus := &models.Bus{}
+	var manufacturingYear sql.NullInt64
+	var lastMaintenanceDate sql.NullTime
+	var insuranceExpiry sql.NullTime
+
 	err := r.db.QueryRow(query, licensePlate).Scan(
 		&bus.ID, &bus.BusOwnerID, &bus.PermitID, &bus.BusNumber, &bus.LicensePlate,
-		&bus.BusType, &bus.TotalSeats, &bus.ManufacturingYear, &bus.LastMaintenanceDate,
-		&bus.InsuranceExpiry, &bus.Status, &bus.HasWifi, &bus.HasAC, &bus.HasChargingPorts,
+		&bus.BusType, &bus.TotalSeats, &manufacturingYear, &lastMaintenanceDate,
+		&insuranceExpiry, &bus.Status, &bus.HasWifi, &bus.HasAC, &bus.HasChargingPorts,
 		&bus.HasEntertainment, &bus.HasRefreshments, &bus.CreatedAt, &bus.UpdatedAt,
 	)
 
@@ -133,6 +170,18 @@ func (r *BusRepository) GetByLicensePlate(licensePlate string) (*models.Bus, err
 			return nil, nil
 		}
 		return nil, err
+	}
+
+	// Convert sql.Null* types to pointers
+	if manufacturingYear.Valid {
+		year := int(manufacturingYear.Int64)
+		bus.ManufacturingYear = &year
+	}
+	if lastMaintenanceDate.Valid {
+		bus.LastMaintenanceDate = &lastMaintenanceDate.Time
+	}
+	if insuranceExpiry.Valid {
+		bus.InsuranceExpiry = &insuranceExpiry.Time
 	}
 
 	return bus, nil
@@ -277,10 +326,14 @@ func (r *BusRepository) GetByPermitID(permitID string) (*models.Bus, error) {
 	`
 
 	bus := &models.Bus{}
+	var manufacturingYear sql.NullInt64
+	var lastMaintenanceDate sql.NullTime
+	var insuranceExpiry sql.NullTime
+
 	err := r.db.QueryRow(query, permitID).Scan(
 		&bus.ID, &bus.BusOwnerID, &bus.PermitID, &bus.BusNumber, &bus.LicensePlate,
-		&bus.BusType, &bus.TotalSeats, &bus.ManufacturingYear, &bus.LastMaintenanceDate,
-		&bus.InsuranceExpiry, &bus.Status, &bus.HasWifi, &bus.HasAC, &bus.HasChargingPorts,
+		&bus.BusType, &bus.TotalSeats, &manufacturingYear, &lastMaintenanceDate,
+		&insuranceExpiry, &bus.Status, &bus.HasWifi, &bus.HasAC, &bus.HasChargingPorts,
 		&bus.HasEntertainment, &bus.HasRefreshments, &bus.CreatedAt, &bus.UpdatedAt,
 	)
 
@@ -289,6 +342,18 @@ func (r *BusRepository) GetByPermitID(permitID string) (*models.Bus, error) {
 			return nil, nil
 		}
 		return nil, err
+	}
+
+	// Convert sql.Null* types to pointers
+	if manufacturingYear.Valid {
+		year := int(manufacturingYear.Int64)
+		bus.ManufacturingYear = &year
+	}
+	if lastMaintenanceDate.Valid {
+		bus.LastMaintenanceDate = &lastMaintenanceDate.Time
+	}
+	if insuranceExpiry.Valid {
+		bus.InsuranceExpiry = &insuranceExpiry.Time
 	}
 
 	return bus, nil
@@ -316,15 +381,32 @@ func (r *BusRepository) GetByStatus(busOwnerID string, status string) ([]models.
 	buses := []models.Bus{}
 	for rows.Next() {
 		var bus models.Bus
+		var manufacturingYear sql.NullInt64
+		var lastMaintenanceDate sql.NullTime
+		var insuranceExpiry sql.NullTime
+
 		err := rows.Scan(
 			&bus.ID, &bus.BusOwnerID, &bus.PermitID, &bus.BusNumber, &bus.LicensePlate,
-			&bus.BusType, &bus.TotalSeats, &bus.ManufacturingYear, &bus.LastMaintenanceDate,
-			&bus.InsuranceExpiry, &bus.Status, &bus.HasWifi, &bus.HasAC, &bus.HasChargingPorts,
+			&bus.BusType, &bus.TotalSeats, &manufacturingYear, &lastMaintenanceDate,
+			&insuranceExpiry, &bus.Status, &bus.HasWifi, &bus.HasAC, &bus.HasChargingPorts,
 			&bus.HasEntertainment, &bus.HasRefreshments, &bus.CreatedAt, &bus.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
+
+		// Convert sql.Null* types to pointers
+		if manufacturingYear.Valid {
+			year := int(manufacturingYear.Int64)
+			bus.ManufacturingYear = &year
+		}
+		if lastMaintenanceDate.Valid {
+			bus.LastMaintenanceDate = &lastMaintenanceDate.Time
+		}
+		if insuranceExpiry.Valid {
+			bus.InsuranceExpiry = &insuranceExpiry.Time
+		}
+
 		buses = append(buses, bus)
 	}
 
