@@ -94,32 +94,25 @@ func main() {
 	busRepository := database.NewBusRepository(db)
 
 	// Initialize lounge owner repositories
-	loungeOwnerRepository := database.NewLoungeOwnerRepository(db)
-	loungeRepository := database.NewLoungeRepository(db)
-
-	// Initialize trip scheduling repositories
-	// masterRouteRepo := database.NewMasterRouteRepository(db) // TODO: Add master routes handler later
-	tripScheduleRepo := database.NewTripScheduleRepository(db)
-	scheduledTripRepo := database.NewScheduledTripRepository(db)
-	// activeTripRepo := database.NewActiveTripRepository(db) // TODO: Add active trips handler later
-	// bookingRepo := database.NewBookingRepository(db) // TODO: Add bookings handler later
+	// Type assertion needed: db is interface DB, but repositories need *sqlx.DB
+	sqlxDB, ok := db.(*database.PostgresDB)
+	if !ok {
+		logger.Fatal("Failed to cast database connection to PostgresDB")
+	}
+	loungeOwnerRepository := database.NewLoungeOwnerRepository(sqlxDB.DB)
+	loungeRepository := database.NewLoungeRepository(sqlxDB.DB)
 
 	// Initialize staff service
 	staffService := services.NewStaffService(staffRepository, ownerRepository, userRepository)
 
-	// Initialize trip generator service
-	tripGeneratorSvc := services.NewTripGeneratorService(
-		tripScheduleRepo,
-		scheduledTripRepo,
-		busRepository,
-	)
-
-	// Initialize and start cron service
-	cronService := services.NewCronService(tripGeneratorSvc)
-	if err := cronService.Start(); err != nil {
-		logger.Fatalf("Failed to start cron service: %v", err)
-	}
-	logger.Info("✓ Cron service started - Trip auto-generation enabled")
+	// TODO: Trip scheduling system - Not included in this release
+	// The following components need to be implemented and deployed separately:
+	// - database.NewTripScheduleRepository
+	// - database.NewScheduledTripRepository
+	// - services.NewTripGeneratorService
+	// - services.NewCronService
+	// - handlers.NewTripScheduleHandler
+	// - handlers.NewScheduledTripHandler
 
 	// Initialize SMS Gateway (Dialog)
 	var smsGateway sms.SMSGateway
@@ -199,20 +192,9 @@ func main() {
 	loungeOwnerHandler := handlers.NewLoungeOwnerHandler(loungeOwnerRepository, loungeRepository, userRepository)
 	adminHandler := handlers.NewAdminHandler(loungeOwnerRepository, loungeRepository, userRepository)
 
-	// Initialize trip scheduling handlers
-	tripScheduleHandler := handlers.NewTripScheduleHandler(
-		tripScheduleRepo,
-		permitRepository,
-		ownerRepository,
-		busRepository,
-		tripGeneratorSvc,
-	)
-	scheduledTripHandler := handlers.NewScheduledTripHandler(
-		scheduledTripRepo,
-		tripScheduleRepo,
-		permitRepository,
-		ownerRepository,
-	)
+	// TODO: Trip scheduling handlers - Not included in this release
+	// tripScheduleHandler := handlers.NewTripScheduleHandler(...)
+	// scheduledTripHandler := handlers.NewScheduledTripHandler(...)
 
 	// Initialize Gin router
 	router := gin.New()
@@ -343,6 +325,9 @@ func main() {
 			buses.GET("/status/:status", busHandler.GetBusesByStatus)
 		}
 
+		// TODO: Trip Schedule routes - Not included in this release
+		// Uncomment when trip scheduling system is ready
+		/*
 		// Trip Schedule routes (all protected - bus owners only)
 		tripSchedules := v1.Group("/trip-schedules")
 		tripSchedules.Use(middleware.AuthMiddleware(jwtService))
@@ -371,11 +356,14 @@ func main() {
 
 		// Public bookable trips (no auth required)
 		v1.GET("/bookable-trips", scheduledTripHandler.GetBookableTrips)
+		*/
 
 		// Admin cron management routes (optional - for testing)
 		admin := v1.Group("/admin")
 		// TODO: Add admin auth middleware
 		{
+			// TODO: Cron management - Not included in this release
+			/*
 			// Cron management
 			admin.POST("/cron/generate-trips", func(c *gin.Context) {
 				cronService.RunGenerateFutureTripsNow()
@@ -391,6 +379,7 @@ func main() {
 				status := cronService.GetJobStatus()
 				c.JSON(200, status)
 			})
+			*/
 
 			// Lounge Owner approval (TODO: Implement)
 			admin.GET("/lounge-owners/pending", adminHandler.GetPendingLoungeOwners)
@@ -440,9 +429,9 @@ func main() {
 
 	logger.Info("Shutting down server...")
 
-	// Stop cron service first
-	logger.Info("Stopping cron service...")
-	cronService.Stop()
+	// TODO: Stop cron service - Not included in this release
+	// logger.Info("Stopping cron service...")
+	// cronService.Stop()
 
 	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
