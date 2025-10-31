@@ -609,6 +609,255 @@ func (h *AuthHandler) VerifyOTPStaff(c *gin.Context) {
 	})
 }
 
+// VerifyOTPLoungeOwner handles POST /api/v1/auth/verify-otp-lounge-owner
+// This endpoint is specifically for lounge owner app authentication
+// It creates users and adds 'lounge_owner' role immediately
+func (h *AuthHandler) VerifyOTPLoungeOwner(c *gin.Context, loungeOwnerRepo *database.LoungeOwnerRepository) {
+	var req VerifyOTPRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "validation_error",
+			Message: "Invalid request body",
+		})
+		return
+	}
+
+	// Validate phone number
+	phone, err := h.phoneValidator.Validate(req.Phone)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid_phone",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	// Get real client IP and user agent
+	clientIP := utils.GetRealIP(c)
+	userAgent := utils.GetUserAgent(c)
+
+	// Get current attempts before validation
+	remainingBefore, _ := h.otpService.GetRemainingAttempts(phone)
+
+	// Validate OTP
+	valid, err := h.otpService.ValidateOTP(phone, req.OTP)
+	if err != nil {
+		// Log failed verification
+		attempts := 3 - remainingBefore + 1
+		h.auditService.LogOTPVerification(nil, phone, false, attempts, clientIP, userAgent, err.Error())
+
+		// Check specific error types
+		switch err {
+		case services.ErrOTPExpired:
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "otp_expired",
+				Message: "OTP has expired. Please request a new one.",
+				Code:    "OTP_EXPIRED",
+			})
+		case services.ErrOTPInvalid:
+			remaining, _ := h.otpService.GetRemainingAttempts(phone)
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "otp_invalid",
+				Message: "Invalid OTP code",
+				Code:    "OTP_INVALID",
+			})
+			c.Header("X-Remaining-Attempts", string(rune(remaining)))
+		case services.ErrMaxAttemptsExceeded:
+			c.JSON(http.StatusTooManyRequests, ErrorResponse{
+				Error:   "max_attempts_exceeded",
+				Message: "Maximum OTP validation attempts exceeded. Please request a new OTP.",
+				Code:    "MAX_ATTEMPTS",
+			})
+		case services.ErrNoOTPFound:
+			c.JSON(http.StatusNotFound, ErrorResponse{
+				Error:   "no_otp_found",
+				Message: "No OTP found for this phone number. Please request an OTP first.",
+				Code:    "NO_OTP",
+			})
+		case services.ErrOTPAlreadyUsed:
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "otp_already_used",
+				Message: "This OTP has already been used. Please request a new one.",
+				Code:    "OTP_USED",
+			})
+		default:
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "validation_failed",
+				Message: "Failed to validate OTP",
+			})
+		}
+		return
+	}
+
+	if !valid {
+		// Log invalid OTP
+		attempts := 3 - remainingBefore + 1
+		h.auditService.LogOTPVerification(nil, phone, false, attempts, clientIP, userAgent, "invalid_code")
+
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "otp_invalid",
+			Message: "Invalid OTP code",
+		})
+		return
+	}
+
+	// Check if user already exists
+	existingUser, err := h.userRepository.GetUserByPhone(phone)
+	if err != nil {
+		log.Printf("ERROR: Failed to check existing user for phone %s: %v", phone, err)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "user_check_failed",
+			Message: "Failed to check user status",
+		})
+		return
+	}
+
+	var user *models.User
+	isNew := false
+
+	if existingUser != nil {
+		// EXISTING USER
+		user = existingUser
+
+		// Add 'lounge_owner' role if not already present
+		hasLoungeOwnerRole := false
+		for _, role := range user.Roles {
+			if role == "lounge_owner" {
+				hasLoungeOwnerRole = true
+				break
+			}
+		}
+
+		if !hasLoungeOwnerRole {
+			// Add lounge_owner role
+			err = h.userRepository.AddRole(user.ID, "lounge_owner")
+			if err != nil {
+				log.Printf("ERROR: Failed to add lounge_owner role to user %s: %v", user.ID, err)
+				// Continue anyway
+			} else {
+				user.Roles = append(user.Roles, "lounge_owner")
+				log.Printf("INFO: Added lounge_owner role to existing user: %s", phone)
+			}
+		}
+
+		log.Printf("INFO: Existing user logged in to lounge owner app: %s (roles: %v)", phone, user.Roles)
+	} else {
+		// NEW USER - Create with lounge_owner role
+		user, err = h.userRepository.CreateUserWithRole(phone, "lounge_owner")
+		if err != nil {
+			log.Printf("ERROR: Failed to create lounge owner user for phone %s: %v", phone, err)
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "user_creation_failed",
+				Message: "Failed to create user account",
+			})
+			return
+		}
+		isNew = true
+		log.Printf("INFO: New lounge owner user created: %s", phone)
+	}
+
+	// Create lounge_owner record if doesn't exist
+	existingOwner, err := loungeOwnerRepo.GetLoungeOwnerByUserID(user.ID)
+	if err != nil {
+		log.Printf("ERROR: Failed to check lounge owner record: %v", err)
+		// Continue anyway
+	}
+
+	if existingOwner == nil {
+		// Create lounge owner record
+		_, err = loungeOwnerRepo.CreateLoungeOwner(user.ID)
+		if err != nil {
+			log.Printf("ERROR: Failed to create lounge owner record for user %s: %v", user.ID, err)
+			// Don't fail login, but log error
+		} else {
+			log.Printf("INFO: Created lounge_owner record for user %s", user.ID)
+		}
+	}
+
+	// Generate JWT tokens with user's actual data
+	accessToken, err := h.jwtService.GenerateAccessToken(
+		user.ID,
+		user.Phone,
+		user.Roles,
+		user.ProfileCompleted,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "token_generation_failed",
+			Message: "Failed to generate access token",
+		})
+		return
+	}
+
+	refreshToken, err := h.jwtService.GenerateRefreshToken(user.ID, user.Phone)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "token_generation_failed",
+			Message: "Failed to generate refresh token",
+		})
+		return
+	}
+
+	// Store refresh token in database
+	expiresAt := time.Now().Add(7 * 24 * time.Hour) // 7 days
+
+	// Get device info from request if provided
+	deviceID := c.GetHeader("X-Device-ID")
+	deviceType := c.GetHeader("X-Device-Type")
+
+	err = h.refreshTokenRepository.StoreRefreshToken(
+		user.ID,
+		refreshToken,
+		deviceID,
+		deviceType,
+		clientIP,
+		userAgent,
+		expiresAt,
+	)
+	if err != nil {
+		// Log error but don't fail the login
+		log.Printf("WARNING: Failed to store refresh token for user %s: %v", user.ID, err)
+	}
+
+	// Log successful OTP verification and login (lounge owner app)
+	h.auditService.LogOTPVerification(&user.ID, phone, true, 3-remainingBefore+1, clientIP, userAgent, "")
+	h.auditService.LogLogin(user.ID, phone, clientIP, userAgent, deviceID, deviceType)
+
+	// Create or update user session
+	deviceModel := c.GetHeader("X-Device-Model")
+	appVersion := c.GetHeader("X-App-Version")
+	osVersion := c.GetHeader("X-OS-Version")
+	fcmToken := c.GetHeader("X-FCM-Token")
+
+	if deviceID != "" && deviceType != "" {
+		_, err = h.userSessionRepository.CreateOrUpdateSession(
+			user.ID,
+			deviceID,
+			deviceType,
+			deviceModel,
+			appVersion,
+			osVersion,
+			clientIP,
+			fcmToken,
+		)
+		if err != nil {
+			// Log error but don't fail the login
+			log.Printf("WARNING: Failed to create/update session for user %s: %v", user.ID, err)
+		}
+	}
+
+	c.JSON(http.StatusOK, VerifyOTPResponse{
+		Message:         "OTP verified successfully",
+		AccessToken:     accessToken,
+		RefreshToken:    refreshToken,
+		ExpiresIn:       3600, // 1 hour
+		IsNewUser:       isNew,
+		ProfileComplete: user.ProfileCompleted,
+		Roles:           user.Roles, // Include user roles including 'lounge_owner'
+	})
+}
+
 // GetOTPStatus handles GET /api/v1/auth/otp-status/:phone
 func (h *AuthHandler) GetOTPStatus(c *gin.Context) {
 	phone := c.Param("phone")

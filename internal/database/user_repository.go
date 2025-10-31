@@ -167,6 +167,23 @@ func (r *UserRepository) HasRole(user *models.User, role string) bool {
 	return false
 }
 
+// AddRole adds a role to an existing user
+func (r *UserRepository) AddRole(userID uuid.UUID, role string) error {
+	query := `
+		UPDATE users 
+		SET roles = array_append(roles, $1),
+		    updated_at = NOW()
+		WHERE id = $2 AND NOT ($1 = ANY(roles))
+	`
+
+	_, err := r.db.Exec(query, role, userID)
+	if err != nil {
+		return fmt.Errorf("failed to add role: %w", err)
+	}
+
+	return nil
+}
+
 // GetUserByPhone retrieves a user by phone number
 func (r *UserRepository) GetUserByPhone(phone string) (*models.User, error) {
 	var user models.User
@@ -418,11 +435,11 @@ func (r *UserRepository) UpdateUserStatus(id uuid.UUID, status string) error {
 func (r *UserRepository) AddUserRole(id uuid.UUID, role string) error {
 	// Validate role
 	validRoles := map[string]bool{
-		"passenger":  true,
-		"driver":     true,
-		"conductor":  true,
-		"bus_owner":  true, // Added for bus owner onboarding
-		"admin":      true,
+		"passenger": true,
+		"driver":    true,
+		"conductor": true,
+		"bus_owner": true, // Added for bus owner onboarding
+		"admin":     true,
 	}
 
 	if !validRoles[role] {

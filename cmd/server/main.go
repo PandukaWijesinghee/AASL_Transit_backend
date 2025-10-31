@@ -93,8 +93,33 @@ func main() {
 	permitRepository := database.NewRoutePermitRepository(db)
 	busRepository := database.NewBusRepository(db)
 
+	// Initialize lounge owner repositories
+	loungeOwnerRepository := database.NewLoungeOwnerRepository(db)
+	loungeRepository := database.NewLoungeRepository(db)
+
+	// Initialize trip scheduling repositories
+	// masterRouteRepo := database.NewMasterRouteRepository(db) // TODO: Add master routes handler later
+	tripScheduleRepo := database.NewTripScheduleRepository(db)
+	scheduledTripRepo := database.NewScheduledTripRepository(db)
+	// activeTripRepo := database.NewActiveTripRepository(db) // TODO: Add active trips handler later
+	// bookingRepo := database.NewBookingRepository(db) // TODO: Add bookings handler later
+
 	// Initialize staff service
 	staffService := services.NewStaffService(staffRepository, ownerRepository, userRepository)
+
+	// Initialize trip generator service
+	tripGeneratorSvc := services.NewTripGeneratorService(
+		tripScheduleRepo,
+		scheduledTripRepo,
+		busRepository,
+	)
+
+	// Initialize and start cron service
+	cronService := services.NewCronService(tripGeneratorSvc)
+	if err := cronService.Start(); err != nil {
+		logger.Fatalf("Failed to start cron service: %v", err)
+	}
+	logger.Info("✓ Cron service started - Trip auto-generation enabled")
 
 	// Initialize SMS Gateway (Dialog)
 	var smsGateway sms.SMSGateway
@@ -170,6 +195,25 @@ func main() {
 	permitHandler := handlers.NewPermitHandler(permitRepository, ownerRepository)
 	busHandler := handlers.NewBusHandler(busRepository, permitRepository, ownerRepository)
 
+	// Initialize lounge owner and admin handlers
+	loungeOwnerHandler := handlers.NewLoungeOwnerHandler(loungeOwnerRepository, loungeRepository, userRepository)
+	adminHandler := handlers.NewAdminHandler(loungeOwnerRepository, loungeRepository, userRepository)
+
+	// Initialize trip scheduling handlers
+	tripScheduleHandler := handlers.NewTripScheduleHandler(
+		tripScheduleRepo,
+		permitRepository,
+		ownerRepository,
+		busRepository,
+		tripGeneratorSvc,
+	)
+	scheduledTripHandler := handlers.NewScheduledTripHandler(
+		scheduledTripRepo,
+		tripScheduleRepo,
+		permitRepository,
+		ownerRepository,
+	)
+
 	// Initialize Gin router
 	router := gin.New()
 
@@ -208,7 +252,10 @@ func main() {
 		{
 			auth.POST("/send-otp", authHandler.SendOTP)
 			auth.POST("/verify-otp", authHandler.VerifyOTP)
-			auth.POST("/verify-otp-staff", authHandler.VerifyOTPStaff) // New staff-specific endpoint
+			auth.POST("/verify-otp-staff", authHandler.VerifyOTPStaff) // Staff-specific endpoint
+			auth.POST("/verify-otp-lounge-owner", func(c *gin.Context) {
+				authHandler.VerifyOTPLoungeOwner(c, loungeOwnerRepository)
+			}) // Lounge owner-specific endpoint
 			auth.GET("/otp-status/:phone", authHandler.GetOTPStatus)
 			auth.POST("/refresh-token", authHandler.RefreshToken)
 			auth.POST("/refresh", authHandler.RefreshToken) // Alias for mobile compatibility
@@ -253,8 +300,23 @@ func main() {
 			busOwner.GET("/profile", busOwnerHandler.GetProfile)
 			busOwner.GET("/profile-status", busOwnerHandler.CheckProfileStatus)
 			busOwner.POST("/complete-onboarding", busOwnerHandler.CompleteOnboarding)
-			busOwner.GET("/staff", busOwnerHandler.GetStaff)   // Get all staff (drivers & conductors)
-			busOwner.POST("/staff", busOwnerHandler.AddStaff)  // Add driver or conductor
+			busOwner.GET("/staff", busOwnerHandler.GetStaff)  // Get all staff (drivers & conductors)
+			busOwner.POST("/staff", busOwnerHandler.AddStaff) // Add driver or conductor
+		}
+
+		// Lounge Owner routes (all protected)
+		loungeOwner := v1.Group("/lounge-owner")
+		loungeOwner.Use(middleware.AuthMiddleware(jwtService))
+		{
+			// Registration endpoints
+			loungeOwner.POST("/register/personal-info", loungeOwnerHandler.SavePersonalInfo)
+			loungeOwner.POST("/register/upload-nic", loungeOwnerHandler.UploadNIC)
+			loungeOwner.POST("/register/add-lounge", loungeOwnerHandler.AddLounge)
+			loungeOwner.GET("/registration/progress", loungeOwnerHandler.GetRegistrationProgress)
+
+			// Profile endpoints
+			loungeOwner.GET("/profile", loungeOwnerHandler.GetProfile)
+			loungeOwner.GET("/lounges", loungeOwnerHandler.GetMyLounges)
 		}
 
 		// Permit routes (all protected)
@@ -279,6 +341,78 @@ func main() {
 			buses.PUT("/:id", busHandler.UpdateBus)
 			buses.DELETE("/:id", busHandler.DeleteBus)
 			buses.GET("/status/:status", busHandler.GetBusesByStatus)
+		}
+
+		// Trip Schedule routes (all protected - bus owners only)
+		tripSchedules := v1.Group("/trip-schedules")
+		tripSchedules.Use(middleware.AuthMiddleware(jwtService))
+		{
+			tripSchedules.GET("", tripScheduleHandler.GetAllSchedules)
+			tripSchedules.POST("", tripScheduleHandler.CreateSchedule)
+			tripSchedules.GET("/:id", tripScheduleHandler.GetScheduleByID)
+			tripSchedules.PUT("/:id", tripScheduleHandler.UpdateSchedule)
+			tripSchedules.DELETE("/:id", tripScheduleHandler.DeleteSchedule)
+			tripSchedules.POST("/:id/deactivate", tripScheduleHandler.DeactivateSchedule)
+		}
+
+		// Scheduled Trip routes (all protected - bus owners only)
+		scheduledTrips := v1.Group("/scheduled-trips")
+		scheduledTrips.Use(middleware.AuthMiddleware(jwtService))
+		{
+			scheduledTrips.GET("", scheduledTripHandler.GetTripsByDateRange)
+			scheduledTrips.GET("/:id", scheduledTripHandler.GetTripByID)
+			scheduledTrips.PATCH("/:id", scheduledTripHandler.UpdateTrip)
+			scheduledTrips.POST("/:id/cancel", scheduledTripHandler.CancelTrip)
+		}
+
+		// Permit-specific trip routes
+		permits.GET("/:permitId/trip-schedules", tripScheduleHandler.GetSchedulesByPermit)
+		permits.GET("/:permitId/scheduled-trips", scheduledTripHandler.GetTripsByPermit)
+
+		// Public bookable trips (no auth required)
+		v1.GET("/bookable-trips", scheduledTripHandler.GetBookableTrips)
+
+		// Admin cron management routes (optional - for testing)
+		admin := v1.Group("/admin")
+		// TODO: Add admin auth middleware
+		{
+			// Cron management
+			admin.POST("/cron/generate-trips", func(c *gin.Context) {
+				cronService.RunGenerateFutureTripsNow()
+				c.JSON(200, gin.H{"message": "Trip generation triggered"})
+			})
+
+			admin.POST("/cron/fill-missing", func(c *gin.Context) {
+				cronService.RunFillMissingTripsNow()
+				c.JSON(200, gin.H{"message": "Fill missing trips triggered"})
+			})
+
+			admin.GET("/cron/status", func(c *gin.Context) {
+				status := cronService.GetJobStatus()
+				c.JSON(200, status)
+			})
+
+			// Lounge Owner approval (TODO: Implement)
+			admin.GET("/lounge-owners/pending", adminHandler.GetPendingLoungeOwners)
+			admin.GET("/lounge-owners/:id", adminHandler.GetLoungeOwnerDetails)
+			admin.POST("/lounge-owners/:id/approve", adminHandler.ApproveLoungeOwner)
+			admin.POST("/lounge-owners/:id/reject", adminHandler.RejectLoungeOwner)
+
+			// Lounge approval (TODO: Implement)
+			admin.GET("/lounges/pending", adminHandler.GetPendingLounges)
+			admin.POST("/lounges/:id/approve", adminHandler.ApproveLounge)
+			admin.POST("/lounges/:id/reject", adminHandler.RejectLounge)
+
+			// Bus Owner approval (TODO: Implement later)
+			admin.GET("/bus-owners/pending", adminHandler.GetPendingBusOwners)
+			admin.POST("/bus-owners/:id/approve", adminHandler.ApproveBusOwner)
+
+			// Staff approval (TODO: Implement later)
+			admin.GET("/staff/pending", adminHandler.GetPendingStaff)
+			admin.POST("/staff/:id/approve", adminHandler.ApproveStaff)
+
+			// Dashboard stats (TODO: Implement)
+			admin.GET("/dashboard/stats", adminHandler.GetDashboardStats)
 		}
 	}
 
@@ -305,6 +439,10 @@ func main() {
 	<-quit
 
 	logger.Info("Shutting down server...")
+
+	// Stop cron service first
+	logger.Info("Stopping cron service...")
+	cronService.Stop()
 
 	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -434,11 +572,11 @@ func debugHeadersHandler() gin.HandlerFunc {
 			"message": "Debug information for IP detection",
 			"headers": headers,
 			"ip_detection": gin.H{
-				"gin_clientip":     c.ClientIP(),
-				"remote_addr":      c.Request.RemoteAddr,
-				"x_real_ip":        c.Request.Header.Get("X-Real-IP"),
-				"x_forwarded_for":  c.Request.Header.Get("X-Forwarded-For"),
-				"x_forwarded_host": c.Request.Header.Get("X-Forwarded-Host"),
+				"gin_clientip":      c.ClientIP(),
+				"remote_addr":       c.Request.RemoteAddr,
+				"x_real_ip":         c.Request.Header.Get("X-Real-IP"),
+				"x_forwarded_for":   c.Request.Header.Get("X-Forwarded-For"),
+				"x_forwarded_host":  c.Request.Header.Get("X-Forwarded-Host"),
 				"x_forwarded_proto": c.Request.Header.Get("X-Forwarded-Proto"),
 			},
 			"user_agent": c.Request.UserAgent(),
