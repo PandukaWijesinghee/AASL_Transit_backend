@@ -13,7 +13,8 @@ type LoungeOwner struct {
 	UserID uuid.UUID `db:"user_id" json:"user_id"`
 
 	// Personal Information
-	FullName sql.NullString `db:"full_name" json:"full_name,omitempty"` // Name as on NIC
+	FullName sql.NullString `db:"full_name" json:"full_name,omitempty"`     // Name as on NIC
+	Email    sql.NullString `db:"email" json:"email,omitempty"`             // Personal email (Step 1)
 
 	// NIC Information
 	NICNumber        sql.NullString `db:"nic_number" json:"nic_number,omitempty"`
@@ -25,23 +26,24 @@ type LoungeOwner struct {
 
 	// Registration Progress Tracking
 	RegistrationStep string `db:"registration_step" json:"registration_step"` // phone_verified, personal_info, nic_uploaded, lounge_added, completed
+	ProfileCompleted bool   `db:"profile_completed" json:"profile_completed"` // True when registration_step = 'completed'
 
 	// Business Information (Required during registration)
-	BusinessName           sql.NullString `db:"business_name" json:"business_name,omitempty"`
-	BusinessLicense        sql.NullString `db:"business_license" json:"business_license,omitempty"`
-	ContactPerson          sql.NullString `db:"contact_person" json:"contact_person,omitempty"`
-	BusinessAddress        sql.NullString `db:"business_address" json:"business_address,omitempty"`
-	City                   sql.NullString `db:"city" json:"city,omitempty"`
-	State                  sql.NullString `db:"state" json:"state,omitempty"`
-	Country                sql.NullString `db:"country" json:"country,omitempty"`
-	PostalCode             sql.NullString `db:"postal_code" json:"postal_code,omitempty"`
-	BusinessEmail          sql.NullString `db:"business_email" json:"business_email,omitempty"`
-	BusinessPhone          sql.NullString `db:"business_phone" json:"business_phone,omitempty"`
-	TaxID                  sql.NullString `db:"tax_id" json:"tax_id,omitempty"`
-	BankAccountDetails     []byte         `db:"bank_account_details" json:"bank_account_details,omitempty"` // JSONB
-	VerificationDocuments  []byte         `db:"verification_documents" json:"verification_documents,omitempty"` // JSONB
-	VerificationStatus     string         `db:"verification_status" json:"verification_status"`                 // pending, approved, rejected
-	TotalLounges           int            `db:"total_lounges" json:"total_lounges"`
+	BusinessName          sql.NullString `db:"business_name" json:"business_name,omitempty"`
+	BusinessLicense       sql.NullString `db:"business_license" json:"business_license,omitempty"`
+	ContactPerson         sql.NullString `db:"contact_person" json:"contact_person,omitempty"`
+	BusinessAddress       sql.NullString `db:"business_address" json:"business_address,omitempty"`
+	City                  sql.NullString `db:"city" json:"city,omitempty"`
+	State                 sql.NullString `db:"state" json:"state,omitempty"`
+	Country               sql.NullString `db:"country" json:"country,omitempty"`
+	PostalCode            sql.NullString `db:"postal_code" json:"postal_code,omitempty"`
+	BusinessEmail         sql.NullString `db:"business_email" json:"business_email,omitempty"`
+	BusinessPhone         sql.NullString `db:"business_phone" json:"business_phone,omitempty"`
+	TaxID                 sql.NullString `db:"tax_id" json:"tax_id,omitempty"`
+	BankAccountDetails    []byte         `db:"bank_account_details" json:"bank_account_details,omitempty"`     // JSONB
+	VerificationDocuments []byte         `db:"verification_documents" json:"verification_documents,omitempty"` // JSONB
+	VerificationStatus    string         `db:"verification_status" json:"verification_status"`                 // pending, approved, rejected
+	TotalLounges          int            `db:"total_lounges" json:"total_lounges"`
 
 	// Metadata
 	CreatedAt time.Time `db:"created_at" json:"created_at"`

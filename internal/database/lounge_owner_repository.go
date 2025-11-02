@@ -109,7 +109,7 @@ func (r *LoungeOwnerRepository) UpdatePersonalInfo(
 		SET 
 			full_name = $1,
 			nic_number = $2,
-			business_email = $3,
+			email = $3,
 			registration_step = $4,
 			updated_at = NOW()
 		WHERE user_id = $5
