@@ -20,26 +20,25 @@ func NewLoungeOwnerRepository(db *sqlx.DB) *LoungeOwnerRepository {
 	return &LoungeOwnerRepository{db: db}
 }
 
-// CreateLoungeOwner creates a new lounge owner record after OTP verification
+// CreateLoungeOwner creates a new lounge owner record after OTP verification (Step 0)
 func (r *LoungeOwnerRepository) CreateLoungeOwner(userID uuid.UUID) (*models.LoungeOwner, error) {
 	loungeOwner := &models.LoungeOwner{
 		ID:                 uuid.New(),
 		UserID:             userID,
 		RegistrationStep:   models.RegStepPhoneVerified,
-		VerificationStatus: "pending",
-		NICOCRAttempts:     0,
-		TotalLounges:       0,
 		ProfileCompleted:   false,
+		VerificationStatus: "pending",
+		TotalLounges:       0,
 		CreatedAt:          time.Now(),
 		UpdatedAt:          time.Now(),
 	}
 
 	query := `
 		INSERT INTO lounge_owners (
-			id, user_id, registration_step, verification_status, 
-			nic_ocr_attempts, total_lounges, profile_completed, created_at, updated_at
+			id, user_id, registration_step, profile_completed, 
+			verification_status, total_lounges, created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, created_at, updated_at
 	`
 
@@ -48,10 +47,9 @@ func (r *LoungeOwnerRepository) CreateLoungeOwner(userID uuid.UUID) (*models.Lou
 		loungeOwner.ID,
 		loungeOwner.UserID,
 		loungeOwner.RegistrationStep,
-		loungeOwner.VerificationStatus,
-		loungeOwner.NICOCRAttempts,
-		loungeOwner.TotalLounges,
 		loungeOwner.ProfileCompleted,
+		loungeOwner.VerificationStatus,
+		loungeOwner.TotalLounges,
 		loungeOwner.CreatedAt,
 		loungeOwner.UpdatedAt,
 	).Scan(&loungeOwner.ID, &loungeOwner.CreatedAt, &loungeOwner.UpdatedAt)
@@ -66,9 +64,7 @@ func (r *LoungeOwnerRepository) CreateLoungeOwner(userID uuid.UUID) (*models.Lou
 // GetLoungeOwnerByUserID retrieves a lounge owner by user ID
 func (r *LoungeOwnerRepository) GetLoungeOwnerByUserID(userID uuid.UUID) (*models.LoungeOwner, error) {
 	var owner models.LoungeOwner
-
 	query := `SELECT * FROM lounge_owners WHERE user_id = $1`
-
 	err := r.db.Get(&owner, query, userID)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -76,16 +72,13 @@ func (r *LoungeOwnerRepository) GetLoungeOwnerByUserID(userID uuid.UUID) (*model
 	if err != nil {
 		return nil, fmt.Errorf("failed to get lounge owner: %w", err)
 	}
-
 	return &owner, nil
 }
 
 // GetLoungeOwnerByID retrieves a lounge owner by ID
 func (r *LoungeOwnerRepository) GetLoungeOwnerByID(id uuid.UUID) (*models.LoungeOwner, error) {
 	var owner models.LoungeOwner
-
 	query := `SELECT * FROM lounge_owners WHERE id = $1`
-
 	err := r.db.Get(&owner, query, id)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -93,46 +86,51 @@ func (r *LoungeOwnerRepository) GetLoungeOwnerByID(id uuid.UUID) (*models.Lounge
 	if err != nil {
 		return nil, fmt.Errorf("failed to get lounge owner: %w", err)
 	}
-
 	return &owner, nil
 }
 
-// UpdatePersonalInfo updates lounge owner personal information (Step 1)
-func (r *LoungeOwnerRepository) UpdatePersonalInfo(
+// UpdateBusinessAndManagerInfo updates business and manager information (Step 1)
+func (r *LoungeOwnerRepository) UpdateBusinessAndManagerInfo(
 	userID uuid.UUID,
-	fullName string,
-	nicNumber string,
-	email *string,
+	businessName string,
+	businessLicense string,
+	managerFullName string,
+	managerNICNumber string,
+	managerEmail *string,
 ) error {
 	query := `
 		UPDATE lounge_owners 
 		SET 
-			full_name = $1,
-			nic_number = $2,
-			email = $3,
-			registration_step = $4,
+			business_name = $1,
+			business_license = $2,
+			manager_full_name = $3,
+			manager_nic_number = $4,
+			manager_email = $5,
+			registration_step = $6,
 			updated_at = NOW()
-		WHERE user_id = $5
+		WHERE user_id = $7
 	`
 
 	var emailValue interface{}
-	if email != nil && *email != "" {
-		emailValue = *email
+	if managerEmail != nil && *managerEmail != "" {
+		emailValue = *managerEmail
 	} else {
 		emailValue = nil
 	}
 
 	result, err := r.db.Exec(
 		query,
-		fullName,
-		nicNumber,
+		businessName,
+		businessLicense,
+		managerFullName,
+		managerNICNumber,
 		emailValue,
-		models.RegStepPersonalInfo,
+		models.RegStepBusinessInfo,
 		userID,
 	)
 
 	if err != nil {
-		return fmt.Errorf("failed to update personal info: %w", err)
+		return fmt.Errorf("failed to update business and manager info: %w", err)
 	}
 
 	rows, err := result.RowsAffected()
@@ -147,8 +145,8 @@ func (r *LoungeOwnerRepository) UpdatePersonalInfo(
 	return nil
 }
 
-// UpdateNICImages updates NIC image URLs (Step 2)
-func (r *LoungeOwnerRepository) UpdateNICImages(
+// UpdateManagerNICImages updates manager NIC image URLs (Step 2)
+func (r *LoungeOwnerRepository) UpdateManagerNICImages(
 	userID uuid.UUID,
 	frontImageURL string,
 	backImageURL string,
@@ -156,8 +154,8 @@ func (r *LoungeOwnerRepository) UpdateNICImages(
 	query := `
 		UPDATE lounge_owners 
 		SET 
-			nic_front_image_url = $1,
-			nic_back_image_url = $2,
+			manager_nic_front_url = $1,
+			manager_nic_back_url = $2,
 			registration_step = $3,
 			updated_at = NOW()
 		WHERE user_id = $4
@@ -172,7 +170,7 @@ func (r *LoungeOwnerRepository) UpdateNICImages(
 	)
 
 	if err != nil {
-		return fmt.Errorf("failed to update NIC images: %w", err)
+		return fmt.Errorf("failed to update manager NIC images: %w", err)
 	}
 
 	rows, err := result.RowsAffected()
@@ -182,108 +180,6 @@ func (r *LoungeOwnerRepository) UpdateNICImages(
 
 	if rows == 0 {
 		return fmt.Errorf("lounge owner not found")
-	}
-
-	return nil
-}
-
-// IncrementOCRAttempts increments the OCR attempt counter
-func (r *LoungeOwnerRepository) IncrementOCRAttempts(userID uuid.UUID) error {
-	query := `
-		UPDATE lounge_owners 
-		SET 
-			nic_ocr_attempts = nic_ocr_attempts + 1,
-			last_ocr_attempt_at = NOW(),
-			updated_at = NOW()
-		WHERE user_id = $1
-	`
-
-	_, err := r.db.Exec(query, userID)
-	if err != nil {
-		return fmt.Errorf("failed to increment OCR attempts: %w", err)
-	}
-
-	return nil
-}
-
-// SetOCRBlock blocks OCR attempts for 24 hours
-func (r *LoungeOwnerRepository) SetOCRBlock(userID uuid.UUID) error {
-	blockUntil := time.Now().Add(models.OCRBlockDuration)
-
-	query := `
-		UPDATE lounge_owners 
-		SET 
-			ocr_blocked_until = $1,
-			updated_at = NOW()
-		WHERE user_id = $2
-	`
-
-	_, err := r.db.Exec(query, blockUntil, userID)
-	if err != nil {
-		return fmt.Errorf("failed to set OCR block: %w", err)
-	}
-
-	return nil
-}
-
-// IsOCRBlocked checks if OCR attempts are currently blocked
-func (r *LoungeOwnerRepository) IsOCRBlocked(userID uuid.UUID) (bool, time.Time, error) {
-	var blockedUntil sql.NullTime
-
-	query := `
-		SELECT ocr_blocked_until 
-		FROM lounge_owners 
-		WHERE user_id = $1
-	`
-
-	err := r.db.QueryRow(query, userID).Scan(&blockedUntil)
-	if err != nil {
-		return false, time.Time{}, fmt.Errorf("failed to check OCR block: %w", err)
-	}
-
-	if !blockedUntil.Valid {
-		return false, time.Time{}, nil
-	}
-
-	if time.Now().Before(blockedUntil.Time) {
-		return true, blockedUntil.Time, nil
-	}
-
-	return false, time.Time{}, nil
-}
-
-// GetOCRAttempts returns the number of OCR attempts
-func (r *LoungeOwnerRepository) GetOCRAttempts(userID uuid.UUID) (int, error) {
-	var attempts int
-
-	query := `
-		SELECT nic_ocr_attempts 
-		FROM lounge_owners 
-		WHERE user_id = $1
-	`
-
-	err := r.db.QueryRow(query, userID).Scan(&attempts)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get OCR attempts: %w", err)
-	}
-
-	return attempts, nil
-}
-
-// ResetOCRAttempts resets OCR attempts counter (called after 24h block expires)
-func (r *LoungeOwnerRepository) ResetOCRAttempts(userID uuid.UUID) error {
-	query := `
-		UPDATE lounge_owners 
-		SET 
-			nic_ocr_attempts = 0,
-			ocr_blocked_until = NULL,
-			updated_at = NOW()
-		WHERE user_id = $1
-	`
-
-	_, err := r.db.Exec(query, userID)
-	if err != nil {
-		return fmt.Errorf("failed to reset OCR attempts: %w", err)
 	}
 
 	return nil
@@ -326,42 +222,6 @@ func (r *LoungeOwnerRepository) CompleteRegistration(userID uuid.UUID) error {
 	return nil
 }
 
-// UpdateVerificationStatus updates the verification status (for admin approval)
-func (r *LoungeOwnerRepository) UpdateVerificationStatus(id uuid.UUID, status string, notes *string) error {
-	query := `
-		UPDATE lounge_owners 
-		SET 
-			verification_status = $1,
-			updated_at = NOW()
-		WHERE id = $2
-	`
-
-	_, err := r.db.Exec(query, status, id)
-	if err != nil {
-		return fmt.Errorf("failed to update verification status: %w", err)
-	}
-
-	return nil
-}
-
-// IncrementTotalLounges increments the total lounges count
-func (r *LoungeOwnerRepository) IncrementTotalLounges(userID uuid.UUID) error {
-	query := `
-		UPDATE lounge_owners 
-		SET 
-			total_lounges = total_lounges + 1,
-			updated_at = NOW()
-		WHERE user_id = $1
-	`
-
-	_, err := r.db.Exec(query, userID)
-	if err != nil {
-		return fmt.Errorf("failed to increment total lounges: %w", err)
-	}
-
-	return nil
-}
-
 // GetRegistrationProgress returns the current registration step and completion status
 func (r *LoungeOwnerRepository) GetRegistrationProgress(userID uuid.UUID) (string, bool, error) {
 	var step string
@@ -379,4 +239,51 @@ func (r *LoungeOwnerRepository) GetRegistrationProgress(userID uuid.UUID) (strin
 	}
 
 	return step, completed, nil
+}
+
+// UpdateVerificationStatus updates the verification status (for admin approval)
+func (r *LoungeOwnerRepository) UpdateVerificationStatus(id uuid.UUID, status string, notes *string, verifiedBy uuid.UUID) error {
+	query := `
+		UPDATE lounge_owners 
+		SET 
+			verification_status = $1,
+			verification_notes = $2,
+			verified_at = NOW(),
+			verified_by = $3,
+			updated_at = NOW()
+		WHERE id = $4
+	`
+
+	var notesValue interface{}
+	if notes != nil {
+		notesValue = *notes
+	} else {
+		notesValue = nil
+	}
+
+	_, err := r.db.Exec(query, status, notesValue, verifiedBy, id)
+	if err != nil {
+		return fmt.Errorf("failed to update verification status: %w", err)
+	}
+
+	return nil
+}
+
+// GetPendingLoungeOwners retrieves all lounge owners pending verification
+func (r *LoungeOwnerRepository) GetPendingLoungeOwners(limit int, offset int) ([]models.LoungeOwner, error) {
+	var owners []models.LoungeOwner
+
+	query := `
+		SELECT * FROM lounge_owners 
+		WHERE verification_status = 'pending' AND profile_completed = true
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	err := r.db.Select(&owners, query, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pending lounge owners: %w", err)
+	}
+
+	return owners, nil
 }

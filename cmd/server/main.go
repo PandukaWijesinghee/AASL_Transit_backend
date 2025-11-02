@@ -103,6 +103,7 @@ func main() {
 	}
 	loungeOwnerRepository := database.NewLoungeOwnerRepository(sqlxDB.DB)
 	loungeRepository := database.NewLoungeRepository(sqlxDB.DB)
+	loungeStaffRepository := database.NewLoungeStaffRepository(sqlxDB.DB)
 
 	// Initialize staff service
 	staffService := services.NewStaffService(staffRepository, ownerRepository, userRepository)
@@ -190,10 +191,12 @@ func main() {
 	permitHandler := handlers.NewPermitHandler(permitRepository, ownerRepository)
 	busHandler := handlers.NewBusHandler(busRepository, permitRepository, ownerRepository)
 
-	// Initialize lounge owner and admin handlers
-	logger.Info("🔍 DEBUG: Initializing lounge owner handler...")
-	loungeOwnerHandler := handlers.NewLoungeOwnerHandler(loungeOwnerRepository, loungeRepository, userRepository)
-	logger.Info("🔍 DEBUG: Lounge owner handler initialized successfully")
+	// Initialize lounge owner, lounge, staff, and admin handlers
+	logger.Info("🔍 DEBUG: Initializing lounge handlers...")
+	loungeOwnerHandler := handlers.NewLoungeOwnerHandler(loungeOwnerRepository, userRepository)
+	loungeHandler := handlers.NewLoungeHandler(loungeRepository, loungeOwnerRepository)
+	loungeStaffHandler := handlers.NewLoungeStaffHandler(loungeStaffRepository, loungeRepository, loungeOwnerRepository)
+	logger.Info("🔍 DEBUG: Lounge handlers initialized successfully")
 	adminHandler := handlers.NewAdminHandler(loungeOwnerRepository, loungeRepository, userRepository)
 
 	// TODO: Trip scheduling handlers - Not included in this release
@@ -313,22 +316,66 @@ func main() {
 		loungeOwner.Use(middleware.AuthMiddleware(jwtService))
 		{
 			// Registration endpoints
-			logger.Info("  ✅ POST /api/v1/lounge-owner/register/personal-info")
-			loungeOwner.POST("/register/personal-info", loungeOwnerHandler.SavePersonalInfo)
-			logger.Info("  ✅ POST /api/v1/lounge-owner/register/upload-nic")
-			loungeOwner.POST("/register/upload-nic", loungeOwnerHandler.UploadNIC)
+			logger.Info("  ✅ POST /api/v1/lounge-owner/register/business-info")
+			loungeOwner.POST("/register/business-info", loungeOwnerHandler.SaveBusinessAndManagerInfo)
+			logger.Info("  ✅ POST /api/v1/lounge-owner/register/upload-manager-nic")
+			loungeOwner.POST("/register/upload-manager-nic", loungeOwnerHandler.UploadManagerNIC)
 			logger.Info("  ✅ POST /api/v1/lounge-owner/register/add-lounge")
-			loungeOwner.POST("/register/add-lounge", loungeOwnerHandler.AddLounge)
+			loungeOwner.POST("/register/add-lounge", loungeHandler.AddLounge)
 			logger.Info("  ✅ GET /api/v1/lounge-owner/registration/progress")
 			loungeOwner.GET("/registration/progress", loungeOwnerHandler.GetRegistrationProgress)
 
 			// Profile endpoints
 			logger.Info("  ✅ GET /api/v1/lounge-owner/profile")
 			loungeOwner.GET("/profile", loungeOwnerHandler.GetProfile)
-			logger.Info("  ✅ GET /api/v1/lounge-owner/lounges")
-			loungeOwner.GET("/lounges", loungeOwnerHandler.GetMyLounges)
 		}
 		logger.Info("🏢 Lounge Owner routes registered successfully")
+
+		// Lounge routes (protected)
+		logger.Info("🏨 Registering Lounge routes...")
+		lounges := v1.Group("/lounges")
+		{
+			// Public routes (no authentication)
+			logger.Info("  ✅ GET /api/v1/lounges/city/:city (public)")
+			lounges.GET("/city/:city", loungeHandler.GetLoungesByCity)
+
+			// Protected routes (require JWT authentication)
+			loungesProtected := lounges.Group("")
+			loungesProtected.Use(middleware.AuthMiddleware(jwtService))
+			{
+				logger.Info("  ✅ GET /api/v1/lounges/my-lounges")
+				loungesProtected.GET("/my-lounges", loungeHandler.GetMyLounges)
+				logger.Info("  ✅ GET /api/v1/lounges/:id")
+				loungesProtected.GET("/:id", loungeHandler.GetLoungeByID)
+				logger.Info("  ✅ PUT /api/v1/lounges/:id")
+				loungesProtected.PUT("/:id", loungeHandler.UpdateLounge)
+				logger.Info("  ✅ DELETE /api/v1/lounges/:id")
+				loungesProtected.DELETE("/:id", loungeHandler.DeleteLounge)
+
+				// Staff management for specific lounge
+				logger.Info("  ✅ POST /api/v1/lounges/:lounge_id/staff")
+				loungesProtected.POST("/:lounge_id/staff", loungeStaffHandler.AddStaff)
+				logger.Info("  ✅ GET /api/v1/lounges/:lounge_id/staff")
+				loungesProtected.GET("/:lounge_id/staff", loungeStaffHandler.GetStaffByLounge)
+				logger.Info("  ✅ PUT /api/v1/lounges/:lounge_id/staff/:staff_id/permission")
+				loungesProtected.PUT("/:lounge_id/staff/:staff_id/permission", loungeStaffHandler.UpdateStaffPermission)
+				logger.Info("  ✅ PUT /api/v1/lounges/:lounge_id/staff/:staff_id/status")
+				loungesProtected.PUT("/:lounge_id/staff/:staff_id/status", loungeStaffHandler.UpdateStaffStatus)
+				logger.Info("  ✅ DELETE /api/v1/lounges/:lounge_id/staff/:staff_id")
+				loungesProtected.DELETE("/:lounge_id/staff/:staff_id", loungeStaffHandler.RemoveStaff)
+			}
+		}
+		logger.Info("� Lounge routes registered successfully")
+
+		// Staff profile routes (for lounge staff members)
+		logger.Info("👤 Registering Staff profile routes...")
+		staffProfile := v1.Group("/staff")
+		staffProfile.Use(middleware.AuthMiddleware(jwtService))
+		{
+			logger.Info("  ✅ GET /api/v1/staff/my-profile")
+			staffProfile.GET("/my-profile", loungeStaffHandler.GetMyStaffProfile)
+		}
+		logger.Info("👤 Staff profile routes registered successfully")
 
 		// Permit routes (all protected)
 		permits := v1.Group("/permits")
