@@ -13,8 +13,8 @@ type LoungeOwner struct {
 	UserID uuid.UUID `db:"user_id" json:"user_id"`
 
 	// Personal Information
-	FullName sql.NullString `db:"full_name" json:"full_name,omitempty"`     // Name as on NIC
-	Email    sql.NullString `db:"email" json:"email,omitempty"`             // Personal email (Step 1)
+	FullName sql.NullString `db:"full_name" json:"full_name,omitempty"` // Name as on NIC
+	Email    sql.NullString `db:"email" json:"email,omitempty"`         // Personal email (Step 1)
 
 	// NIC Information
 	NICNumber        sql.NullString `db:"nic_number" json:"nic_number,omitempty"`
