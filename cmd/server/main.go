@@ -35,6 +35,8 @@ func main() {
 
 	logger.Info("Starting SmartTransit SMS Authentication Backend")
 	logger.Infof("Version: %s, Build Time: %s", version, buildTime)
+	logger.Info("🔍 DEBUG: Lounge Owner registration system ENABLED")
+	logger.Info("🔍 DEBUG: This build includes lounge owner routes")
 
 	// Load configuration
 	cfg, err := config.Load()
@@ -189,7 +191,9 @@ func main() {
 	busHandler := handlers.NewBusHandler(busRepository, permitRepository, ownerRepository)
 
 	// Initialize lounge owner and admin handlers
+	logger.Info("🔍 DEBUG: Initializing lounge owner handler...")
 	loungeOwnerHandler := handlers.NewLoungeOwnerHandler(loungeOwnerRepository, loungeRepository, userRepository)
+	logger.Info("🔍 DEBUG: Lounge owner handler initialized successfully")
 	adminHandler := handlers.NewAdminHandler(loungeOwnerRepository, loungeRepository, userRepository)
 
 	// TODO: Trip scheduling handlers - Not included in this release
@@ -228,6 +232,23 @@ func main() {
 	{
 		// Debug endpoint - shows all request headers and IP detection (public)
 		v1.GET("/debug/headers", debugHeadersHandler())
+
+		// Debug endpoint - list all registered routes
+		v1.GET("/debug/routes", func(c *gin.Context) {
+			routes := router.Routes()
+			routeList := make([]map[string]string, 0)
+			for _, route := range routes {
+				routeList = append(routeList, map[string]string{
+					"method": route.Method,
+					"path":   route.Path,
+				})
+			}
+			c.JSON(200, gin.H{
+				"message":      "Registered routes",
+				"total_routes": len(routeList),
+				"routes":       routeList,
+			})
+		})
 
 		// Authentication routes (public)
 		auth := v1.Group("/auth")
@@ -287,19 +308,27 @@ func main() {
 		}
 
 		// Lounge Owner routes (all protected)
+		logger.Info("🏢 Registering Lounge Owner routes...")
 		loungeOwner := v1.Group("/lounge-owner")
 		loungeOwner.Use(middleware.AuthMiddleware(jwtService))
 		{
 			// Registration endpoints
+			logger.Info("  ✅ POST /api/v1/lounge-owner/register/personal-info")
 			loungeOwner.POST("/register/personal-info", loungeOwnerHandler.SavePersonalInfo)
+			logger.Info("  ✅ POST /api/v1/lounge-owner/register/upload-nic")
 			loungeOwner.POST("/register/upload-nic", loungeOwnerHandler.UploadNIC)
+			logger.Info("  ✅ POST /api/v1/lounge-owner/register/add-lounge")
 			loungeOwner.POST("/register/add-lounge", loungeOwnerHandler.AddLounge)
+			logger.Info("  ✅ GET /api/v1/lounge-owner/registration/progress")
 			loungeOwner.GET("/registration/progress", loungeOwnerHandler.GetRegistrationProgress)
 
 			// Profile endpoints
+			logger.Info("  ✅ GET /api/v1/lounge-owner/profile")
 			loungeOwner.GET("/profile", loungeOwnerHandler.GetProfile)
+			logger.Info("  ✅ GET /api/v1/lounge-owner/lounges")
 			loungeOwner.GET("/lounges", loungeOwnerHandler.GetMyLounges)
 		}
+		logger.Info("🏢 Lounge Owner routes registered successfully")
 
 		// Permit routes (all protected)
 		permits := v1.Group("/permits")
