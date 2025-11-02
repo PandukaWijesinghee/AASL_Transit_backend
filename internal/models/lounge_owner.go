@@ -26,11 +26,11 @@ type LoungeOwner struct {
 	// Registration Progress Tracking
 	RegistrationStep string `db:"registration_step" json:"registration_step"` // phone_verified, personal_info, nic_uploaded, lounge_added, completed
 
-	// Business Information (Optional during registration, required later)
-	CompanyName            sql.NullString `db:"company_name" json:"company_name,omitempty"`
-	LicenseNumber          sql.NullString `db:"license_number" json:"license_number,omitempty"`
+	// Business Information (Required during registration)
+	BusinessName           sql.NullString `db:"business_name" json:"business_name,omitempty"`
+	BusinessLicense        sql.NullString `db:"business_license" json:"business_license,omitempty"`
 	ContactPerson          sql.NullString `db:"contact_person" json:"contact_person,omitempty"`
-	Address                sql.NullString `db:"address" json:"address,omitempty"`
+	BusinessAddress        sql.NullString `db:"business_address" json:"business_address,omitempty"`
 	City                   sql.NullString `db:"city" json:"city,omitempty"`
 	State                  sql.NullString `db:"state" json:"state,omitempty"`
 	Country                sql.NullString `db:"country" json:"country,omitempty"`
@@ -38,12 +38,10 @@ type LoungeOwner struct {
 	BusinessEmail          sql.NullString `db:"business_email" json:"business_email,omitempty"`
 	BusinessPhone          sql.NullString `db:"business_phone" json:"business_phone,omitempty"`
 	TaxID                  sql.NullString `db:"tax_id" json:"tax_id,omitempty"`
-	BankAccountDetails     []byte         `db:"bank_account_details" json:"bank_account_details,omitempty"`     // JSONB
+	BankAccountDetails     []byte         `db:"bank_account_details" json:"bank_account_details,omitempty"` // JSONB
 	VerificationDocuments  []byte         `db:"verification_documents" json:"verification_documents,omitempty"` // JSONB
 	VerificationStatus     string         `db:"verification_status" json:"verification_status"`                 // pending, approved, rejected
 	TotalLounges           int            `db:"total_lounges" json:"total_lounges"`
-	ProfileCompleted       bool           `db:"profile_completed" json:"profile_completed"`
-	IdentityOrIncorpNumber sql.NullString `db:"identity_or_incorporation_no" json:"identity_or_incorporation_no,omitempty"`
 
 	// Metadata
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
