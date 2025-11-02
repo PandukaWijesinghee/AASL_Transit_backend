@@ -79,13 +79,14 @@ type VerifyOTPRequest struct {
 
 // VerifyOTPResponse represents the response after verifying OTP
 type VerifyOTPResponse struct {
-	Message         string   `json:"message"`
-	AccessToken     string   `json:"access_token"`
-	RefreshToken    string   `json:"refresh_token"`
-	ExpiresIn       int      `json:"expires_in_seconds"`
-	IsNewUser       bool     `json:"is_new_user"`
-	ProfileComplete bool     `json:"profile_complete"`
-	Roles           []string `json:"roles"` // User's roles (can be empty for new staff users)
+	Message          string   `json:"message"`
+	AccessToken      string   `json:"access_token"`
+	RefreshToken     string   `json:"refresh_token"`
+	ExpiresIn        int      `json:"expires_in_seconds"`
+	IsNewUser        bool     `json:"is_new_user"`
+	ProfileComplete  bool     `json:"profile_complete"`
+	Roles            []string `json:"roles"`                       // User's roles (can be empty for new staff users)
+	RegistrationStep string   `json:"registration_step,omitempty"` // For lounge owners: phone_verified, personal_info, nic_uploaded, lounge_added, completed
 }
 
 // ErrorResponse represents an error response
@@ -759,6 +760,7 @@ func (h *AuthHandler) VerifyOTPLoungeOwner(c *gin.Context, loungeOwnerRepo *data
 	}
 
 	// Create lounge_owner record if doesn't exist
+	var registrationStep string = ""
 	existingOwner, err := loungeOwnerRepo.GetLoungeOwnerByUserID(user.ID)
 	if err != nil {
 		log.Printf("ERROR: Failed to check lounge owner record: %v", err)
@@ -767,13 +769,16 @@ func (h *AuthHandler) VerifyOTPLoungeOwner(c *gin.Context, loungeOwnerRepo *data
 
 	if existingOwner == nil {
 		// Create lounge owner record
-		_, err = loungeOwnerRepo.CreateLoungeOwner(user.ID)
+		newOwner, err := loungeOwnerRepo.CreateLoungeOwner(user.ID)
 		if err != nil {
 			log.Printf("ERROR: Failed to create lounge owner record for user %s: %v", user.ID, err)
 			// Don't fail login, but log error
 		} else {
 			log.Printf("INFO: Created lounge_owner record for user %s", user.ID)
+			registrationStep = newOwner.RegistrationStep // Should be 'phone_verified'
 		}
+	} else {
+		registrationStep = existingOwner.RegistrationStep
 	}
 
 	// Generate JWT tokens with user's actual data
@@ -849,13 +854,14 @@ func (h *AuthHandler) VerifyOTPLoungeOwner(c *gin.Context, loungeOwnerRepo *data
 	}
 
 	c.JSON(http.StatusOK, VerifyOTPResponse{
-		Message:         "OTP verified successfully",
-		AccessToken:     accessToken,
-		RefreshToken:    refreshToken,
-		ExpiresIn:       3600, // 1 hour
-		IsNewUser:       isNew,
-		ProfileComplete: user.ProfileCompleted,
-		Roles:           user.Roles, // Include user roles including 'lounge_owner'
+		Message:          "OTP verified successfully",
+		AccessToken:      accessToken,
+		RefreshToken:     refreshToken,
+		ExpiresIn:        3600, // 1 hour
+		IsNewUser:        isNew,
+		ProfileComplete:  user.ProfileCompleted,
+		Roles:            user.Roles,       // Include user roles including 'lounge_owner'
+		RegistrationStep: registrationStep, // Include registration step for navigation
 	})
 }
 
