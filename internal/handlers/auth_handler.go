@@ -743,7 +743,8 @@ func (h *AuthHandler) VerifyOTPLoungeOwner(c *gin.Context, loungeOwnerRepo *data
 
 		log.Printf("INFO: Existing user logged in to lounge owner app: %s (roles: %v)", phone, user.Roles)
 	} else {
-		// NEW USER - Create with lounge_owner role
+		// NEW USER - Create with lounge_owner role immediately
+		// This app is exclusively for lounge owners
 		user, err = h.userRepository.CreateUserWithRole(phone, "lounge_owner")
 		if err != nil {
 			log.Printf("ERROR: Failed to create lounge owner user for phone %s: %v", phone, err)

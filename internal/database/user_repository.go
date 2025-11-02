@@ -108,10 +108,12 @@ func (r *UserRepository) CreateUserWithoutRole(phone string) (*models.User, erro
 func (r *UserRepository) CreateUserWithRole(phone string, role string) (*models.User, error) {
 	// Validate role
 	validRoles := map[string]bool{
-		"passenger": true,
-		"driver":    true,
-		"conductor": true,
-		"admin":     true,
+		"passenger":    true,
+		"driver":       true,
+		"conductor":    true,
+		"bus_owner":    true,
+		"lounge_owner": true,
+		"admin":        true,
 	}
 
 	if !validRoles[role] {
@@ -435,11 +437,12 @@ func (r *UserRepository) UpdateUserStatus(id uuid.UUID, status string) error {
 func (r *UserRepository) AddUserRole(id uuid.UUID, role string) error {
 	// Validate role
 	validRoles := map[string]bool{
-		"passenger": true,
-		"driver":    true,
-		"conductor": true,
-		"bus_owner": true, // Added for bus owner onboarding
-		"admin":     true,
+		"passenger":    true,
+		"driver":       true,
+		"conductor":    true,
+		"bus_owner":    true,
+		"lounge_owner": true,
+		"admin":        true,
 	}
 
 	if !validRoles[role] {
