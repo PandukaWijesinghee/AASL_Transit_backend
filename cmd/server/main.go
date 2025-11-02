@@ -328,34 +328,34 @@ func main() {
 		// TODO: Trip Schedule routes - Not included in this release
 		// Uncomment when trip scheduling system is ready
 		/*
-		// Trip Schedule routes (all protected - bus owners only)
-		tripSchedules := v1.Group("/trip-schedules")
-		tripSchedules.Use(middleware.AuthMiddleware(jwtService))
-		{
-			tripSchedules.GET("", tripScheduleHandler.GetAllSchedules)
-			tripSchedules.POST("", tripScheduleHandler.CreateSchedule)
-			tripSchedules.GET("/:id", tripScheduleHandler.GetScheduleByID)
-			tripSchedules.PUT("/:id", tripScheduleHandler.UpdateSchedule)
-			tripSchedules.DELETE("/:id", tripScheduleHandler.DeleteSchedule)
-			tripSchedules.POST("/:id/deactivate", tripScheduleHandler.DeactivateSchedule)
-		}
+			// Trip Schedule routes (all protected - bus owners only)
+			tripSchedules := v1.Group("/trip-schedules")
+			tripSchedules.Use(middleware.AuthMiddleware(jwtService))
+			{
+				tripSchedules.GET("", tripScheduleHandler.GetAllSchedules)
+				tripSchedules.POST("", tripScheduleHandler.CreateSchedule)
+				tripSchedules.GET("/:id", tripScheduleHandler.GetScheduleByID)
+				tripSchedules.PUT("/:id", tripScheduleHandler.UpdateSchedule)
+				tripSchedules.DELETE("/:id", tripScheduleHandler.DeleteSchedule)
+				tripSchedules.POST("/:id/deactivate", tripScheduleHandler.DeactivateSchedule)
+			}
 
-		// Scheduled Trip routes (all protected - bus owners only)
-		scheduledTrips := v1.Group("/scheduled-trips")
-		scheduledTrips.Use(middleware.AuthMiddleware(jwtService))
-		{
-			scheduledTrips.GET("", scheduledTripHandler.GetTripsByDateRange)
-			scheduledTrips.GET("/:id", scheduledTripHandler.GetTripByID)
-			scheduledTrips.PATCH("/:id", scheduledTripHandler.UpdateTrip)
-			scheduledTrips.POST("/:id/cancel", scheduledTripHandler.CancelTrip)
-		}
+			// Scheduled Trip routes (all protected - bus owners only)
+			scheduledTrips := v1.Group("/scheduled-trips")
+			scheduledTrips.Use(middleware.AuthMiddleware(jwtService))
+			{
+				scheduledTrips.GET("", scheduledTripHandler.GetTripsByDateRange)
+				scheduledTrips.GET("/:id", scheduledTripHandler.GetTripByID)
+				scheduledTrips.PATCH("/:id", scheduledTripHandler.UpdateTrip)
+				scheduledTrips.POST("/:id/cancel", scheduledTripHandler.CancelTrip)
+			}
 
-		// Permit-specific trip routes
-		permits.GET("/:permitId/trip-schedules", tripScheduleHandler.GetSchedulesByPermit)
-		permits.GET("/:permitId/scheduled-trips", scheduledTripHandler.GetTripsByPermit)
+			// Permit-specific trip routes
+			permits.GET("/:permitId/trip-schedules", tripScheduleHandler.GetSchedulesByPermit)
+			permits.GET("/:permitId/scheduled-trips", scheduledTripHandler.GetTripsByPermit)
 
-		// Public bookable trips (no auth required)
-		v1.GET("/bookable-trips", scheduledTripHandler.GetBookableTrips)
+			// Public bookable trips (no auth required)
+			v1.GET("/bookable-trips", scheduledTripHandler.GetBookableTrips)
 		*/
 
 		// Admin cron management routes (optional - for testing)
@@ -364,21 +364,21 @@ func main() {
 		{
 			// TODO: Cron management - Not included in this release
 			/*
-			// Cron management
-			admin.POST("/cron/generate-trips", func(c *gin.Context) {
-				cronService.RunGenerateFutureTripsNow()
-				c.JSON(200, gin.H{"message": "Trip generation triggered"})
-			})
+				// Cron management
+				admin.POST("/cron/generate-trips", func(c *gin.Context) {
+					cronService.RunGenerateFutureTripsNow()
+					c.JSON(200, gin.H{"message": "Trip generation triggered"})
+				})
 
-			admin.POST("/cron/fill-missing", func(c *gin.Context) {
-				cronService.RunFillMissingTripsNow()
-				c.JSON(200, gin.H{"message": "Fill missing trips triggered"})
-			})
+				admin.POST("/cron/fill-missing", func(c *gin.Context) {
+					cronService.RunFillMissingTripsNow()
+					c.JSON(200, gin.H{"message": "Fill missing trips triggered"})
+				})
 
-			admin.GET("/cron/status", func(c *gin.Context) {
-				status := cronService.GetJobStatus()
-				c.JSON(200, status)
-			})
+				admin.GET("/cron/status", func(c *gin.Context) {
+					status := cronService.GetJobStatus()
+					c.JSON(200, status)
+				})
 			*/
 
 			// Lounge Owner approval (TODO: Implement)
