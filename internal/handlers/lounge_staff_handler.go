@@ -544,11 +544,11 @@ func (h *LoungeStaffHandler) GetMyStaffProfile(c *gin.Context) {
 
 	if lounge != nil {
 		response["lounge"] = gin.H{
-			"id":           lounge.ID,
-			"lounge_name":  lounge.LoungeName,
-			"address":      lounge.Address,
-			"city":         lounge.City,
-			"status":       lounge.Status,
+			"id":          lounge.ID,
+			"lounge_name": lounge.LoungeName,
+			"address":     lounge.Address,
+			"city":        lounge.City,
+			"status":      lounge.Status,
 		}
 	}
 

@@ -17,9 +17,9 @@ type LoungeOwner struct {
 	BusinessLicense sql.NullString `db:"business_license" json:"business_license,omitempty"` // Business registration number
 
 	// Manager Information (person managing the lounges)
-	ManagerFullName   sql.NullString `db:"manager_full_name" json:"manager_full_name,omitempty"`     // Manager's full legal name
-	ManagerNICNumber  sql.NullString `db:"manager_nic_number" json:"manager_nic_number,omitempty"`   // Manager's NIC (UNIQUE per person)
-	ManagerEmail      sql.NullString `db:"manager_email" json:"manager_email,omitempty"`             // Manager's email (optional)
+	ManagerFullName    sql.NullString `db:"manager_full_name" json:"manager_full_name,omitempty"`         // Manager's full legal name
+	ManagerNICNumber   sql.NullString `db:"manager_nic_number" json:"manager_nic_number,omitempty"`       // Manager's NIC (UNIQUE per person)
+	ManagerEmail       sql.NullString `db:"manager_email" json:"manager_email,omitempty"`                 // Manager's email (optional)
 	ManagerNICFrontURL sql.NullString `db:"manager_nic_front_url" json:"manager_nic_front_url,omitempty"` // Manager's NIC front image
 	ManagerNICBackURL  sql.NullString `db:"manager_nic_back_url" json:"manager_nic_back_url,omitempty"`   // Manager's NIC back image
 
@@ -28,10 +28,10 @@ type LoungeOwner struct {
 	ProfileCompleted bool   `db:"profile_completed" json:"profile_completed"` // True when registration_step = 'completed'
 
 	// Verification
-	VerificationStatus string       `db:"verification_status" json:"verification_status"` // pending, approved, rejected
+	VerificationStatus string         `db:"verification_status" json:"verification_status"` // pending, approved, rejected
 	VerificationNotes  sql.NullString `db:"verification_notes" json:"verification_notes,omitempty"`
-	VerifiedAt         sql.NullTime `db:"verified_at" json:"verified_at,omitempty"`
-	VerifiedBy         uuid.NullUUID `db:"verified_by" json:"verified_by,omitempty"`
+	VerifiedAt         sql.NullTime   `db:"verified_at" json:"verified_at,omitempty"`
+	VerifiedBy         uuid.NullUUID  `db:"verified_by" json:"verified_by,omitempty"`
 
 	// Metadata
 	TotalLounges int       `db:"total_lounges" json:"total_lounges"`

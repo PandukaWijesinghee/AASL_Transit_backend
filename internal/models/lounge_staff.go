@@ -14,12 +14,12 @@ type LoungeStaff struct {
 	UserID   uuid.NullUUID `db:"user_id" json:"user_id,omitempty"` // NULL until they register
 
 	// Staff Information
-	PhoneNumber   string         `db:"phone_number" json:"phone_number"`
-	FullName      sql.NullString `db:"full_name" json:"full_name,omitempty"`
-	NICNumber     sql.NullString `db:"nic_number" json:"nic_number,omitempty"`
-	NICFrontURL   sql.NullString `db:"nic_front_url" json:"nic_front_url,omitempty"`
-	NICBackURL    sql.NullString `db:"nic_back_url" json:"nic_back_url,omitempty"`
-	Email         sql.NullString `db:"email" json:"email,omitempty"`
+	PhoneNumber string         `db:"phone_number" json:"phone_number"`
+	FullName    sql.NullString `db:"full_name" json:"full_name,omitempty"`
+	NICNumber   sql.NullString `db:"nic_number" json:"nic_number,omitempty"`
+	NICFrontURL sql.NullString `db:"nic_front_url" json:"nic_front_url,omitempty"`
+	NICBackURL  sql.NullString `db:"nic_back_url" json:"nic_back_url,omitempty"`
+	Email       sql.NullString `db:"email" json:"email,omitempty"`
 
 	// Permissions
 	PermissionType string `db:"permission_type" json:"permission_type"` // 'admin' or 'staff'

@@ -35,17 +35,17 @@ func NewLoungeHandler(
 
 // AddLoungeRequest represents the lounge creation request
 type AddLoungeRequest struct {
-	LoungeName     string   `json:"lounge_name" binding:"required"`
-	Address        string   `json:"address" binding:"required"`
-	City           string   `json:"city" binding:"required"`
-	ContactPhone   string   `json:"contact_phone" binding:"required"`
-	Latitude       *string  `json:"latitude"`
-	Longitude      *string  `json:"longitude"`
-	Price1Hour     *string  `json:"price_1_hour"`      // DECIMAL as string (e.g., "500.00")
-	Price2Hours    *string  `json:"price_2_hours"`     // DECIMAL as string (e.g., "900.00")
-	PriceUntilBus  *string  `json:"price_until_bus"`   // DECIMAL as string (e.g., "1500.00")
-	Amenities      []string `json:"amenities"`         // Array: ["WiFi", "AC", "Food"]
-	Images         []string `json:"images"`            // Array of image URLs
+	LoungeName    string   `json:"lounge_name" binding:"required"`
+	Address       string   `json:"address" binding:"required"`
+	City          string   `json:"city" binding:"required"`
+	ContactPhone  string   `json:"contact_phone" binding:"required"`
+	Latitude      *string  `json:"latitude"`
+	Longitude     *string  `json:"longitude"`
+	Price1Hour    *string  `json:"price_1_hour"`    // DECIMAL as string (e.g., "500.00")
+	Price2Hours   *string  `json:"price_2_hours"`   // DECIMAL as string (e.g., "900.00")
+	PriceUntilBus *string  `json:"price_until_bus"` // DECIMAL as string (e.g., "1500.00")
+	Amenities     []string `json:"amenities"`       // Array: ["WiFi", "AC", "Food"]
+	Images        []string `json:"images"`          // Array of image URLs
 }
 
 // AddLounge handles POST /api/v1/lounge-owner/register/add-lounge
@@ -203,24 +203,24 @@ func (h *LoungeHandler) GetMyLounges(c *gin.Context) {
 		}
 
 		response = append(response, gin.H{
-			"id":               lounge.ID,
-			"lounge_name":      lounge.LoungeName,
-			"address":          lounge.Address,
-			"city":             lounge.City,
-			"contact_phone":    lounge.ContactPhone,
-			"latitude":         lounge.Latitude,
-			"longitude":        lounge.Longitude,
-			"price_1_hour":     lounge.Price1Hour,
-			"price_2_hours":    lounge.Price2Hours,
-			"price_until_bus":  lounge.PriceUntilBus,
-			"amenities":        amenities,
-			"images":           images,
-			"status":           lounge.Status,
-			"is_operational":   lounge.IsOperational,
-			"total_staff":      lounge.TotalStaff,
-			"average_rating":   lounge.AverageRating,
-			"total_bookings":   lounge.TotalBookings,
-			"created_at":       lounge.CreatedAt,
+			"id":              lounge.ID,
+			"lounge_name":     lounge.LoungeName,
+			"address":         lounge.Address,
+			"city":            lounge.City,
+			"contact_phone":   lounge.ContactPhone,
+			"latitude":        lounge.Latitude,
+			"longitude":       lounge.Longitude,
+			"price_1_hour":    lounge.Price1Hour,
+			"price_2_hours":   lounge.Price2Hours,
+			"price_until_bus": lounge.PriceUntilBus,
+			"amenities":       amenities,
+			"images":          images,
+			"status":          lounge.Status,
+			"is_operational":  lounge.IsOperational,
+			"total_staff":     lounge.TotalStaff,
+			"average_rating":  lounge.AverageRating,
+			"total_bookings":  lounge.TotalBookings,
+			"created_at":      lounge.CreatedAt,
 		})
 	}
 
@@ -276,26 +276,26 @@ func (h *LoungeHandler) GetLoungeByID(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"id":               lounge.ID,
-		"lounge_owner_id":  lounge.LoungeOwnerID,
-		"lounge_name":      lounge.LoungeName,
-		"address":          lounge.Address,
-		"city":             lounge.City,
-		"contact_phone":    lounge.ContactPhone,
-		"latitude":         lounge.Latitude,
-		"longitude":        lounge.Longitude,
-		"price_1_hour":     lounge.Price1Hour,
-		"price_2_hours":    lounge.Price2Hours,
-		"price_until_bus":  lounge.PriceUntilBus,
-		"amenities":        amenities,
-		"images":           images,
-		"status":           lounge.Status,
-		"is_operational":   lounge.IsOperational,
-		"total_staff":      lounge.TotalStaff,
-		"average_rating":   lounge.AverageRating,
-		"total_bookings":   lounge.TotalBookings,
-		"created_at":       lounge.CreatedAt,
-		"updated_at":       lounge.UpdatedAt,
+		"id":              lounge.ID,
+		"lounge_owner_id": lounge.LoungeOwnerID,
+		"lounge_name":     lounge.LoungeName,
+		"address":         lounge.Address,
+		"city":            lounge.City,
+		"contact_phone":   lounge.ContactPhone,
+		"latitude":        lounge.Latitude,
+		"longitude":       lounge.Longitude,
+		"price_1_hour":    lounge.Price1Hour,
+		"price_2_hours":   lounge.Price2Hours,
+		"price_until_bus": lounge.PriceUntilBus,
+		"amenities":       amenities,
+		"images":          images,
+		"status":          lounge.Status,
+		"is_operational":  lounge.IsOperational,
+		"total_staff":     lounge.TotalStaff,
+		"average_rating":  lounge.AverageRating,
+		"total_bookings":  lounge.TotalBookings,
+		"created_at":      lounge.CreatedAt,
+		"updated_at":      lounge.UpdatedAt,
 	})
 }
 
@@ -305,17 +305,17 @@ func (h *LoungeHandler) GetLoungeByID(c *gin.Context) {
 
 // UpdateLoungeRequest represents the lounge update request
 type UpdateLoungeRequest struct {
-	LoungeName     string   `json:"lounge_name" binding:"required"`
-	Address        string   `json:"address" binding:"required"`
-	City           string   `json:"city" binding:"required"`
-	ContactPhone   string   `json:"contact_phone" binding:"required"`
-	Latitude       *string  `json:"latitude"`
-	Longitude      *string  `json:"longitude"`
-	Price1Hour     *string  `json:"price_1_hour"`
-	Price2Hours    *string  `json:"price_2_hours"`
-	PriceUntilBus  *string  `json:"price_until_bus"`
-	Amenities      []string `json:"amenities"`
-	Images         []string `json:"images"`
+	LoungeName    string   `json:"lounge_name" binding:"required"`
+	Address       string   `json:"address" binding:"required"`
+	City          string   `json:"city" binding:"required"`
+	ContactPhone  string   `json:"contact_phone" binding:"required"`
+	Latitude      *string  `json:"latitude"`
+	Longitude     *string  `json:"longitude"`
+	Price1Hour    *string  `json:"price_1_hour"`
+	Price2Hours   *string  `json:"price_2_hours"`
+	PriceUntilBus *string  `json:"price_until_bus"`
+	Amenities     []string `json:"amenities"`
+	Images        []string `json:"images"`
 }
 
 // UpdateLounge handles PUT /api/v1/lounges/:id
@@ -513,19 +513,19 @@ func (h *LoungeHandler) GetLoungesByCity(c *gin.Context) {
 		}
 
 		response = append(response, gin.H{
-			"id":               lounge.ID,
-			"lounge_name":      lounge.LoungeName,
-			"address":          lounge.Address,
-			"city":             lounge.City,
-			"latitude":         lounge.Latitude,
-			"longitude":        lounge.Longitude,
-			"price_1_hour":     lounge.Price1Hour,
-			"price_2_hours":    lounge.Price2Hours,
-			"price_until_bus":  lounge.PriceUntilBus,
-			"amenities":        amenities,
-			"images":           images,
-			"average_rating":   lounge.AverageRating,
-			"total_bookings":   lounge.TotalBookings,
+			"id":              lounge.ID,
+			"lounge_name":     lounge.LoungeName,
+			"address":         lounge.Address,
+			"city":            lounge.City,
+			"latitude":        lounge.Latitude,
+			"longitude":       lounge.Longitude,
+			"price_1_hour":    lounge.Price1Hour,
+			"price_2_hours":   lounge.Price2Hours,
+			"price_until_bus": lounge.PriceUntilBus,
+			"amenities":       amenities,
+			"images":          images,
+			"average_rating":  lounge.AverageRating,
+			"total_bookings":  lounge.TotalBookings,
 		})
 	}
 
