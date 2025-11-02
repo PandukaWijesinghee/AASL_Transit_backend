@@ -1251,13 +1251,13 @@ paths:
   # ============================================================================
   # Lounge Owner Endpoints
   # ============================================================================
-  /api/v1/lounge-owner/register/personal-info:
+  /api/v1/lounge-owner/register/business-info:
     post:
-      summary: Save lounge owner personal information
+      summary: Save business and manager information
       description: |
-        First step of lounge owner registration - save personal information.
+        Step 1 of lounge owner registration - save business and manager details.
         Requires authenticated user with 'lounge_owner' role.
-      operationId: saveLoungeOwnerPersonalInfo
+      operationId: saveLoungeOwnerBusinessInfo
       tags:
         - Lounge Owner
       security:
@@ -1269,29 +1269,40 @@ paths:
             schema:
               type: object
               required:
-                - full_name
-                - nic_number
-                - email
+                - business_name
+                - manager_full_name
+                - manager_nic_number
               properties:
-                full_name:
+                business_name:
                   type: string
                   minLength: 3
+                  maxLength: 255
+                  example: "Grand Hotel Colombo"
+                  description: Business/Hotel name
+                business_license:
+                  type: string
                   maxLength: 100
+                  example: "BR2024123456"
+                  description: Business registration number (optional)
+                manager_full_name:
+                  type: string
+                  minLength: 3
+                  maxLength: 255
                   example: "John Doe"
-                  description: Full legal name
-                nic_number:
+                  description: Manager's full legal name
+                manager_nic_number:
                   type: string
                   pattern: '^[0-9]{9}[VXvx]$|^[0-9]{12}$'
                   example: "200012345678"
-                  description: National Identity Card number (old format 9 digits + V/X or new format 12 digits)
-                email:
+                  description: Manager's NIC (one person can manage only one business)
+                manager_email:
                   type: string
                   format: email
-                  example: "john@example.com"
-                  description: Personal email address
+                  example: "manager@grandhotel.com"
+                  description: Manager's email address (optional)
       responses:
         "200":
-          description: Personal information saved successfully
+          description: Business and manager information saved successfully
           content:
             application/json:
               schema:
@@ -1299,10 +1310,10 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "Personal information saved successfully"
-                  registration_status:
+                    example: "Business and manager information saved successfully"
+                  registration_step:
                     type: string
-                    example: "personal_info_saved"
+                    example: "business_info"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1310,13 +1321,12 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
-  /api/v1/lounge-owner/register/upload-nic:
+  /api/v1/lounge-owner/register/upload-manager-nic:
     post:
-      summary: Upload NIC front and back images
+      summary: Upload manager NIC front and back images
       description: |
-        Second step of lounge owner registration - upload NIC images for verification.
-        Supports OCR extraction of data from NIC images.
-      operationId: uploadLoungeOwnerNIC
+        Step 2 of lounge owner registration - upload manager's NIC images for verification.
+      operationId: uploadManagerNIC
       tags:
         - Lounge Owner
       security:
@@ -1328,22 +1338,22 @@ paths:
             schema:
               type: object
               required:
-                - nic_front_url
-                - nic_back_url
+                - manager_nic_front_url
+                - manager_nic_back_url
               properties:
-                nic_front_url:
+                manager_nic_front_url:
                   type: string
                   format: uri
-                  example: "https://storage.supabase.co/path/to/nic_front.jpg"
-                  description: URL to NIC front image (upload to Supabase Storage first)
-                nic_back_url:
+                  example: "https://storage.supabase.co/path/to/manager_nic_front.jpg"
+                  description: URL to manager NIC front image (upload to Supabase Storage first)
+                manager_nic_back_url:
                   type: string
                   format: uri
-                  example: "https://storage.supabase.co/path/to/nic_back.jpg"
-                  description: URL to NIC back image (upload to Supabase Storage first)
+                  example: "https://storage.supabase.co/path/to/manager_nic_back.jpg"
+                  description: URL to manager NIC back image (upload to Supabase Storage first)
       responses:
         "200":
-          description: NIC images uploaded successfully
+          description: Manager NIC images uploaded successfully
           content:
             application/json:
               schema:
@@ -1351,8 +1361,8 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "NIC images uploaded successfully"
-                  registration_status:
+                    example: "Manager NIC images uploaded successfully"
+                  registration_step:
                     type: string
                     example: "nic_uploaded"
         "400":
@@ -1364,10 +1374,11 @@ paths:
 
   /api/v1/lounge-owner/register/add-lounge:
     post:
-      summary: Add lounge information
+      summary: Add lounge with pricing information
       description: |
-        Third step of lounge owner registration - add lounge location and details.
+        Step 3 of lounge owner registration - add lounge location and pricing.
         Can be called multiple times to add multiple lounges.
+        Includes pricing for 3 types: 1 hour, 2 hours, until bus arrives.
       operationId: addLounge
       tags:
         - Lounge Owner
@@ -1383,45 +1394,60 @@ paths:
                 - lounge_name
                 - address
                 - city
-                - latitude
-                - longitude
+                - contact_phone
               properties:
                 lounge_name:
                   type: string
                   minLength: 3
-                  maxLength: 100
+                  maxLength: 255
                   example: "City Central Lounge"
                   description: Name of the lounge
                 address:
                   type: string
                   minLength: 10
-                  maxLength: 255
-                  example: "123 Main St, Colombo"
+                  example: "123 Main St, Colombo 7"
                   description: Full address of the lounge
                 city:
                   type: string
                   example: "Colombo"
                   description: City where lounge is located
-                latitude:
-                  type: number
-                  format: double
-                  example: 6.9271
-                  description: GPS latitude coordinate
-                longitude:
-                  type: number
-                  format: double
-                  example: 79.8612
-                  description: GPS longitude coordinate
                 contact_phone:
                   type: string
                   example: "+94112345678"
                   description: Contact phone number for the lounge
+                latitude:
+                  type: string
+                  example: "6.9271"
+                  description: GPS latitude coordinate (as string)
+                longitude:
+                  type: string
+                  example: "79.8612"
+                  description: GPS longitude coordinate (as string)
+                price_1_hour:
+                  type: string
+                  example: "500.00"
+                  description: Price in LKR for 1 hour access (DECIMAL as string)
+                price_2_hours:
+                  type: string
+                  example: "900.00"
+                  description: Price in LKR for 2 hours access (DECIMAL as string)
+                price_until_bus:
+                  type: string
+                  example: "1500.00"
+                  description: Price in LKR for access until bus arrives (DECIMAL as string)
                 amenities:
                   type: array
                   items:
                     type: string
-                  example: ["wifi", "charging_stations", "cafe"]
+                  example: ["WiFi", "AC", "Charging", "Cafe", "Shower"]
                   description: List of amenities available
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: uri
+                  example: ["https://storage.supabase.co/lounge1.jpg", "https://storage.supabase.co/lounge2.jpg"]
+                  description: Array of lounge image URLs
       responses:
         "201":
           description: Lounge added successfully
@@ -1437,9 +1463,12 @@ paths:
                     type: string
                     format: uuid
                     example: "d581c281-ba77-49d2-8f68-5f7377417bf8"
-                  registration_status:
+                  registration_step:
                     type: string
-                    example: "completed"
+                    example: "lounge_added"
+                  status:
+                    type: string
+                    example: "pending"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1465,22 +1494,41 @@ paths:
               schema:
                 type: object
                 properties:
-                  registration_status:
+                  registration_step:
                     type: string
-                    enum: ["pending", "personal_info_saved", "nic_uploaded", "completed"]
-                    example: "personal_info_saved"
-                  personal_info_completed:
-                    type: boolean
-                    example: true
-                  nic_uploaded:
+                    enum: ["phone_verified", "business_info", "nic_uploaded", "lounge_added", "completed"]
+                    example: "business_info"
+                  profile_completed:
                     type: boolean
                     example: false
-                  lounges_added:
+                  verification_status:
+                    type: string
+                    enum: ["pending", "approved", "rejected"]
+                    example: "pending"
+                  total_lounges:
                     type: integer
                     example: 0
-                  next_step:
-                    type: string
-                    example: "upload_nic"
+                  total_staff:
+                    type: integer
+                    example: 0
+                  steps:
+                    type: object
+                    properties:
+                      phone_verified:
+                        type: boolean
+                        example: true
+                      business_info:
+                        type: boolean
+                        example: true
+                      nic_uploaded:
+                        type: boolean
+                        example: false
+                      lounge_added:
+                        type: boolean
+                        example: false
+                      completed:
+                        type: boolean
+                        example: false
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -1522,30 +1570,46 @@ paths:
                     type: string
                     format: uuid
                     example: "3edeb9af-51c3-4c24-a5d0-76c9dee2d4ea"
-                  full_name:
+                  business_name:
+                    type: string
+                    example: "Grand Hotel Colombo"
+                  business_license:
+                    type: string
+                    example: "BR2024123456"
+                  manager_full_name:
                     type: string
                     example: "John Doe"
-                  nic_number:
+                  manager_nic_number:
                     type: string
                     example: "200012345678"
-                  email:
+                  manager_email:
                     type: string
-                    example: "john@example.com"
-                  phone:
+                    example: "manager@grandhotel.com"
+                  manager_nic_front:
                     type: string
-                    example: "+94771234567"
-                  registration_status:
+                    format: uri
+                    example: "https://storage.supabase.co/path/to/manager_nic_front.jpg"
+                  manager_nic_back:
                     type: string
-                    enum: ["pending", "personal_info_saved", "nic_uploaded", "completed"]
+                    format: uri
+                    example: "https://storage.supabase.co/path/to/manager_nic_back.jpg"
+                  registration_step:
+                    type: string
+                    enum: ["phone_verified", "business_info", "nic_uploaded", "lounge_added", "completed"]
                     example: "completed"
-                  nic_front_url:
+                  profile_completed:
+                    type: boolean
+                    example: true
+                  verification_status:
                     type: string
-                    format: uri
-                    example: "https://storage.supabase.co/path/to/nic_front.jpg"
-                  nic_back_url:
-                    type: string
-                    format: uri
-                    example: "https://storage.supabase.co/path/to/nic_back.jpg"
+                    enum: ["pending", "approved", "rejected"]
+                    example: "pending"
+                  total_lounges:
+                    type: integer
+                    example: 2
+                  total_staff:
+                    type: integer
+                    example: 5
                   created_at:
                     type: string
                     format: date-time
@@ -1569,11 +1633,14 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
-  /api/v1/lounge-owner/lounges:
+  # ============================================================================
+  # Lounge Management Endpoints
+  # ============================================================================
+  /api/v1/lounges/my-lounges:
     get:
-      summary: Get all lounges owned by this owner
+      summary: Get all my lounges
       description: |
-        Retrieve all lounges associated with the authenticated lounge owner.
+        Retrieve all lounges owned by the authenticated lounge owner with pricing and amenities.
       operationId: getMyLounges
       tags:
         - Lounge Owner
@@ -1595,45 +1662,466 @@ paths:
                         id:
                           type: string
                           format: uuid
-                          example: "d581c281-ba77-49d2-8f68-5f7377417bf8"
                         lounge_name:
                           type: string
                           example: "City Central Lounge"
                         address:
                           type: string
-                          example: "123 Main St, Colombo"
                         city:
                           type: string
-                          example: "Colombo"
-                        latitude:
-                          type: number
-                          format: double
-                          example: 6.9271
-                        longitude:
-                          type: number
-                          format: double
-                          example: 79.8612
                         contact_phone:
                           type: string
-                          example: "+94112345678"
+                        latitude:
+                          type: string
+                        longitude:
+                          type: string
+                        price_1_hour:
+                          type: string
+                          example: "500.00"
+                        price_2_hours:
+                          type: string
+                          example: "900.00"
+                        price_until_bus:
+                          type: string
+                          example: "1500.00"
                         amenities:
                           type: array
                           items:
                             type: string
-                          example: ["wifi", "charging_stations", "cafe"]
+                        images:
+                          type: array
+                          items:
+                            type: string
                         status:
                           type: string
-                          enum: ["active", "inactive", "pending_approval"]
-                          example: "active"
+                          enum: ["pending", "active", "inactive", "suspended"]
+                        is_operational:
+                          type: boolean
+                        total_staff:
+                          type: integer
+                        average_rating:
+                          type: string
+                        total_bookings:
+                          type: integer
                         created_at:
                           type: string
                           format: date-time
-                          example: "2025-10-19T10:30:00Z"
                   total:
                     type: integer
-                    example: 2
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounges/{id}:
+    get:
+      summary: Get lounge by ID
+      description: Get detailed information about a specific lounge
+      operationId: getLoungeByID
+      tags:
+        - Lounge Owner
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Lounge details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lounge"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    put:
+      summary: Update lounge
+      description: Update lounge information including pricing
+      operationId: updateLounge
+      tags:
+        - Lounge Owner
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - lounge_name
+                - address
+                - city
+                - contact_phone
+              properties:
+                lounge_name:
+                  type: string
+                address:
+                  type: string
+                city:
+                  type: string
+                contact_phone:
+                  type: string
+                latitude:
+                  type: string
+                longitude:
+                  type: string
+                price_1_hour:
+                  type: string
+                price_2_hours:
+                  type: string
+                price_until_bus:
+                  type: string
+                amenities:
+                  type: array
+                  items:
+                    type: string
+                images:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Lounge updated successfully
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      summary: Delete lounge
+      description: Delete a lounge (triggers will update counts)
+      operationId: deleteLounge
+      tags:
+        - Lounge Owner
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Lounge deleted successfully
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounges/city/{city}:
+    get:
+      summary: Get lounges by city (Public)
+      description: Search for active lounges in a specific city - no authentication required
+      operationId: getLoungesByCity
+      tags:
+        - Lounge Owner
+      parameters:
+        - name: city
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "Colombo"
+      responses:
+        "200":
+          description: Lounges retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lounges:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Lounge"
+                  total:
+                    type: integer
+                  city:
+                    type: string
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================================
+  # Lounge Staff Management Endpoints
+  # ============================================================================
+  /api/v1/lounges/{lounge_id}/staff:
+    post:
+      summary: Add staff to lounge
+      description: |
+        Step 4 (optional) - Add staff member to a specific lounge.
+        Staff will be invited and can register later.
+      operationId: addStaffToLounge
+      tags:
+        - Lounge Owner
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lounge_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - lounge_id
+                - phone_number
+                - full_name
+                - nic_number
+                - permission_type
+              properties:
+                lounge_id:
+                  type: string
+                  format: uuid
+                phone_number:
+                  type: string
+                  example: "+94771234567"
+                full_name:
+                  type: string
+                  example: "Jane Smith"
+                nic_number:
+                  type: string
+                  example: "199812345678"
+                permission_type:
+                  type: string
+                  enum: ["admin", "staff"]
+                  example: "staff"
+                  description: "admin = full access, staff = view-only"
+      responses:
+        "201":
+          description: Staff added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  staff_id:
+                    type: string
+                    format: uuid
+                  phone_number:
+                    type: string
+                  permission_type:
+                    type: string
+                  has_registered:
+                    type: boolean
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    get:
+      summary: Get staff for lounge
+      description: Get all staff members assigned to a specific lounge
+      operationId: getStaffByLounge
+      tags:
+        - Lounge Owner
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lounge_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Staff list retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  staff:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LoungeStaff"
+                  total:
+                    type: integer
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounges/{lounge_id}/staff/{staff_id}/permission:
+    put:
+      summary: Update staff permission
+      description: Change staff permission type between admin and staff
+      operationId: updateStaffPermission
+      tags:
+        - Lounge Owner
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lounge_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: staff_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - permission_type
+              properties:
+                permission_type:
+                  type: string
+                  enum: ["admin", "staff"]
+      responses:
+        "200":
+          description: Permission updated
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounges/{lounge_id}/staff/{staff_id}/status:
+    put:
+      summary: Update staff employment status
+      description: Update staff employment status (active, inactive, suspended)
+      operationId: updateStaffStatus
+      tags:
+        - Lounge Owner
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lounge_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: staff_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - employment_status
+              properties:
+                employment_status:
+                  type: string
+                  enum: ["active", "inactive", "terminated"]
+      responses:
+        "200":
+          description: Status updated
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounges/{lounge_id}/staff/{staff_id}:
+    delete:
+      summary: Remove staff from lounge
+      description: Remove a staff member from the lounge (triggers will update counts)
+      operationId: removeStaff
+      tags:
+        - Lounge Owner
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lounge_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: staff_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Staff removed successfully
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/staff/my-profile:
+    get:
+      summary: Get staff member profile
+      description: Staff members can view their assigned lounge and profile information
+      operationId: getMyStaffProfile
+      tags:
+        - Lounge Owner
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Staff profile retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/LoungeStaff"
+                  - type: object
+                    properties:
+                      lounge:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          lounge_name:
+                            type: string
+                          address:
+                            type: string
+                          city:
+                            type: string
+                          status:
+                            type: string
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -2126,6 +2614,132 @@ components:
           type: string
           example: "197512345678"
         created_at:
+          type: string
+          format: date-time
+
+    Lounge:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        lounge_owner_id:
+          type: string
+          format: uuid
+          example: "660e8400-e29b-41d4-a716-446655440001"
+        lounge_name:
+          type: string
+          example: "City Transit Lounge"
+        address:
+          type: string
+          example: "123 Main Street, Colombo"
+        city:
+          type: string
+          example: "Colombo"
+        contact_phone:
+          type: string
+          example: "+94771234567"
+        latitude:
+          type: string
+          example: "6.9271"
+        longitude:
+          type: string
+          example: "79.8612"
+        price_1_hour:
+          type: string
+          description: "Price for 1 hour in LKR (DECIMAL stored as string)"
+          example: "500.00"
+        price_2_hours:
+          type: string
+          description: "Price for 2 hours in LKR (DECIMAL stored as string)"
+          example: "900.00"
+        price_until_bus:
+          type: string
+          description: "Price until bus departure in LKR (DECIMAL stored as string)"
+          example: "1500.00"
+        amenities:
+          type: array
+          items:
+            type: string
+          example: ["WiFi", "AC", "Food", "Restrooms", "Charging"]
+        images:
+          type: array
+          items:
+            type: string
+          example: ["https://example.com/lounge1.jpg", "https://example.com/lounge2.jpg"]
+        status:
+          type: string
+          enum: [pending, active, inactive, suspended]
+          example: "active"
+        is_operational:
+          type: boolean
+          example: true
+        total_staff:
+          type: integer
+          example: 3
+        average_rating:
+          type: string
+          example: "4.5"
+        total_bookings:
+          type: integer
+          example: 150
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    LoungeStaff:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "770e8400-e29b-41d4-a716-446655440002"
+        lounge_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        user_id:
+          type: string
+          format: uuid
+          nullable: true
+          example: "880e8400-e29b-41d4-a716-446655440003"
+        phone_number:
+          type: string
+          example: "+94771234567"
+        full_name:
+          type: string
+          example: "John Doe"
+        nic_number:
+          type: string
+          example: "199512345678"
+        permission_type:
+          type: string
+          enum: [admin, staff]
+          example: "staff"
+          description: "admin = full access, staff = view only"
+        employment_status:
+          type: string
+          enum: [active, inactive, terminated]
+          example: "active"
+        has_registered:
+          type: boolean
+          example: false
+          description: "True if staff has registered with their phone number"
+        invited_at:
+          type: string
+          format: date-time
+        registered_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
           type: string
           format: date-time
 
