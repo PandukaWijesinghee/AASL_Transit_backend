@@ -42,6 +42,8 @@ tags:
     description: Staff registration and management
   - name: Bus Owner
     description: Bus owner profile and onboarding management
+  - name: Lounge Owner
+    description: Lounge owner registration and management
   - name: Permits
     description: Route permit management
   - name: Buses
@@ -322,6 +324,114 @@ paths:
                   error:
                     type: string
                     example: Staff member is not active or profile incomplete
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/auth/verify-otp-lounge-owner:
+    post:
+      summary: Verify OTP and login (Lounge Owner)
+      description: |
+        Verifies the OTP for lounge owner users and returns JWT tokens.
+
+        **Lounge Owner Specific:** Creates user with 'lounge_owner' role if new, or adds role if existing user.
+
+        **Multi-role Support:** Existing users (passengers) can become lounge owners.
+      operationId: verifyOtpLoungeOwner
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone_number
+                - otp
+              properties:
+                phone_number:
+                  type: string
+                  pattern: '^\+94[0-9]{9}$'
+                  example: "+94771234567"
+                  description: Phone number in E.164 format
+                otp:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  example: "123456"
+                  description: 6-digit OTP code
+      responses:
+        "200":
+          description: OTP verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "OTP verified successfully"
+                  access_token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  refresh_token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  expires_in_seconds:
+                    type: integer
+                    example: 3600
+                    description: Access token expiry in seconds
+                  is_new_user:
+                    type: boolean
+                    example: true
+                    description: Whether this is a newly created user
+                  profile_complete:
+                    type: boolean
+                    example: false
+                    description: Whether user has completed their profile
+                  roles:
+                    type: array
+                    items:
+                      type: string
+                    example: ["lounge_owner"]
+                    description: User's roles including lounge_owner
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/InvalidOtp"
+        "404":
+          description: No OTP found for phone number
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "no_otp_found"
+                  message:
+                    type: string
+                    example: "No OTP found for this phone number. Please request an OTP first."
+                  code:
+                    type: string
+                    example: "NO_OTP"
+        "429":
+          description: Too many OTP validation attempts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "max_attempts_exceeded"
+                  message:
+                    type: string
+                    example: "Maximum OTP validation attempts exceeded. Please request a new OTP."
+                  code:
+                    type: string
+                    example: "MAX_ATTEMPTS"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -1135,6 +1245,395 @@ paths:
                   staff_type:
                     type: string
                     example: "driver"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================================
+  # Lounge Owner Endpoints
+  # ============================================================================
+  /api/v1/lounge-owner/register/personal-info:
+    post:
+      summary: Save lounge owner personal information
+      description: |
+        First step of lounge owner registration - save personal information.
+        Requires authenticated user with 'lounge_owner' role.
+      operationId: saveLoungeOwnerPersonalInfo
+      tags:
+        - Lounge Owner
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - full_name
+                - nic_number
+                - business_email
+              properties:
+                full_name:
+                  type: string
+                  minLength: 3
+                  maxLength: 100
+                  example: "John Doe"
+                  description: Full legal name
+                nic_number:
+                  type: string
+                  pattern: '^[0-9]{9}[VXvx]$|^[0-9]{12}$'
+                  example: "200012345678"
+                  description: National Identity Card number (old format 9 digits + V/X or new format 12 digits)
+                business_email:
+                  type: string
+                  format: email
+                  example: "john@example.com"
+                  description: Business email address
+      responses:
+        "200":
+          description: Personal information saved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Personal information saved successfully"
+                  registration_status:
+                    type: string
+                    example: "personal_info_saved"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounge-owner/register/upload-nic:
+    post:
+      summary: Upload NIC front and back images
+      description: |
+        Second step of lounge owner registration - upload NIC images for verification.
+        Supports OCR extraction of data from NIC images.
+      operationId: uploadLoungeOwnerNIC
+      tags:
+        - Lounge Owner
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - nic_front_url
+                - nic_back_url
+              properties:
+                nic_front_url:
+                  type: string
+                  format: uri
+                  example: "https://storage.supabase.co/path/to/nic_front.jpg"
+                  description: URL to NIC front image (upload to Supabase Storage first)
+                nic_back_url:
+                  type: string
+                  format: uri
+                  example: "https://storage.supabase.co/path/to/nic_back.jpg"
+                  description: URL to NIC back image (upload to Supabase Storage first)
+      responses:
+        "200":
+          description: NIC images uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "NIC images uploaded successfully"
+                  registration_status:
+                    type: string
+                    example: "nic_uploaded"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounge-owner/register/add-lounge:
+    post:
+      summary: Add lounge information
+      description: |
+        Third step of lounge owner registration - add lounge location and details.
+        Can be called multiple times to add multiple lounges.
+      operationId: addLounge
+      tags:
+        - Lounge Owner
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - lounge_name
+                - address
+                - city
+                - latitude
+                - longitude
+              properties:
+                lounge_name:
+                  type: string
+                  minLength: 3
+                  maxLength: 100
+                  example: "City Central Lounge"
+                  description: Name of the lounge
+                address:
+                  type: string
+                  minLength: 10
+                  maxLength: 255
+                  example: "123 Main St, Colombo"
+                  description: Full address of the lounge
+                city:
+                  type: string
+                  example: "Colombo"
+                  description: City where lounge is located
+                latitude:
+                  type: number
+                  format: double
+                  example: 6.9271
+                  description: GPS latitude coordinate
+                longitude:
+                  type: number
+                  format: double
+                  example: 79.8612
+                  description: GPS longitude coordinate
+                contact_phone:
+                  type: string
+                  example: "+94112345678"
+                  description: Contact phone number for the lounge
+                amenities:
+                  type: array
+                  items:
+                    type: string
+                  example: ["wifi", "charging_stations", "cafe"]
+                  description: List of amenities available
+      responses:
+        "201":
+          description: Lounge added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Lounge added successfully"
+                  lounge_id:
+                    type: string
+                    format: uuid
+                    example: "d581c281-ba77-49d2-8f68-5f7377417bf8"
+                  registration_status:
+                    type: string
+                    example: "completed"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounge-owner/registration/progress:
+    get:
+      summary: Get registration progress
+      description: |
+        Get current registration status and what steps have been completed.
+      operationId: getLoungeOwnerRegistrationProgress
+      tags:
+        - Lounge Owner
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Registration progress retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  registration_status:
+                    type: string
+                    enum: ["pending", "personal_info_saved", "nic_uploaded", "completed"]
+                    example: "personal_info_saved"
+                  personal_info_completed:
+                    type: boolean
+                    example: true
+                  nic_uploaded:
+                    type: boolean
+                    example: false
+                  lounges_added:
+                    type: integer
+                    example: 0
+                  next_step:
+                    type: string
+                    example: "upload_nic"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Lounge owner profile not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Lounge owner profile not found"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounge-owner/profile:
+    get:
+      summary: Get lounge owner profile
+      description: |
+        Retrieve complete lounge owner profile including personal information and registration status.
+      operationId: getLoungeOwnerProfile
+      tags:
+        - Lounge Owner
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    example: "d581c281-ba77-49d2-8f68-5f7377417bf8"
+                  user_id:
+                    type: string
+                    format: uuid
+                    example: "3edeb9af-51c3-4c24-a5d0-76c9dee2d4ea"
+                  full_name:
+                    type: string
+                    example: "John Doe"
+                  nic_number:
+                    type: string
+                    example: "200012345678"
+                  business_email:
+                    type: string
+                    example: "john@example.com"
+                  phone:
+                    type: string
+                    example: "+94771234567"
+                  registration_status:
+                    type: string
+                    enum: ["pending", "personal_info_saved", "nic_uploaded", "completed"]
+                    example: "completed"
+                  nic_front_url:
+                    type: string
+                    format: uri
+                    example: "https://storage.supabase.co/path/to/nic_front.jpg"
+                  nic_back_url:
+                    type: string
+                    format: uri
+                    example: "https://storage.supabase.co/path/to/nic_back.jpg"
+                  created_at:
+                    type: string
+                    format: date-time
+                    example: "2025-10-19T10:30:00Z"
+                  updated_at:
+                    type: string
+                    format: date-time
+                    example: "2025-10-19T11:00:00Z"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Lounge owner profile not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Lounge owner profile not found"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounge-owner/lounges:
+    get:
+      summary: Get all lounges owned by this owner
+      description: |
+        Retrieve all lounges associated with the authenticated lounge owner.
+      operationId: getMyLounges
+      tags:
+        - Lounge Owner
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lounges retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lounges:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          example: "d581c281-ba77-49d2-8f68-5f7377417bf8"
+                        lounge_name:
+                          type: string
+                          example: "City Central Lounge"
+                        address:
+                          type: string
+                          example: "123 Main St, Colombo"
+                        city:
+                          type: string
+                          example: "Colombo"
+                        latitude:
+                          type: number
+                          format: double
+                          example: 6.9271
+                        longitude:
+                          type: number
+                          format: double
+                          example: 79.8612
+                        contact_phone:
+                          type: string
+                          example: "+94112345678"
+                        amenities:
+                          type: array
+                          items:
+                            type: string
+                          example: ["wifi", "charging_stations", "cafe"]
+                        status:
+                          type: string
+                          enum: ["active", "inactive", "pending_approval"]
+                          example: "active"
+                        created_at:
+                          type: string
+                          format: date-time
+                          example: "2025-10-19T10:30:00Z"
+                  total:
+                    type: integer
+                    example: 2
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
