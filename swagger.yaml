@@ -1271,7 +1271,7 @@ paths:
               required:
                 - full_name
                 - nic_number
-                - business_email
+                - email
               properties:
                 full_name:
                   type: string
@@ -1284,11 +1284,11 @@ paths:
                   pattern: '^[0-9]{9}[VXvx]$|^[0-9]{12}$'
                   example: "200012345678"
                   description: National Identity Card number (old format 9 digits + V/X or new format 12 digits)
-                business_email:
+                email:
                   type: string
                   format: email
                   example: "john@example.com"
-                  description: Business email address
+                  description: Personal email address
       responses:
         "200":
           description: Personal information saved successfully
@@ -1528,7 +1528,7 @@ paths:
                   nic_number:
                     type: string
                     example: "200012345678"
-                  business_email:
+                  email:
                     type: string
                     example: "john@example.com"
                   phone:
