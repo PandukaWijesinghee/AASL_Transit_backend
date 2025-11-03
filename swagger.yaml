@@ -2322,6 +2322,124 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/permits/{permitId}/route-details:
+    get:
+      summary: Get route details with polyline and stops
+      description: Retrieve master route polyline and predefined stops for map visualization in schedule creation wizard
+      operationId: getPermitRouteDetails
+      tags:
+        - Route Permits
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: permitId
+          in: path
+          required: true
+          description: Permit UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Route details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  permit:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      permit_number:
+                        type: string
+                        example: "PER-2024-001"
+                      route_name:
+                        type: string
+                        example: "Colombo - Kandy Express"
+                  route:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      route_number:
+                        type: string
+                        example: "01"
+                      route_name:
+                        type: string
+                        example: "Negombo - Kandy Intercity"
+                      origin_city:
+                        type: string
+                        example: "Negombo"
+                      destination_city:
+                        type: string
+                        example: "Kandy"
+                      total_distance_km:
+                        type: number
+                        example: 107.3
+                      estimated_duration_minutes:
+                        type: integer
+                        example: 180
+                      encoded_polyline:
+                        type: string
+                        example: "ic~`Awr{xM}AkAaBsAcBqA..."
+                        description: Google Maps encoded polyline string for route visualization
+                  stops:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        master_route_id:
+                          type: string
+                          format: uuid
+                        stop_name:
+                          type: string
+                          example: "Negombo Bus Stand"
+                        stop_order:
+                          type: integer
+                          example: 1
+                        latitude:
+                          type: number
+                          example: 7.2089
+                        longitude:
+                          type: number
+                          example: 79.8358
+                        arrival_time_offset_minutes:
+                          type: integer
+                          example: 0
+                          description: Minutes from origin (0 for starting point)
+                        is_major_stop:
+                          type: boolean
+                          example: true
+                        created_at:
+                          type: string
+                          format: date-time
+        "404":
+          description: Permit not found or no master route associated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "No master route associated with this permit"
+                  message:
+                    type: string
+                    example: "This permit does not have route polyline data"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Access denied (not permit owner)
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   # ============================================================================
   # Bus Endpoints
   # ============================================================================

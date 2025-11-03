@@ -111,6 +111,7 @@ func main() {
 	// Initialize trip scheduling repositories
 	tripScheduleRepo := database.NewTripScheduleRepository(sqlxDB.DB)
 	scheduledTripRepo := database.NewScheduledTripRepository(sqlxDB.DB)
+	masterRouteRepo := database.NewMasterRouteRepository(sqlxDB.DB)
 
 	// Initialize trip generator service
 	tripGeneratorSvc := services.NewTripGeneratorService(
@@ -197,7 +198,7 @@ func main() {
 
 	// Initialize bus owner and permit handlers
 	busOwnerHandler := handlers.NewBusOwnerHandler(ownerRepository, permitRepository, userRepository, staffRepository)
-	permitHandler := handlers.NewPermitHandler(permitRepository, ownerRepository)
+	permitHandler := handlers.NewPermitHandler(permitRepository, ownerRepository, masterRouteRepo)
 	busHandler := handlers.NewBusHandler(busRepository, permitRepository, ownerRepository)
 
 	// Initialize lounge owner, lounge, staff, and admin handlers
@@ -448,6 +449,7 @@ func main() {
 		// Permit-specific trip routes
 		permits.GET("/:permitId/trip-schedules", tripScheduleHandler.GetSchedulesByPermit)
 		permits.GET("/:permitId/scheduled-trips", scheduledTripHandler.GetTripsByPermit)
+		permits.GET("/:permitId/route-details", permitHandler.GetRouteDetails)
 
 		// Public bookable trips (no auth required)
 		v1.GET("/bookable-trips", scheduledTripHandler.GetBookableTrips)

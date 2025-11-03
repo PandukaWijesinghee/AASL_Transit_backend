@@ -11,14 +11,16 @@ import (
 )
 
 type PermitHandler struct {
-	permitRepo   *database.RoutePermitRepository
-	busOwnerRepo *database.BusOwnerRepository
+	permitRepo      *database.RoutePermitRepository
+	busOwnerRepo    *database.BusOwnerRepository
+	masterRouteRepo *database.MasterRouteRepository
 }
 
-func NewPermitHandler(permitRepo *database.RoutePermitRepository, busOwnerRepo *database.BusOwnerRepository) *PermitHandler {
+func NewPermitHandler(permitRepo *database.RoutePermitRepository, busOwnerRepo *database.BusOwnerRepository, masterRouteRepo *database.MasterRouteRepository) *PermitHandler {
 	return &PermitHandler{
-		permitRepo:   permitRepo,
-		busOwnerRepo: busOwnerRepo,
+		permitRepo:      permitRepo,
+		busOwnerRepo:    busOwnerRepo,
+		masterRouteRepo: masterRouteRepo,
 	}
 }
 
@@ -277,4 +279,95 @@ func (h *PermitHandler) DeletePermit(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Permit deleted successfully"})
+}
+
+// GetRouteDetails retrieves route details with polyline and stops for a permit
+// GET /api/v1/permits/:permitId/route-details
+func (h *PermitHandler) GetRouteDetails(c *gin.Context) {
+	// Get user context from JWT middleware
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// Get bus owner by user_id
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch profile"})
+		return
+	}
+
+	// Get permit ID from URL
+	permitID := c.Param("permitId")
+
+	// Get permit
+	permit, err := h.permitRepo.GetByID(permitID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Permit not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch permit"})
+		return
+	}
+
+	// Verify ownership
+	if permit.BusOwnerID != busOwner.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	// Check if permit has master_route_id
+	if permit.MasterRouteID == nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "No master route associated with this permit",
+			"message": "This permit does not have route polyline data",
+		})
+		return
+	}
+
+	// Get master route details
+	masterRoute, err := h.masterRouteRepo.GetByID(*permit.MasterRouteID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Master route not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch route details"})
+		return
+	}
+
+	// Get route stops
+	stops, err := h.masterRouteRepo.GetStopsByRouteID(*permit.MasterRouteID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch route stops"})
+		return
+	}
+
+	// Build response
+	response := gin.H{
+		"permit": gin.H{
+			"id":            permit.ID,
+			"permit_number": permit.PermitNumber,
+			"route_name":    permit.RouteName,
+		},
+		"route": gin.H{
+			"id":                        masterRoute.ID,
+			"route_number":              masterRoute.RouteNumber,
+			"route_name":                masterRoute.RouteName,
+			"origin_city":               masterRoute.OriginCity,
+			"destination_city":          masterRoute.DestinationCity,
+			"total_distance_km":         masterRoute.TotalDistanceKm,
+			"estimated_duration_minutes": masterRoute.EstimatedDurationMinutes,
+			"encoded_polyline":          masterRoute.EncodedPolyline,
+		},
+		"stops": stops,
+	}
+
+	c.JSON(http.StatusOK, response)
 }
