@@ -108,14 +108,23 @@ func main() {
 	// Initialize staff service
 	staffService := services.NewStaffService(staffRepository, ownerRepository, userRepository)
 
-	// TODO: Trip scheduling system - Not included in this release
-	// The following components need to be implemented and deployed separately:
-	// - database.NewTripScheduleRepository
-	// - database.NewScheduledTripRepository
-	// - services.NewTripGeneratorService
-	// - services.NewCronService
-	// - handlers.NewTripScheduleHandler
-	// - handlers.NewScheduledTripHandler
+	// Initialize trip scheduling repositories
+	tripScheduleRepo := database.NewTripScheduleRepository(sqlxDB.DB)
+	scheduledTripRepo := database.NewScheduledTripRepository(sqlxDB.DB)
+
+	// Initialize trip generator service
+	tripGeneratorSvc := services.NewTripGeneratorService(
+		tripScheduleRepo,
+		scheduledTripRepo,
+		busRepository,
+	)
+
+	// Initialize and start cron service
+	cronService := services.NewCronService(tripGeneratorSvc)
+	if err := cronService.Start(); err != nil {
+		logger.Fatalf("Failed to start cron service: %v", err)
+	}
+	logger.Info("✓ Cron service started - Trip auto-generation enabled")
 
 	// Initialize SMS Gateway (Dialog)
 	var smsGateway sms.SMSGateway
@@ -199,9 +208,22 @@ func main() {
 	logger.Info("🔍 DEBUG: Lounge handlers initialized successfully")
 	adminHandler := handlers.NewAdminHandler(loungeOwnerRepository, loungeRepository, userRepository)
 
-	// TODO: Trip scheduling handlers - Not included in this release
-	// tripScheduleHandler := handlers.NewTripScheduleHandler(...)
-	// scheduledTripHandler := handlers.NewScheduledTripHandler(...)
+	// Initialize trip scheduling handlers
+	tripScheduleHandler := handlers.NewTripScheduleHandler(
+		tripScheduleRepo,
+		permitRepository,
+		ownerRepository,
+		busRepository,
+		tripGeneratorSvc,
+	)
+
+	scheduledTripHandler := handlers.NewScheduledTripHandler(
+		scheduledTripRepo,
+		tripScheduleRepo,
+		permitRepository,
+		ownerRepository,
+	)
+	logger.Info("Trip scheduling handlers initialized")
 
 	// Initialize Gin router
 	router := gin.New()
@@ -505,9 +527,9 @@ func main() {
 
 	logger.Info("Shutting down server...")
 
-	// TODO: Stop cron service - Not included in this release
-	// logger.Info("Stopping cron service...")
-	// cronService.Stop()
+	// Stop cron service
+	logger.Info("Stopping cron service...")
+	cronService.Stop()
 
 	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

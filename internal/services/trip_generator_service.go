@@ -1,0 +1,244 @@
+package services
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/smarttransit/sms-auth-backend/internal/database"
+	"github.com/smarttransit/sms-auth-backend/internal/models"
+)
+
+// TripGeneratorService handles automatic generation of scheduled trips from schedules
+type TripGeneratorService struct {
+	scheduleRepo     *database.TripScheduleRepository
+	scheduledTripRepo *database.ScheduledTripRepository
+	busRepo          *database.BusRepository
+}
+
+// NewTripGeneratorService creates a new TripGeneratorService
+func NewTripGeneratorService(
+	scheduleRepo *database.TripScheduleRepository,
+	scheduledTripRepo *database.ScheduledTripRepository,
+	busRepo *database.BusRepository,
+) *TripGeneratorService {
+	return &TripGeneratorService{
+		scheduleRepo:     scheduleRepo,
+		scheduledTripRepo: scheduledTripRepo,
+		busRepo:          busRepo,
+	}
+}
+
+// GenerateTripsForSchedule generates scheduled trips for a given schedule and date range
+func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSchedule, startDate, endDate time.Time) (int, error) {
+	generated := 0
+	currentDate := startDate
+
+	for currentDate.Before(endDate) || currentDate.Equal(endDate) {
+		// Check if schedule is valid for this date
+		if schedule.IsValidForDate(currentDate) {
+			// Check if trip already exists for this date
+			existing, err := s.scheduledTripRepo.GetByScheduleAndDate(schedule.ID, currentDate)
+			if err == nil && existing != nil {
+				// Trip already exists, skip
+				currentDate = currentDate.AddDate(0, 0, 1)
+				continue
+			}
+
+			// Get total seats from bus (if assigned)
+			totalSeats := 50 // Default
+			if schedule.BusID != nil {
+				bus, err := s.busRepo.GetByID(*schedule.BusID)
+				if err == nil {
+					totalSeats = bus.TotalSeats
+				}
+			}
+
+			// Calculate max bookable seats
+			maxBookableSeats := totalSeats
+			if schedule.MaxBookableSeats != nil && *schedule.MaxBookableSeats < totalSeats {
+				maxBookableSeats = *schedule.MaxBookableSeats
+			}
+
+			// Create scheduled trip
+			trip := &models.ScheduledTrip{
+				ID:                   uuid.New().String(),
+				TripScheduleID:       schedule.ID,
+				PermitID:             schedule.PermitID,
+				BusID:                schedule.BusID,
+				TripDate:             currentDate,
+				DepartureTime:        schedule.DepartureTime,
+				EstimatedArrivalTime: nil, // Can be calculated based on route
+				AssignedDriverID:     schedule.DefaultDriverID,
+				AssignedConductorID:  schedule.DefaultConductorID,
+				IsBookable:           schedule.IsBookable,
+				TotalSeats:           totalSeats,
+				AvailableSeats:       maxBookableSeats,
+				BookedSeats:          0,
+				BaseFare:             schedule.BaseFare,
+				Status:               models.ScheduledTripStatusScheduled,
+				SelectedStopIDs:      schedule.SelectedStopIDs,
+			}
+
+			if err := s.scheduledTripRepo.Create(trip); err != nil {
+				// Log error but continue with other dates
+				fmt.Printf("Failed to create trip for date %s: %v\n", currentDate.Format("2006-01-02"), err)
+			} else {
+				generated++
+			}
+		}
+
+		currentDate = currentDate.AddDate(0, 0, 1)
+	}
+
+	return generated, nil
+}
+
+// GenerateTripsForNewSchedule generates trips for a newly created schedule (next 14 days)
+func (s *TripGeneratorService) GenerateTripsForNewSchedule(schedule *models.TripSchedule) (int, error) {
+	startDate := time.Now()
+
+	// Start from valid_from if it's in the future
+	if schedule.ValidFrom.After(startDate) {
+		startDate = schedule.ValidFrom
+	}
+
+	// Generate for next 14 days
+	endDate := startDate.AddDate(0, 0, 14)
+
+	// Don't exceed valid_until
+	if schedule.ValidUntil != nil && endDate.After(*schedule.ValidUntil) {
+		endDate = *schedule.ValidUntil
+	}
+
+	return s.GenerateTripsForSchedule(schedule, startDate, endDate)
+}
+
+// GenerateFutureTrips generates trips for all active schedules for future dates (14-30 days)
+// This is called by the cron job
+func (s *TripGeneratorService) GenerateFutureTrips() (int, error) {
+	// Get date range: from 14 days from now to 30 days from now
+	startDate := time.Now().AddDate(0, 0, 14)
+	endDate := time.Now().AddDate(0, 0, 30)
+
+	// Get all active schedules for this date range
+	schedules, err := s.scheduleRepo.GetActiveSchedulesForDate(startDate)
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch active schedules: %w", err)
+	}
+
+	totalGenerated := 0
+
+	for _, schedule := range schedules {
+		// Skip if schedule ends before our start date
+		if schedule.ValidUntil != nil && schedule.ValidUntil.Before(startDate) {
+			continue
+		}
+
+		generated, err := s.GenerateTripsForSchedule(&schedule, startDate, endDate)
+		if err != nil {
+			fmt.Printf("Error generating trips for schedule %s: %v\n", schedule.ID, err)
+			continue
+		}
+
+		totalGenerated += generated
+	}
+
+	return totalGenerated, nil
+}
+
+// RegenerateTripsForSchedule regenerates trips for a schedule (useful after updates)
+// Regenerates only future trips that haven't started yet
+func (s *TripGeneratorService) RegenerateTripsForSchedule(schedule *models.TripSchedule) (int, error) {
+	startDate := time.Now()
+
+	// Start from valid_from if it's in the future
+	if schedule.ValidFrom.After(startDate) {
+		startDate = schedule.ValidFrom
+	}
+
+	// Generate for next 14 days
+	endDate := startDate.AddDate(0, 0, 14)
+
+	// Don't exceed valid_until
+	if schedule.ValidUntil != nil && endDate.After(*schedule.ValidUntil) {
+		endDate = *schedule.ValidUntil
+	}
+
+	// Note: This will skip trips that already exist (handled in GenerateTripsForSchedule)
+	return s.GenerateTripsForSchedule(schedule, startDate, endDate)
+}
+
+// CleanupOldTrips removes completed trips older than specified days
+func (s *TripGeneratorService) CleanupOldTrips(daysToKeep int) error {
+	// This would delete old completed trips
+	// Implementation depends on if you want to keep historical data
+	// For now, we'll keep all data for reporting
+	return nil
+}
+
+// FillMissingTrips scans for any gaps in scheduled trips and fills them
+// Useful for recovering from downtime or errors
+func (s *TripGeneratorService) FillMissingTrips() (int, error) {
+	startDate := time.Now()
+	endDate := startDate.AddDate(0, 0, 30)
+
+	schedules, err := s.scheduleRepo.GetActiveSchedulesForDate(startDate)
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch active schedules: %w", err)
+	}
+
+	totalGenerated := 0
+
+	for _, schedule := range schedules {
+		generated, err := s.GenerateTripsForSchedule(&schedule, startDate, endDate)
+		if err != nil {
+			fmt.Printf("Error filling missing trips for schedule %s: %v\n", schedule.ID, err)
+			continue
+		}
+
+		totalGenerated += generated
+	}
+
+	return totalGenerated, nil
+}
+
+// GetGenerationStats returns statistics about trip generation
+type GenerationStats struct {
+	TotalSchedules     int       `json:"total_schedules"`
+	ActiveSchedules    int       `json:"active_schedules"`
+	TripsGenerated     int       `json:"trips_generated"`
+	NextRunDate        time.Time `json:"next_run_date"`
+	LastRunDate        time.Time `json:"last_run_date"`
+	AverageTripPerDay  float64   `json:"average_trips_per_day"`
+}
+
+// GetStats returns generation statistics
+func (s *TripGeneratorService) GetStats() (*GenerationStats, error) {
+	// Get active schedules
+	today := time.Now()
+	schedules, err := s.scheduleRepo.GetActiveSchedulesForDate(today)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get trips for next 7 days
+	startDate := time.Now()
+	endDate := startDate.AddDate(0, 0, 7)
+	trips, err := s.scheduledTripRepo.GetByDateRange(startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+
+	avgPerDay := float64(len(trips)) / 7.0
+
+	stats := &GenerationStats{
+		ActiveSchedules:   len(schedules),
+		TripsGenerated:    len(trips),
+		AverageTripPerDay: avgPerDay,
+		LastRunDate:       time.Now(), // Would be stored in DB in production
+		NextRunDate:       time.Now().AddDate(0, 0, 1).Truncate(24 * time.Hour),
+	}
+
+	return stats, nil
+}

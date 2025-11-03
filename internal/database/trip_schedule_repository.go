@@ -1,0 +1,284 @@
+package database
+
+import (
+	"database/sql"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/smarttransit/sms-auth-backend/internal/models"
+)
+
+// TripScheduleRepository handles database operations for trip_schedules table
+type TripScheduleRepository struct {
+	db DB
+}
+
+// NewTripScheduleRepository creates a new TripScheduleRepository
+func NewTripScheduleRepository(db DB) *TripScheduleRepository {
+	return &TripScheduleRepository{db: db}
+}
+
+// Create creates a new trip schedule
+func (r *TripScheduleRepository) Create(schedule *models.TripSchedule) error {
+	query := `
+		INSERT INTO trip_schedules (
+			id, bus_owner_id, permit_id, bus_id, schedule_name,
+			recurrence_type, recurrence_days, specific_dates, departure_time,
+			base_fare, is_bookable, max_bookable_seats, advance_booking_hours,
+			default_driver_id, default_conductor_id, selected_stop_ids,
+			is_active, valid_from, valid_until, notes
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+			$11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+		)
+		RETURNING created_at, updated_at
+	`
+
+	// Generate ID if not provided
+	if schedule.ID == "" {
+		schedule.ID = uuid.New().String()
+	}
+
+	err := r.db.QueryRow(
+		query,
+		schedule.ID, schedule.BusOwnerID, schedule.PermitID, schedule.BusID, schedule.ScheduleName,
+		schedule.RecurrenceType, schedule.RecurrenceDays, schedule.SpecificDates, schedule.DepartureTime,
+		schedule.BaseFare, schedule.IsBookable, schedule.MaxBookableSeats, schedule.AdvanceBookingHours,
+		schedule.DefaultDriverID, schedule.DefaultConductorID, schedule.SelectedStopIDs,
+		schedule.IsActive, schedule.ValidFrom, schedule.ValidUntil, schedule.Notes,
+	).Scan(&schedule.CreatedAt, &schedule.UpdatedAt)
+
+	return err
+}
+
+// GetByID retrieves a trip schedule by ID
+func (r *TripScheduleRepository) GetByID(scheduleID string) (*models.TripSchedule, error) {
+	query := `
+		SELECT id, bus_owner_id, permit_id, bus_id, schedule_name,
+			   recurrence_type, recurrence_days, specific_dates, departure_time,
+			   base_fare, is_bookable, max_bookable_seats, advance_booking_hours,
+			   default_driver_id, default_conductor_id, selected_stop_ids,
+			   is_active, valid_from, valid_until, notes,
+			   created_at, updated_at
+		FROM trip_schedules
+		WHERE id = $1
+	`
+
+	schedule := &models.TripSchedule{}
+	var busID sql.NullString
+	var scheduleName sql.NullString
+	var maxBookableSeats sql.NullInt64
+	var defaultDriverID sql.NullString
+	var defaultConductorID sql.NullString
+	var validUntil sql.NullTime
+	var notes sql.NullString
+
+	err := r.db.QueryRow(query, scheduleID).Scan(
+		&schedule.ID, &schedule.BusOwnerID, &schedule.PermitID, &busID, &scheduleName,
+		&schedule.RecurrenceType, &schedule.RecurrenceDays, &schedule.SpecificDates, &schedule.DepartureTime,
+		&schedule.BaseFare, &schedule.IsBookable, &maxBookableSeats, &schedule.AdvanceBookingHours,
+		&defaultDriverID, &defaultConductorID, &schedule.SelectedStopIDs,
+		&schedule.IsActive, &schedule.ValidFrom, &validUntil, &notes,
+		&schedule.CreatedAt, &schedule.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert sql.Null* types
+	if busID.Valid {
+		schedule.BusID = &busID.String
+	}
+	if scheduleName.Valid {
+		schedule.ScheduleName = &scheduleName.String
+	}
+	if maxBookableSeats.Valid {
+		seats := int(maxBookableSeats.Int64)
+		schedule.MaxBookableSeats = &seats
+	}
+	if defaultDriverID.Valid {
+		schedule.DefaultDriverID = &defaultDriverID.String
+	}
+	if defaultConductorID.Valid {
+		schedule.DefaultConductorID = &defaultConductorID.String
+	}
+	if validUntil.Valid {
+		schedule.ValidUntil = &validUntil.Time
+	}
+	if notes.Valid {
+		schedule.Notes = &notes.String
+	}
+
+	return schedule, nil
+}
+
+// GetByBusOwnerID retrieves all trip schedules for a bus owner
+func (r *TripScheduleRepository) GetByBusOwnerID(busOwnerID string) ([]models.TripSchedule, error) {
+	query := `
+		SELECT id, bus_owner_id, permit_id, bus_id, schedule_name,
+			   recurrence_type, recurrence_days, specific_dates, departure_time,
+			   base_fare, is_bookable, max_bookable_seats, advance_booking_hours,
+			   default_driver_id, default_conductor_id, selected_stop_ids,
+			   is_active, valid_from, valid_until, notes,
+			   created_at, updated_at
+		FROM trip_schedules
+		WHERE bus_owner_id = $1
+		ORDER BY departure_time
+	`
+
+	rows, err := r.db.Query(query, busOwnerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return r.scanSchedules(rows)
+}
+
+// GetByPermitID retrieves all trip schedules for a permit
+func (r *TripScheduleRepository) GetByPermitID(permitID string) ([]models.TripSchedule, error) {
+	query := `
+		SELECT id, bus_owner_id, permit_id, bus_id, schedule_name,
+			   recurrence_type, recurrence_days, specific_dates, departure_time,
+			   base_fare, is_bookable, max_bookable_seats, advance_booking_hours,
+			   default_driver_id, default_conductor_id, selected_stop_ids,
+			   is_active, valid_from, valid_until, notes,
+			   created_at, updated_at
+		FROM trip_schedules
+		WHERE permit_id = $1
+		ORDER BY departure_time
+	`
+
+	rows, err := r.db.Query(query, permitID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return r.scanSchedules(rows)
+}
+
+// GetActiveSchedulesForDate retrieves all active schedules for a specific date
+func (r *TripScheduleRepository) GetActiveSchedulesForDate(date time.Time) ([]models.TripSchedule, error) {
+	query := `
+		SELECT id, bus_owner_id, permit_id, bus_id, schedule_name,
+			   recurrence_type, recurrence_days, specific_dates, departure_time,
+			   base_fare, is_bookable, max_bookable_seats, advance_booking_hours,
+			   default_driver_id, default_conductor_id, selected_stop_ids,
+			   is_active, valid_from, valid_until, notes,
+			   created_at, updated_at
+		FROM trip_schedules
+		WHERE is_active = true
+		  AND valid_from <= $1
+		  AND (valid_until IS NULL OR valid_until >= $1)
+	`
+
+	rows, err := r.db.Query(query, date)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return r.scanSchedules(rows)
+}
+
+// Update updates a trip schedule
+func (r *TripScheduleRepository) Update(schedule *models.TripSchedule) error {
+	query := `
+		UPDATE trip_schedules
+		SET bus_id = $2, schedule_name = $3, recurrence_type = $4,
+			recurrence_days = $5, specific_dates = $6, departure_time = $7,
+			base_fare = $8, is_bookable = $9, max_bookable_seats = $10,
+			advance_booking_hours = $11, default_driver_id = $12,
+			default_conductor_id = $13, selected_stop_ids = $14,
+			is_active = $15, valid_from = $16, valid_until = $17,
+			notes = $18, updated_at = NOW()
+		WHERE id = $1
+		RETURNING updated_at
+	`
+
+	err := r.db.QueryRow(
+		query,
+		schedule.ID, schedule.BusID, schedule.ScheduleName, schedule.RecurrenceType,
+		schedule.RecurrenceDays, schedule.SpecificDates, schedule.DepartureTime,
+		schedule.BaseFare, schedule.IsBookable, schedule.MaxBookableSeats,
+		schedule.AdvanceBookingHours, schedule.DefaultDriverID,
+		schedule.DefaultConductorID, schedule.SelectedStopIDs,
+		schedule.IsActive, schedule.ValidFrom, schedule.ValidUntil,
+		schedule.Notes,
+	).Scan(&schedule.UpdatedAt)
+
+	return err
+}
+
+// Delete deletes a trip schedule
+func (r *TripScheduleRepository) Delete(scheduleID string) error {
+	query := `DELETE FROM trip_schedules WHERE id = $1`
+	_, err := r.db.Exec(query, scheduleID)
+	return err
+}
+
+// Deactivate deactivates a trip schedule
+func (r *TripScheduleRepository) Deactivate(scheduleID string) error {
+	query := `UPDATE trip_schedules SET is_active = false, updated_at = NOW() WHERE id = $1`
+	_, err := r.db.Exec(query, scheduleID)
+	return err
+}
+
+// scanSchedules scans multiple schedules from rows
+func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSchedule, error) {
+	schedules := []models.TripSchedule{}
+
+	for rows.Next() {
+		var schedule models.TripSchedule
+		var busID sql.NullString
+		var scheduleName sql.NullString
+		var maxBookableSeats sql.NullInt64
+		var defaultDriverID sql.NullString
+		var defaultConductorID sql.NullString
+		var validUntil sql.NullTime
+		var notes sql.NullString
+
+		err := rows.Scan(
+			&schedule.ID, &schedule.BusOwnerID, &schedule.PermitID, &busID, &scheduleName,
+			&schedule.RecurrenceType, &schedule.RecurrenceDays, &schedule.SpecificDates, &schedule.DepartureTime,
+			&schedule.BaseFare, &schedule.IsBookable, &maxBookableSeats, &schedule.AdvanceBookingHours,
+			&defaultDriverID, &defaultConductorID, &schedule.SelectedStopIDs,
+			&schedule.IsActive, &schedule.ValidFrom, &validUntil, &notes,
+			&schedule.CreatedAt, &schedule.UpdatedAt,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		// Convert sql.Null* types
+		if busID.Valid {
+			schedule.BusID = &busID.String
+		}
+		if scheduleName.Valid {
+			schedule.ScheduleName = &scheduleName.String
+		}
+		if maxBookableSeats.Valid {
+			seats := int(maxBookableSeats.Int64)
+			schedule.MaxBookableSeats = &seats
+		}
+		if defaultDriverID.Valid {
+			schedule.DefaultDriverID = &defaultDriverID.String
+		}
+		if defaultConductorID.Valid {
+			schedule.DefaultConductorID = &defaultConductorID.String
+		}
+		if validUntil.Valid {
+			schedule.ValidUntil = &validUntil.Time
+		}
+		if notes.Valid {
+			schedule.Notes = &notes.String
+		}
+
+		schedules = append(schedules, schedule)
+	}
+
+	return schedules, rows.Err()
+}

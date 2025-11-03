@@ -1,0 +1,179 @@
+package models
+
+import (
+	"errors"
+	"time"
+)
+
+// RecurrenceType represents how often a trip schedule repeats
+type RecurrenceType string
+
+const (
+	RecurrenceDaily        RecurrenceType = "daily"
+	RecurrenceWeekly       RecurrenceType = "weekly"
+	RecurrenceSpecificDates RecurrenceType = "specific_dates"
+)
+
+// TripSchedule represents a recurring trip template
+type TripSchedule struct {
+	ID                    string         `json:"id" db:"id"`
+	BusOwnerID            string         `json:"bus_owner_id" db:"bus_owner_id"`
+	PermitID              string         `json:"permit_id" db:"permit_id"`
+	BusID                 *string        `json:"bus_id,omitempty" db:"bus_id"`
+	ScheduleName          *string        `json:"schedule_name,omitempty" db:"schedule_name"`
+	RecurrenceType        RecurrenceType `json:"recurrence_type" db:"recurrence_type"`
+	RecurrenceDays        IntArray       `json:"recurrence_days,omitempty" db:"recurrence_days"`
+	SpecificDates         DateArray      `json:"specific_dates,omitempty" db:"specific_dates"`
+	DepartureTime         string         `json:"departure_time" db:"departure_time"` // TIME type stored as string (HH:MM:SS)
+	BaseFare              float64        `json:"base_fare" db:"base_fare"`
+	IsBookable            bool           `json:"is_bookable" db:"is_bookable"`
+	MaxBookableSeats      *int           `json:"max_bookable_seats,omitempty" db:"max_bookable_seats"`
+	AdvanceBookingHours   int            `json:"advance_booking_hours" db:"advance_booking_hours"`
+	DefaultDriverID       *string        `json:"default_driver_id,omitempty" db:"default_driver_id"`
+	DefaultConductorID    *string        `json:"default_conductor_id,omitempty" db:"default_conductor_id"`
+	SelectedStopIDs       UUIDArray      `json:"selected_stop_ids,omitempty" db:"selected_stop_ids"`
+	IsActive              bool           `json:"is_active" db:"is_active"`
+	ValidFrom             time.Time      `json:"valid_from" db:"valid_from"`
+	ValidUntil            *time.Time     `json:"valid_until,omitempty" db:"valid_until"`
+	Notes                 *string        `json:"notes,omitempty" db:"notes"`
+	CreatedAt             time.Time      `json:"created_at" db:"created_at"`
+	UpdatedAt             time.Time      `json:"updated_at" db:"updated_at"`
+}
+
+// CreateTripScheduleRequest represents the request to create a trip schedule
+type CreateTripScheduleRequest struct {
+	PermitID            string    `json:"permit_id" binding:"required"`
+	BusID               *string   `json:"bus_id,omitempty"`
+	ScheduleName        *string   `json:"schedule_name,omitempty"`
+	RecurrenceType      string    `json:"recurrence_type" binding:"required,oneof=daily weekly specific_dates"`
+	RecurrenceDays      []int     `json:"recurrence_days,omitempty"`
+	SpecificDates       []string  `json:"specific_dates,omitempty"` // Date strings in YYYY-MM-DD format
+	DepartureTime       string    `json:"departure_time" binding:"required"`
+	BaseFare            float64   `json:"base_fare" binding:"required,gt=0"`
+	IsBookable          bool      `json:"is_bookable"`
+	MaxBookableSeats    *int      `json:"max_bookable_seats,omitempty"`
+	AdvanceBookingHours int       `json:"advance_booking_hours"`
+	DefaultDriverID     *string   `json:"default_driver_id,omitempty"`
+	DefaultConductorID  *string   `json:"default_conductor_id,omitempty"`
+	SelectedStopIDs     []string  `json:"selected_stop_ids,omitempty"`
+	ValidFrom           string    `json:"valid_from" binding:"required"`
+	ValidUntil          *string   `json:"valid_until,omitempty"`
+	Notes               *string   `json:"notes,omitempty"`
+}
+
+// Validate validates the create trip schedule request
+func (r *CreateTripScheduleRequest) Validate() error {
+	// Check recurrence type specific validations
+	switch RecurrenceType(r.RecurrenceType) {
+	case RecurrenceWeekly:
+		if len(r.RecurrenceDays) == 0 {
+			return errors.New("recurrence_days is required for weekly schedules")
+		}
+		// Validate days are 0-6 (Sunday-Saturday)
+		for _, day := range r.RecurrenceDays {
+			if day < 0 || day > 6 {
+				return errors.New("recurrence_days must contain values between 0 (Sunday) and 6 (Saturday)")
+			}
+		}
+	case RecurrenceSpecificDates:
+		if len(r.SpecificDates) == 0 {
+			return errors.New("specific_dates is required for specific_dates recurrence type")
+		}
+	}
+
+	// Validate departure time format (HH:MM or HH:MM:SS)
+	if _, err := time.Parse("15:04", r.DepartureTime); err != nil {
+		if _, err := time.Parse("15:04:05", r.DepartureTime); err != nil {
+			return errors.New("departure_time must be in HH:MM or HH:MM:SS format")
+		}
+	}
+
+	// Validate dates
+	validFrom, err := time.Parse("2006-01-02", r.ValidFrom)
+	if err != nil {
+		return errors.New("valid_from must be in YYYY-MM-DD format")
+	}
+
+	if r.ValidUntil != nil {
+		validUntil, err := time.Parse("2006-01-02", *r.ValidUntil)
+		if err != nil {
+			return errors.New("valid_until must be in YYYY-MM-DD format")
+		}
+		if validUntil.Before(validFrom) {
+			return errors.New("valid_until must be after valid_from")
+		}
+	}
+
+	// Validate booking settings
+	if r.IsBookable && r.MaxBookableSeats != nil && *r.MaxBookableSeats <= 0 {
+		return errors.New("max_bookable_seats must be greater than 0 if specified")
+	}
+
+	return nil
+}
+
+// IsValidForDate checks if the schedule is valid for a specific date
+func (s *TripSchedule) IsValidForDate(date time.Time) bool {
+	if !s.IsActive {
+		return false
+	}
+
+	// Check if date is within valid range
+	if date.Before(s.ValidFrom) {
+		return false
+	}
+
+	if s.ValidUntil != nil && date.After(*s.ValidUntil) {
+		return false
+	}
+
+	// Check recurrence rules
+	switch s.RecurrenceType {
+	case RecurrenceDaily:
+		return true
+	case RecurrenceWeekly:
+		weekday := int(date.Weekday())
+		for _, day := range s.RecurrenceDays {
+			if day == weekday {
+				return true
+			}
+		}
+		return false
+	case RecurrenceSpecificDates:
+		dateOnly := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+		for _, specificDate := range s.SpecificDates {
+			specificDateOnly := time.Date(specificDate.Year(), specificDate.Month(), specificDate.Day(), 0, 0, 0, 0, time.UTC)
+			if dateOnly.Equal(specificDateOnly) {
+				return true
+			}
+		}
+		return false
+	}
+
+	return false
+}
+
+// GetNextOccurrences returns the next N dates when this schedule will run
+func (s *TripSchedule) GetNextOccurrences(n int) []time.Time {
+	dates := make([]time.Time, 0, n)
+	currentDate := time.Now()
+
+	// Start from valid_from if it's in the future
+	if s.ValidFrom.After(currentDate) {
+		currentDate = s.ValidFrom
+	}
+
+	// Limit search to 365 days to prevent infinite loops
+	maxDays := 365
+	dayCount := 0
+
+	for len(dates) < n && dayCount < maxDays {
+		if s.IsValidForDate(currentDate) {
+			dates = append(dates, currentDate)
+		}
+		currentDate = currentDate.AddDate(0, 0, 1)
+		dayCount++
+	}
+
+	return dates
+}

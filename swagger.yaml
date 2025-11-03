@@ -48,6 +48,10 @@ tags:
     description: Route permit management
   - name: Buses
     description: Bus registration and management
+  - name: Trip Schedules
+    description: Trip schedule template management
+  - name: Scheduled Trips
+    description: Generated trip instances and bookings
 
 paths:
   # ============================================================================
@@ -2512,6 +2516,353 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  # ============================================================================
+  # Trip Schedule Endpoints
+  # ============================================================================
+  /api/v1/trip-schedules:
+    post:
+      summary: Create trip schedule
+      description: Create a new trip schedule template. Trips are generated instantly for the next 14 days.
+      operationId: createTripSchedule
+      tags:
+        - Trip Schedules
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - permit_id
+                - recurrence_type
+                - departure_time
+                - base_fare
+                - valid_from
+              properties:
+                permit_id:
+                  type: string
+                  format: uuid
+                recurrence_type:
+                  type: string
+                  enum: [daily, weekly, specific_dates]
+                recurrence_days:
+                  type: array
+                  items:
+                    type: integer
+                    minimum: 0
+                    maximum: 6
+                  description: "Days of week: 0=Sunday, 6=Saturday (for weekly)"
+                specific_dates:
+                  type: array
+                  items:
+                    type: string
+                    format: date
+                  description: "List of specific dates (for specific_dates type)"
+                departure_time:
+                  type: string
+                  example: "08:00:00"
+                estimated_arrival_time:
+                  type: string
+                  example: "10:30:00"
+                base_fare:
+                  type: number
+                  format: double
+                is_bookable:
+                  type: boolean
+                  default: true
+                valid_from:
+                  type: string
+                  format: date
+                valid_until:
+                  type: string
+                  format: date
+                notes:
+                  type: string
+      responses:
+        "201":
+          description: Schedule created and trips generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schedule:
+                    $ref: "#/components/schemas/TripSchedule"
+                  trips_generated:
+                    type: integer
+                    example: 14
+                  message:
+                    type: string
+                    example: "Schedule created successfully"
+        "400":
+          description: Invalid input
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    get:
+      summary: Get all trip schedules
+      description: Retrieve all trip schedules for the authenticated bus owner
+      operationId: getAllTripSchedules
+      tags:
+        - Trip Schedules
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of trip schedules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TripSchedule"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/trip-schedules/{id}:
+    get:
+      summary: Get trip schedule by ID
+      description: Retrieve a specific trip schedule
+      operationId: getTripScheduleById
+      tags:
+        - Trip Schedules
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Trip schedule details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TripSchedule"
+        "404":
+          description: Schedule not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    put:
+      summary: Update trip schedule
+      description: Update an existing trip schedule and regenerate trips
+      operationId: updateTripSchedule
+      tags:
+        - Trip Schedules
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                recurrence_type:
+                  type: string
+                  enum: [daily, weekly, specific_dates]
+                recurrence_days:
+                  type: array
+                  items:
+                    type: integer
+                departure_time:
+                  type: string
+                base_fare:
+                  type: number
+                is_bookable:
+                  type: boolean
+                valid_until:
+                  type: string
+                  format: date
+      responses:
+        "200":
+          description: Schedule updated successfully
+        "404":
+          description: Schedule not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================================
+  # Scheduled Trip Endpoints
+  # ============================================================================
+  /api/v1/scheduled-trips:
+    get:
+      summary: Get scheduled trips by date range
+      description: Retrieve scheduled trips within a specified date range
+      operationId: getScheduledTrips
+      tags:
+        - Scheduled Trips
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2025-11-01"
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2025-11-15"
+      responses:
+        "200":
+          description: List of scheduled trips
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScheduledTrip"
+        "400":
+          description: Invalid date range
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/scheduled-trips/{id}:
+    get:
+      summary: Get scheduled trip by ID
+      description: Retrieve details of a specific scheduled trip
+      operationId: getScheduledTripById
+      tags:
+        - Scheduled Trips
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Scheduled trip details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledTrip"
+        "404":
+          description: Trip not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    patch:
+      summary: Update scheduled trip
+      description: Update scheduled trip details (assign staff, change status, etc.)
+      operationId: updateScheduledTrip
+      tags:
+        - Scheduled Trips
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assigned_driver_id:
+                  type: string
+                  format: uuid
+                assigned_conductor_id:
+                  type: string
+                  format: uuid
+                status:
+                  type: string
+                  enum: [scheduled, confirmed, in_progress, completed, cancelled]
+      responses:
+        "200":
+          description: Trip updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledTrip"
+        "404":
+          description: Trip not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/bookable-trips:
+    get:
+      summary: Get bookable trips (Public)
+      description: Public endpoint to get available trips for booking by passengers
+      operationId: getBookableTrips
+      tags:
+        - Scheduled Trips
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: origin
+          in: query
+          schema:
+            type: string
+        - name: destination
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of bookable trips
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScheduledTrip"
+        "400":
+          description: Invalid parameters
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 # ============================================================================
 # Components (Schemas, Responses, SecuritySchemes)
 # ============================================================================
@@ -3134,6 +3485,169 @@ components:
         has_refreshments:
           type: boolean
           example: true
+
+    TripSchedule:
+      type: object
+      required:
+        - id
+        - permit_id
+        - recurrence_type
+        - departure_time
+        - base_fare
+        - valid_from
+        - is_active
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "d3eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        permit_id:
+          type: string
+          format: uuid
+          example: "c2eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        recurrence_type:
+          type: string
+          enum: [daily, weekly, specific_dates]
+          example: "weekly"
+        recurrence_days:
+          type: array
+          items:
+            type: integer
+            minimum: 0
+            maximum: 6
+          example: [1, 2, 3, 4, 5]
+          description: "Days of week: 0=Sunday, 6=Saturday"
+        specific_dates:
+          type: array
+          items:
+            type: string
+            format: date
+          example: ["2025-11-05", "2025-11-12"]
+        departure_time:
+          type: string
+          example: "08:00:00"
+        estimated_arrival_time:
+          type: string
+          example: "10:30:00"
+        base_fare:
+          type: number
+          format: double
+          example: 350.00
+        is_bookable:
+          type: boolean
+          example: true
+        valid_from:
+          type: string
+          format: date
+          example: "2025-11-01"
+        valid_until:
+          type: string
+          format: date
+          example: "2025-12-31"
+        is_active:
+          type: boolean
+          example: true
+        notes:
+          type: string
+          example: "Regular weekday service"
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-11-01T10:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2025-11-01T10:00:00Z"
+
+    ScheduledTrip:
+      type: object
+      required:
+        - id
+        - trip_schedule_id
+        - permit_id
+        - trip_date
+        - departure_time
+        - total_seats
+        - available_seats
+        - booked_seats
+        - base_fare
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "e4eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        trip_schedule_id:
+          type: string
+          format: uuid
+          example: "d3eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        permit_id:
+          type: string
+          format: uuid
+          example: "c2eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        bus_id:
+          type: string
+          format: uuid
+          example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        trip_date:
+          type: string
+          format: date
+          example: "2025-11-05"
+        departure_time:
+          type: string
+          example: "08:00:00"
+        estimated_arrival_time:
+          type: string
+          example: "10:30:00"
+        assigned_driver_id:
+          type: string
+          format: uuid
+          example: "f5eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        assigned_conductor_id:
+          type: string
+          format: uuid
+          example: "g6eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        driver_name:
+          type: string
+          example: "John Doe"
+        conductor_name:
+          type: string
+          example: "Jane Smith"
+        is_bookable:
+          type: boolean
+          example: true
+        total_seats:
+          type: integer
+          example: 45
+        available_seats:
+          type: integer
+          example: 30
+        booked_seats:
+          type: integer
+          example: 15
+        base_fare:
+          type: number
+          format: double
+          example: 350.00
+        status:
+          type: string
+          enum: [scheduled, confirmed, in_progress, completed, cancelled]
+          example: "scheduled"
+        cancellation_reason:
+          type: string
+          example: "Driver unavailable"
+        cancelled_at:
+          type: string
+          format: date-time
+          example: "2025-11-05T07:00:00Z"
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-11-01T10:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2025-11-01T10:00:00Z"
 
   responses:
     BadRequest:
