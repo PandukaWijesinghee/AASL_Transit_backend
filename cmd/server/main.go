@@ -408,7 +408,7 @@ func main() {
 			permits.GET("", permitHandler.GetAllPermits)
 			permits.GET("/valid", permitHandler.GetValidPermits)
 			permits.GET("/:id", permitHandler.GetPermitByID)
-			permits.GET("/:permitId/route-details", permitHandler.GetRouteDetails)
+			permits.GET("/:id/route-details", permitHandler.GetRouteDetails)
 			permits.POST("", permitHandler.CreatePermit)
 			permits.PUT("/:id", permitHandler.UpdatePermit)
 			permits.DELETE("/:id", permitHandler.DeletePermit)
@@ -457,9 +457,9 @@ func main() {
 		}
 
 		// Permit-specific trip routes
-		permits.GET("/:permitId/trip-schedules", tripScheduleHandler.GetSchedulesByPermit)
-		permits.GET("/:permitId/scheduled-trips", scheduledTripHandler.GetTripsByPermit)
-		permits.GET("/:permitId/route-details", permitHandler.GetRouteDetails)
+		permits.GET("/:id/trip-schedules", tripScheduleHandler.GetSchedulesByPermit)
+		permits.GET("/:id/scheduled-trips", scheduledTripHandler.GetTripsByPermit)
+		permits.GET("/:id/route-details", permitHandler.GetRouteDetails)
 
 		// Public bookable trips (no auth required)
 		v1.GET("/bookable-trips", scheduledTripHandler.GetBookableTrips)
