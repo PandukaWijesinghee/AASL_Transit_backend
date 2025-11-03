@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"sms-auth-backend/internal/database"
+	"github.com/smarttransit/sms-auth-backend/internal/database"
 
 	"github.com/gin-gonic/gin"
 )
