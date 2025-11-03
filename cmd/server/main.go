@@ -200,6 +200,7 @@ func main() {
 	busOwnerHandler := handlers.NewBusOwnerHandler(ownerRepository, permitRepository, userRepository, staffRepository)
 	permitHandler := handlers.NewPermitHandler(permitRepository, ownerRepository, masterRouteRepo)
 	busHandler := handlers.NewBusHandler(busRepository, permitRepository, ownerRepository)
+	masterRouteHandler := handlers.NewMasterRouteHandler(masterRouteRepo)
 
 	// Initialize lounge owner, lounge, staff, and admin handlers
 	logger.Info("🔍 DEBUG: Initializing lounge handlers...")
@@ -407,9 +408,18 @@ func main() {
 			permits.GET("", permitHandler.GetAllPermits)
 			permits.GET("/valid", permitHandler.GetValidPermits)
 			permits.GET("/:id", permitHandler.GetPermitByID)
+			permits.GET("/:permitId/route-details", permitHandler.GetRouteDetails)
 			permits.POST("", permitHandler.CreatePermit)
 			permits.PUT("/:id", permitHandler.UpdatePermit)
 			permits.DELETE("/:id", permitHandler.DeletePermit)
+		}
+
+		// Master Routes (all protected - for dropdown selection)
+		masterRoutes := v1.Group("/master-routes")
+		masterRoutes.Use(middleware.AuthMiddleware(jwtService))
+		{
+			masterRoutes.GET("", masterRouteHandler.ListMasterRoutes)
+			masterRoutes.GET("/:id", masterRouteHandler.GetMasterRouteByID)
 		}
 
 		// Bus routes (all protected)

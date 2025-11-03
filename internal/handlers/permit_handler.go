@@ -162,6 +162,32 @@ func (h *PermitHandler) CreatePermit(c *gin.Context) {
 		return
 	}
 
+	// NEW: If master_route_id is provided, auto-populate route details
+	if req.MasterRouteID != nil && *req.MasterRouteID != "" {
+		masterRoute, err := h.masterRouteRepo.GetByID(*req.MasterRouteID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid master_route_id: route not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch master route"})
+			return
+		}
+
+		// Auto-populate route details from master route
+		req.RouteNumber = masterRoute.RouteNumber
+		req.FromCity = masterRoute.OriginCity
+		req.ToCity = masterRoute.DestinationCity
+
+		// Auto-populate optional fields if not provided
+		if req.TotalDistanceKm == nil {
+			req.TotalDistanceKm = &masterRoute.TotalDistanceKm
+		}
+		if req.EstimatedDuration == nil {
+			req.EstimatedDuration = &masterRoute.EstimatedDurationMinutes
+		}
+	}
+
 	// Create permit model from request
 	permit, err := models.NewRoutePermitFromRequest(busOwner.ID, &req)
 	if err != nil {

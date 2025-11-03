@@ -90,17 +90,25 @@ func (p *RoutePermit) RouteDisplayName() string {
 
 // CreateRoutePermitRequest represents the request body for creating a permit
 type CreateRoutePermitRequest struct {
+	// Core required fields
 	PermitNumber          string   `json:"permit_number" binding:"required"`
 	BusRegistrationNumber string   `json:"bus_registration_number" binding:"required"`
-	RouteNumber           string   `json:"route_number" binding:"required"`
-	FromCity              string   `json:"from_city" binding:"required"`
-	ToCity                string   `json:"to_city" binding:"required"`
-	Via                   *string  `json:"via,omitempty"`
 	ApprovedFare          float64  `json:"approved_fare" binding:"required,gt=0"`
 	ValidityFrom          string   `json:"validity_from" binding:"required"` // Date format: YYYY-MM-DD
 	ValidityTo            string   `json:"validity_to" binding:"required"`   // Date format: YYYY-MM-DD
+
+	// NEW: Option 1 - Use existing master route (auto-populates route details)
+	MasterRouteID         *string  `json:"master_route_id,omitempty"`
+
+	// Option 2 - Manually enter route details (required if no master_route_id)
+	RouteNumber           string   `json:"route_number"`
+	FromCity              string   `json:"from_city"`
+	ToCity                string   `json:"to_city"`
+	Via                   *string  `json:"via,omitempty"`
 	TotalDistanceKm       *float64 `json:"total_distance_km,omitempty"`
 	EstimatedDuration     *int     `json:"estimated_duration_minutes,omitempty"`
+
+	// Optional permit details
 	PermitType            *string  `json:"permit_type,omitempty"`
 	MaxTripsPerDay        *int     `json:"max_trips_per_day,omitempty"`
 	AllowedBusTypes       []string `json:"allowed_bus_types,omitempty"`
@@ -115,15 +123,21 @@ func (r *CreateRoutePermitRequest) Validate() error {
 	if r.BusRegistrationNumber == "" {
 		return errors.New("bus_registration_number is required")
 	}
-	if r.RouteNumber == "" {
-		return errors.New("route_number is required")
+
+	// Either master_route_id OR manual route details must be provided
+	if r.MasterRouteID == nil || *r.MasterRouteID == "" {
+		// Manual route entry - validate all required fields
+		if r.RouteNumber == "" {
+			return errors.New("route_number is required when master_route_id is not provided")
+		}
+		if r.FromCity == "" {
+			return errors.New("from_city is required when master_route_id is not provided")
+		}
+		if r.ToCity == "" {
+			return errors.New("to_city is required when master_route_id is not provided")
+		}
 	}
-	if r.FromCity == "" {
-		return errors.New("from_city is required")
-	}
-	if r.ToCity == "" {
-		return errors.New("to_city is required")
-	}
+
 	if r.ApprovedFare <= 0 {
 		return errors.New("approved_fare must be greater than 0")
 	}
