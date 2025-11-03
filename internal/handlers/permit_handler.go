@@ -179,12 +179,12 @@ func (h *PermitHandler) CreatePermit(c *gin.Context) {
 		req.FromCity = masterRoute.OriginCity
 		req.ToCity = masterRoute.DestinationCity
 
-		// Auto-populate optional fields if not provided
-		if req.TotalDistanceKm == nil {
-			req.TotalDistanceKm = &masterRoute.TotalDistanceKm
+		// Auto-populate optional fields if not provided (pointers already)
+		if req.TotalDistanceKm == nil && masterRoute.TotalDistanceKm != nil {
+			req.TotalDistanceKm = masterRoute.TotalDistanceKm
 		}
-		if req.EstimatedDuration == nil {
-			req.EstimatedDuration = &masterRoute.EstimatedDurationMinutes
+		if req.EstimatedDuration == nil && masterRoute.EstimatedDurationMinutes != nil {
+			req.EstimatedDuration = masterRoute.EstimatedDurationMinutes
 		}
 	}
 

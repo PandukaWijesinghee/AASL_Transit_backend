@@ -46,8 +46,18 @@ func (h *MasterRouteHandler) ListMasterRoutes(c *gin.Context) {
 	options := make([]MasterRouteOption, 0, len(routes))
 	for _, route := range routes {
 		displayLabel := route.RouteNumber + " - " + route.OriginCity + " → " + route.DestinationCity
-		if route.TotalDistanceKm > 0 {
-			displayLabel += " (" + formatDistance(route.TotalDistanceKm) + ")"
+		if route.TotalDistanceKm != nil && *route.TotalDistanceKm > 0 {
+			displayLabel += " (" + formatDistance(*route.TotalDistanceKm) + ")"
+		}
+
+		// Safely dereference pointers
+		var distanceKm float64
+		var durationMins int
+		if route.TotalDistanceKm != nil {
+			distanceKm = *route.TotalDistanceKm
+		}
+		if route.EstimatedDurationMinutes != nil {
+			durationMins = *route.EstimatedDurationMinutes
 		}
 
 		options = append(options, MasterRouteOption{
@@ -56,8 +66,8 @@ func (h *MasterRouteHandler) ListMasterRoutes(c *gin.Context) {
 			RouteName:                route.RouteName,
 			OriginCity:               route.OriginCity,
 			DestinationCity:          route.DestinationCity,
-			TotalDistanceKm:          route.TotalDistanceKm,
-			EstimatedDurationMinutes: route.EstimatedDurationMinutes,
+			TotalDistanceKm:          distanceKm,
+			EstimatedDurationMinutes: durationMins,
 			DisplayLabel:             displayLabel,
 		})
 	}
