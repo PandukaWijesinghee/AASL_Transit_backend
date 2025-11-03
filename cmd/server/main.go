@@ -459,7 +459,6 @@ func main() {
 		// Permit-specific trip routes
 		permits.GET("/:id/trip-schedules", tripScheduleHandler.GetSchedulesByPermit)
 		permits.GET("/:id/scheduled-trips", scheduledTripHandler.GetTripsByPermit)
-		permits.GET("/:id/route-details", permitHandler.GetRouteDetails)
 
 		// Public bookable trips (no auth required)
 		v1.GET("/bookable-trips", scheduledTripHandler.GetBookableTrips)
