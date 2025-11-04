@@ -334,7 +334,7 @@ func (h *PermitHandler) GetRouteDetails(c *gin.Context) {
 	}
 
 	// Check if permit has master_route_id
-	if permit.MasterRouteID == nil {
+	if permit.MasterRouteID == "" {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":   "No master route associated with this permit",
 			"message": "This permit does not have route polyline data",
@@ -343,7 +343,7 @@ func (h *PermitHandler) GetRouteDetails(c *gin.Context) {
 	}
 
 	// Get master route details
-	masterRoute, err := h.masterRouteRepo.GetByID(*permit.MasterRouteID)
+	masterRoute, err := h.masterRouteRepo.GetByID(permit.MasterRouteID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Master route not found"})
@@ -354,7 +354,7 @@ func (h *PermitHandler) GetRouteDetails(c *gin.Context) {
 	}
 
 	// Get route stops
-	stops, err := h.masterRouteRepo.GetStopsByRouteID(*permit.MasterRouteID)
+	stops, err := h.masterRouteRepo.GetStopsByRouteID(permit.MasterRouteID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch route stops"})
 		return
