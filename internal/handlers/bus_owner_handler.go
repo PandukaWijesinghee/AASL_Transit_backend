@@ -88,6 +88,8 @@ func (h *BusOwnerHandler) CheckProfileStatus(c *gin.Context) {
 	                  *busOwner.IdentityOrIncorporationNo != ""
 
 	c.JSON(http.StatusOK, gin.H{
+		"user_id":           userCtx.UserID.String(),
+		"phone":             userCtx.Phone,
 		"profile_completed": busOwner.ProfileCompleted,
 		"permit_count":      permitCount,
 		"has_company_info":  hasCompanyInfo,

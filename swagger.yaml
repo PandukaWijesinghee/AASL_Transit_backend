@@ -935,9 +935,22 @@ paths:
               schema:
                 type: object
                 properties:
+                  user_id:
+                    type: string
+                    format: uuid
+                    example: "123e4567-e89b-12d3-a456-426614174000"
+                  phone:
+                    type: string
+                    example: "+94712345678"
                   profile_completed:
                     type: boolean
                     example: false
+                  permit_count:
+                    type: integer
+                    example: 2
+                  has_company_info:
+                    type: boolean
+                    example: true
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
