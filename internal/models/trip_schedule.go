@@ -24,7 +24,10 @@ type TripSchedule struct {
 	RecurrenceType        RecurrenceType `json:"recurrence_type" db:"recurrence_type"`
 	RecurrenceDays        IntArray       `json:"recurrence_days,omitempty" db:"recurrence_days"`
 	SpecificDates         DateArray      `json:"specific_dates,omitempty" db:"specific_dates"`
-	DepartureTime         string         `json:"departure_time" db:"departure_time"` // TIME type stored as string (HH:MM:SS)
+	DepartureTime         string         `json:"departure_time" db:"departure_time"`                   // TIME type stored as string (HH:MM:SS)
+	EstimatedArrivalTime  *string        `json:"estimated_arrival_time,omitempty" db:"estimated_arrival_time"` // TIME type stored as string (HH:MM:SS)
+	Direction             string         `json:"direction" db:"direction"`                             // UP, DOWN, ROUND_TRIP
+	TripsPerDay           int            `json:"trips_per_day" db:"trips_per_day"`                     // Number of trips per day
 	BaseFare              float64        `json:"base_fare" db:"base_fare"`
 	IsBookable            bool           `json:"is_bookable" db:"is_bookable"`
 	MaxBookableSeats      *int           `json:"max_bookable_seats,omitempty" db:"max_bookable_seats"`
@@ -42,23 +45,26 @@ type TripSchedule struct {
 
 // CreateTripScheduleRequest represents the request to create a trip schedule
 type CreateTripScheduleRequest struct {
-	PermitID            string    `json:"permit_id" binding:"required"`
-	BusID               *string   `json:"bus_id,omitempty"`
-	ScheduleName        *string   `json:"schedule_name,omitempty"`
-	RecurrenceType      string    `json:"recurrence_type" binding:"required,oneof=daily weekly specific_dates"`
-	RecurrenceDays      []int     `json:"recurrence_days,omitempty"`
-	SpecificDates       []string  `json:"specific_dates,omitempty"` // Date strings in YYYY-MM-DD format
-	DepartureTime       string    `json:"departure_time" binding:"required"`
-	BaseFare            float64   `json:"base_fare" binding:"required,gt=0"`
-	IsBookable          bool      `json:"is_bookable"`
-	MaxBookableSeats    *int      `json:"max_bookable_seats,omitempty"`
-	AdvanceBookingHours int       `json:"advance_booking_hours"`
-	DefaultDriverID     *string   `json:"default_driver_id,omitempty"`
-	DefaultConductorID  *string   `json:"default_conductor_id,omitempty"`
-	SelectedStopIDs     []string  `json:"selected_stop_ids,omitempty"`
-	ValidFrom           string    `json:"valid_from" binding:"required"`
-	ValidUntil          *string   `json:"valid_until,omitempty"`
-	Notes               *string   `json:"notes,omitempty"`
+	PermitID             string   `json:"permit_id" binding:"required"`
+	BusID                *string  `json:"bus_id,omitempty"`
+	ScheduleName         *string  `json:"schedule_name,omitempty"`
+	RecurrenceType       string   `json:"recurrence_type" binding:"required,oneof=daily weekly specific_dates"`
+	RecurrenceDays       []int    `json:"recurrence_days,omitempty"`
+	SpecificDates        []string `json:"specific_dates,omitempty"` // Date strings in YYYY-MM-DD format
+	DepartureTime        string   `json:"departure_time" binding:"required"`
+	EstimatedArrivalTime *string  `json:"estimated_arrival_time,omitempty"` // HH:MM or HH:MM:SS format
+	Direction            string   `json:"direction" binding:"required,oneof=UP DOWN ROUND_TRIP"`
+	TripsPerDay          int      `json:"trips_per_day" binding:"required,min=1,max=10"`
+	BaseFare             float64  `json:"base_fare" binding:"required,gt=0"`
+	IsBookable           bool     `json:"is_bookable"`
+	MaxBookableSeats     *int     `json:"max_bookable_seats,omitempty"`
+	AdvanceBookingHours  int      `json:"advance_booking_hours"`
+	DefaultDriverID      *string  `json:"default_driver_id,omitempty"`
+	DefaultConductorID   *string  `json:"default_conductor_id,omitempty"`
+	SelectedStopIDs      []string `json:"selected_stop_ids,omitempty"`
+	ValidFrom            string   `json:"valid_from" binding:"required"`
+	ValidUntil           *string  `json:"valid_until,omitempty"`
+	Notes                *string  `json:"notes,omitempty"`
 }
 
 // Validate validates the create trip schedule request
