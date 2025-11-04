@@ -2789,12 +2789,21 @@ paths:
                 - permit_id
                 - recurrence_type
                 - departure_time
+                - direction
+                - trips_per_day
                 - base_fare
                 - valid_from
               properties:
                 permit_id:
                   type: string
                   format: uuid
+                bus_id:
+                  type: string
+                  format: uuid
+                  description: "Default bus for this schedule"
+                schedule_name:
+                  type: string
+                  example: "Morning Express"
                 recurrence_type:
                   type: string
                   enum: [daily, weekly, specific_dates]
@@ -2817,12 +2826,46 @@ paths:
                 estimated_arrival_time:
                   type: string
                   example: "10:30:00"
+                  description: "User-entered estimated arrival time"
+                direction:
+                  type: string
+                  enum: [UP, DOWN, ROUND_TRIP]
+                  example: "UP"
+                  description: "Trip direction: UP (origin to destination), DOWN (destination to origin), or ROUND_TRIP (both)"
+                trips_per_day:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                  example: 2
+                  description: "Number of trips per day (1-10)"
                 base_fare:
                   type: number
                   format: double
                 is_bookable:
                   type: boolean
                   default: true
+                max_bookable_seats:
+                  type: integer
+                  example: 45
+                  description: "Maximum seats available for booking"
+                advance_booking_hours:
+                  type: integer
+                  default: 24
+                  description: "How many hours in advance booking is allowed"
+                default_driver_id:
+                  type: string
+                  format: uuid
+                  description: "Default driver for trips"
+                default_conductor_id:
+                  type: string
+                  format: uuid
+                  description: "Default conductor for trips"
+                selected_stop_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: "Selected master route stops for this schedule"
                 valid_from:
                   type: string
                   format: date
@@ -3744,6 +3787,8 @@ components:
         - permit_id
         - recurrence_type
         - departure_time
+        - direction
+        - trips_per_day
         - base_fare
         - valid_from
         - is_active
@@ -3756,6 +3801,11 @@ components:
           type: string
           format: uuid
           example: "c2eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        bus_id:
+          type: string
+          format: uuid
+        schedule_name:
+          type: string
         recurrence_type:
           type: string
           enum: [daily, weekly, specific_dates]
@@ -3780,6 +3830,15 @@ components:
         estimated_arrival_time:
           type: string
           example: "10:30:00"
+        direction:
+          type: string
+          enum: [UP, DOWN, ROUND_TRIP]
+          example: "UP"
+        trips_per_day:
+          type: integer
+          minimum: 1
+          maximum: 10
+          example: 2
         base_fare:
           type: number
           format: double
@@ -3787,6 +3846,23 @@ components:
         is_bookable:
           type: boolean
           example: true
+        max_bookable_seats:
+          type: integer
+          example: 45
+        advance_booking_hours:
+          type: integer
+          example: 24
+        default_driver_id:
+          type: string
+          format: uuid
+        default_conductor_id:
+          type: string
+          format: uuid
+        selected_stop_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
         valid_from:
           type: string
           format: date
