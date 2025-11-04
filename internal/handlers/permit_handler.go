@@ -314,7 +314,7 @@ func (h *PermitHandler) GetRouteDetails(c *gin.Context) {
 	}
 
 	// Get permit ID from URL
-	permitID := c.Param("permitId")
+	permitID := c.Param("id")
 
 	// Get permit
 	permit, err := h.permitRepo.GetByID(permitID)
