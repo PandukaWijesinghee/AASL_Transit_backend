@@ -408,7 +408,7 @@ func main() {
 			permits.GET("", permitHandler.GetAllPermits)
 			permits.GET("/valid", permitHandler.GetValidPermits)
 			permits.GET("/:id", permitHandler.GetPermitByID)
-			permits.GET("/:id/route-details", permitHandler.GetRouteDetails)
+			permits.GET("/:permitId/route-details", permitHandler.GetRouteDetails)
 			permits.POST("", permitHandler.CreatePermit)
 			permits.PUT("/:id", permitHandler.UpdatePermit)
 			permits.DELETE("/:id", permitHandler.DeletePermit)
