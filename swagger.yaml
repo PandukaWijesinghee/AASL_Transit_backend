@@ -2130,6 +2130,139 @@ paths:
           $ref: "#/components/responses/InternalServerError"
 
   # ============================================================================
+  # Master Routes Endpoints
+  # ============================================================================
+  /api/v1/master-routes:
+    get:
+      summary: Get all master routes
+      description: Retrieve all active master routes for dropdown selection in permit forms
+      operationId: getAllMasterRoutes
+      tags:
+        - Master Routes
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Master routes retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  master_routes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          description: Unique identifier for the route
+                        route_number:
+                          type: string
+                          description: Route number (e.g., "99-1")
+                          example: "99-1"
+                        route_name:
+                          type: string
+                          description: Name of the route
+                          example: "Badulla - Colombo Express"
+                        origin_city:
+                          type: string
+                          description: Starting city
+                          example: "Badulla"
+                        destination_city:
+                          type: string
+                          description: Ending city
+                          example: "Colombo"
+                        total_distance_km:
+                          type: number
+                          format: float
+                          description: Total distance in kilometers
+                          example: 230.5
+                        estimated_duration_minutes:
+                          type: integer
+                          description: Estimated journey time in minutes
+                          example: 360
+                        display_label:
+                          type: string
+                          description: Formatted label for display in dropdown
+                          example: "99-1 - Badulla → Colombo (230.5 km)"
+                  count:
+                    type: integer
+                    description: Total number of routes returned
+                    example: 1
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/master-routes/{id}:
+    get:
+      summary: Get master route by ID
+      description: Retrieve detailed information about a specific master route
+      operationId: getMasterRouteById
+      tags:
+        - Master Routes
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Master route ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Master route retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  route_number:
+                    type: string
+                    example: "99-1"
+                  route_name:
+                    type: string
+                    example: "Badulla - Colombo Express"
+                  origin_city:
+                    type: string
+                    example: "Badulla"
+                  destination_city:
+                    type: string
+                    example: "Colombo"
+                  total_distance_km:
+                    type: number
+                    format: float
+                    example: 230.5
+                  estimated_duration_minutes:
+                    type: integer
+                    example: 360
+                  encoded_polyline:
+                    type: string
+                    description: Encoded polyline for map visualization
+                  is_active:
+                    type: boolean
+                    example: true
+                  created_at:
+                    type: string
+                    format: date-time
+                  updated_at:
+                    type: string
+                    format: date-time
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================================
   # Permit Endpoints
   # ============================================================================
   /api/v1/permits:
