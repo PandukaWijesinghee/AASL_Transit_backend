@@ -162,33 +162,18 @@ func (h *PermitHandler) CreatePermit(c *gin.Context) {
 		return
 	}
 
-	// NEW: If master_route_id is provided, auto-populate route details
-	if req.MasterRouteID != nil && *req.MasterRouteID != "" {
-		masterRoute, err := h.masterRouteRepo.GetByID(*req.MasterRouteID)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid master_route_id: route not found"})
-				return
-			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch master route"})
+	// Validate that the master_route_id exists
+	_, err = h.masterRouteRepo.GetByID(req.MasterRouteID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid master_route_id: route not found"})
 			return
 		}
-
-		// Auto-populate route details from master route
-		req.RouteNumber = masterRoute.RouteNumber
-		req.FromCity = masterRoute.OriginCity
-		req.ToCity = masterRoute.DestinationCity
-
-		// Auto-populate optional fields if not provided (pointers already)
-		if req.TotalDistanceKm == nil && masterRoute.TotalDistanceKm != nil {
-			req.TotalDistanceKm = masterRoute.TotalDistanceKm
-		}
-		if req.EstimatedDuration == nil && masterRoute.EstimatedDurationMinutes != nil {
-			req.EstimatedDuration = masterRoute.EstimatedDurationMinutes
-		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate master route"})
+		return
 	}
 
-	// Create permit model from request
+	// Create permit model from request (route details come from master_routes table via JOIN)
 	permit, err := models.NewRoutePermitFromRequest(busOwner.ID, &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

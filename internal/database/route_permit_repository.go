@@ -24,13 +24,11 @@ func (r *RoutePermitRepository) Create(permit *models.RoutePermit) error {
 	query := `
 		INSERT INTO route_permits (
 			id, bus_owner_id, permit_number, bus_registration_number,
-			master_route_id, route_number, route_name, full_origin_city,
-			full_destination_city, via, total_distance_km, estimated_duration_minutes,
+			master_route_id, via,
 			issue_date, expiry_date, permit_type, approved_fare, max_trips_per_day,
 			allowed_bus_types, restrictions, status, verified_at, permit_document_url
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-			$13, $14, $15, $16, $17, $18, $19, $20, $21, $22
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
 		)
 		RETURNING created_at, updated_at
 	`
@@ -38,8 +36,7 @@ func (r *RoutePermitRepository) Create(permit *models.RoutePermit) error {
 	err := r.db.QueryRow(
 		query,
 		permit.ID, permit.BusOwnerID, permit.PermitNumber, permit.BusRegistrationNumber,
-		permit.MasterRouteID, permit.RouteNumber, permit.RouteName, permit.FullOriginCity,
-		permit.FullDestinationCity, permit.Via, permit.TotalDistanceKm, permit.EstimatedDurationMinutes,
+		permit.MasterRouteID, permit.Via,
 		permit.IssueDate, permit.ExpiryDate, permit.PermitType, permit.ApprovedFare, permit.MaxTripsPerDay,
 		permit.AllowedBusTypes, permit.Restrictions, permit.Status, permit.VerifiedAt, permit.PermitDocumentURL,
 	).Scan(&permit.CreatedAt, &permit.UpdatedAt)
@@ -47,38 +44,41 @@ func (r *RoutePermitRepository) Create(permit *models.RoutePermit) error {
 	return err
 }
 
-// GetByID retrieves a route permit by ID
-func (r *RoutePermitRepository) GetByID(permitID string) (*models.RoutePermit, error) {
+// GetByID retrieves a route permit by ID with route details from master_routes
+func (r *RoutePermitRepository) GetByID(permitID string) (*models.RoutePermitWithDetails, error) {
 	query := `
 		SELECT
-			id, bus_owner_id, permit_number, bus_registration_number,
-			master_route_id, route_number, route_name, full_origin_city,
-			full_destination_city, via, total_distance_km, estimated_duration_minutes,
-			issue_date, expiry_date, permit_type, approved_fare, max_trips_per_day,
-			allowed_bus_types, restrictions, status, verified_at, permit_document_url,
-			created_at, updated_at
-		FROM route_permits
-		WHERE id = $1
+			rp.id, rp.bus_owner_id, rp.permit_number, rp.bus_registration_number,
+			rp.master_route_id, rp.via,
+			rp.issue_date, rp.expiry_date, rp.permit_type, rp.approved_fare, rp.max_trips_per_day,
+			rp.allowed_bus_types, rp.restrictions, rp.status, rp.verified_at, rp.permit_document_url,
+			rp.created_at, rp.updated_at,
+			mr.route_number, mr.route_name, mr.origin_city, mr.destination_city,
+			mr.total_distance_km, mr.estimated_duration_minutes, mr.encoded_polyline
+		FROM route_permits rp
+		JOIN master_routes mr ON rp.master_route_id = mr.id
+		WHERE rp.id = $1
 	`
 
-	permit := &models.RoutePermit{}
-	var masterRouteID sql.NullString
-	var totalDistanceKm sql.NullFloat64
-	var estimatedDurationMinutes sql.NullInt64
+	permit := &models.RoutePermitWithDetails{}
 	var maxTripsPerDay sql.NullInt64
 	var restrictions sql.NullString
 	var verifiedAt sql.NullTime
 	var permitDocumentURL sql.NullString
 	var via models.StringArray
 	var allowedBusTypes models.StringArray
+	var totalDistanceKm sql.NullFloat64
+	var estimatedDurationMinutes sql.NullInt64
+	var encodedPolyline sql.NullString
 
 	err := r.db.QueryRow(query, permitID).Scan(
 		&permit.ID, &permit.BusOwnerID, &permit.PermitNumber, &permit.BusRegistrationNumber,
-		&masterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
-		&permit.FullDestinationCity, &via, &totalDistanceKm, &estimatedDurationMinutes,
+		&permit.MasterRouteID, &via,
 		&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &maxTripsPerDay,
 		&allowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
 		&permit.CreatedAt, &permit.UpdatedAt,
+		&permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity, &permit.FullDestinationCity,
+		&totalDistanceKm, &estimatedDurationMinutes, &encodedPolyline,
 	)
 
 	if err != nil {
@@ -90,16 +90,6 @@ func (r *RoutePermitRepository) GetByID(permitID string) (*models.RoutePermit, e
 	permit.AllowedBusTypes = allowedBusTypes
 
 	// Convert sql.Null* types to pointers
-	if masterRouteID.Valid {
-		permit.MasterRouteID = &masterRouteID.String
-	}
-	if totalDistanceKm.Valid {
-		permit.TotalDistanceKm = &totalDistanceKm.Float64
-	}
-	if estimatedDurationMinutes.Valid {
-		minutes := int(estimatedDurationMinutes.Int64)
-		permit.EstimatedDurationMinutes = &minutes
-	}
 	if maxTripsPerDay.Valid {
 		trips := int(maxTripsPerDay.Int64)
 		permit.MaxTripsPerDay = &trips
@@ -113,23 +103,35 @@ func (r *RoutePermitRepository) GetByID(permitID string) (*models.RoutePermit, e
 	if permitDocumentURL.Valid {
 		permit.PermitDocumentURL = &permitDocumentURL.String
 	}
+	if totalDistanceKm.Valid {
+		permit.TotalDistanceKm = &totalDistanceKm.Float64
+	}
+	if estimatedDurationMinutes.Valid {
+		minutes := int(estimatedDurationMinutes.Int64)
+		permit.EstimatedDurationMinutes = &minutes
+	}
+	if encodedPolyline.Valid {
+		permit.EncodedPolyline = &encodedPolyline.String
+	}
 
 	return permit, nil
 }
 
-// GetByOwnerID retrieves all permits for a bus owner
-func (r *RoutePermitRepository) GetByOwnerID(busOwnerID string) ([]models.RoutePermit, error) {
+// GetByOwnerID retrieves all permits for a bus owner with route details
+func (r *RoutePermitRepository) GetByOwnerID(busOwnerID string) ([]models.RoutePermitWithDetails, error) {
 	query := `
 		SELECT
-			id, bus_owner_id, permit_number, bus_registration_number,
-			master_route_id, route_number, route_name, full_origin_city,
-			full_destination_city, via, total_distance_km, estimated_duration_minutes,
-			issue_date, expiry_date, permit_type, approved_fare, max_trips_per_day,
-			allowed_bus_types, restrictions, status, verified_at, permit_document_url,
-			created_at, updated_at
-		FROM route_permits
-		WHERE bus_owner_id = $1
-		ORDER BY created_at DESC
+			rp.id, rp.bus_owner_id, rp.permit_number, rp.bus_registration_number,
+			rp.master_route_id, rp.via,
+			rp.issue_date, rp.expiry_date, rp.permit_type, rp.approved_fare, rp.max_trips_per_day,
+			rp.allowed_bus_types, rp.restrictions, rp.status, rp.verified_at, rp.permit_document_url,
+			rp.created_at, rp.updated_at,
+			mr.route_number, mr.route_name, mr.origin_city, mr.destination_city,
+			mr.total_distance_km, mr.estimated_duration_minutes, mr.encoded_polyline
+		FROM route_permits rp
+		JOIN master_routes mr ON rp.master_route_id = mr.id
+		WHERE rp.bus_owner_id = $1
+		ORDER BY rp.created_at DESC
 	`
 
 	rows, err := r.db.Query(query, busOwnerID)
@@ -138,46 +140,37 @@ func (r *RoutePermitRepository) GetByOwnerID(busOwnerID string) ([]models.RouteP
 	}
 	defer rows.Close()
 
-	permits := []models.RoutePermit{}
+	permits := []models.RoutePermitWithDetails{}
 	for rows.Next() {
-		var permit models.RoutePermit
-		var masterRouteID sql.NullString
-		var totalDistanceKm sql.NullFloat64
-		var estimatedDurationMinutes sql.NullInt64
+		var permit models.RoutePermitWithDetails
 		var maxTripsPerDay sql.NullInt64
 		var restrictions sql.NullString
 		var verifiedAt sql.NullTime
 		var permitDocumentURL sql.NullString
 		var via models.StringArray
 		var allowedBusTypes models.StringArray
+		var totalDistanceKm sql.NullFloat64
+		var estimatedDurationMinutes sql.NullInt64
+		var encodedPolyline sql.NullString
 
 		err := rows.Scan(
 			&permit.ID, &permit.BusOwnerID, &permit.PermitNumber, &permit.BusRegistrationNumber,
-			&masterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
-			&permit.FullDestinationCity, &via, &totalDistanceKm, &estimatedDurationMinutes,
+			&permit.MasterRouteID, &via,
 			&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &maxTripsPerDay,
 			&allowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
 			&permit.CreatedAt, &permit.UpdatedAt,
+			&permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity, &permit.FullDestinationCity,
+			&totalDistanceKm, &estimatedDurationMinutes, &encodedPolyline,
 		)
 		if err != nil {
 			return nil, err
 		}
 
-		// Assign arrays (they'll be nil if NULL in database)
+		// Assign arrays
 		permit.Via = via
 		permit.AllowedBusTypes = allowedBusTypes
 
 		// Convert sql.Null* types to pointers
-		if masterRouteID.Valid {
-			permit.MasterRouteID = &masterRouteID.String
-		}
-		if totalDistanceKm.Valid {
-			permit.TotalDistanceKm = &totalDistanceKm.Float64
-		}
-		if estimatedDurationMinutes.Valid {
-			minutes := int(estimatedDurationMinutes.Int64)
-			permit.EstimatedDurationMinutes = &minutes
-		}
 		if maxTripsPerDay.Valid {
 			trips := int(maxTripsPerDay.Int64)
 			permit.MaxTripsPerDay = &trips
@@ -191,6 +184,16 @@ func (r *RoutePermitRepository) GetByOwnerID(busOwnerID string) ([]models.RouteP
 		if permitDocumentURL.Valid {
 			permit.PermitDocumentURL = &permitDocumentURL.String
 		}
+		if totalDistanceKm.Valid {
+			permit.TotalDistanceKm = &totalDistanceKm.Float64
+		}
+		if estimatedDurationMinutes.Valid {
+			minutes := int(estimatedDurationMinutes.Int64)
+			permit.EstimatedDurationMinutes = &minutes
+		}
+		if encodedPolyline.Valid {
+			permit.EncodedPolyline = &encodedPolyline.String
+		}
 
 		permits = append(permits, permit)
 	}
@@ -198,53 +201,52 @@ func (r *RoutePermitRepository) GetByOwnerID(busOwnerID string) ([]models.RouteP
 	return permits, nil
 }
 
-// GetByPermitNumber retrieves a permit by permit number
-func (r *RoutePermitRepository) GetByPermitNumber(permitNumber string, busOwnerID string) (*models.RoutePermit, error) {
+// GetByPermitNumber retrieves a permit by permit number with route details
+func (r *RoutePermitRepository) GetByPermitNumber(permitNumber string, busOwnerID string) (*models.RoutePermitWithDetails, error) {
 	query := `
 		SELECT
-			id, bus_owner_id, permit_number, bus_registration_number,
-			master_route_id, route_number, route_name, full_origin_city,
-			full_destination_city, via, total_distance_km, estimated_duration_minutes,
-			issue_date, expiry_date, permit_type, approved_fare, max_trips_per_day,
-			allowed_bus_types, restrictions, status, verified_at, permit_document_url,
-			created_at, updated_at
-		FROM route_permits
-		WHERE permit_number = $1 AND bus_owner_id = $2
+			rp.id, rp.bus_owner_id, rp.permit_number, rp.bus_registration_number,
+			rp.master_route_id, rp.via,
+			rp.issue_date, rp.expiry_date, rp.permit_type, rp.approved_fare, rp.max_trips_per_day,
+			rp.allowed_bus_types, rp.restrictions, rp.status, rp.verified_at, rp.permit_document_url,
+			rp.created_at, rp.updated_at,
+			mr.route_number, mr.route_name, mr.origin_city, mr.destination_city,
+			mr.total_distance_km, mr.estimated_duration_minutes, mr.encoded_polyline
+		FROM route_permits rp
+		JOIN master_routes mr ON rp.master_route_id = mr.id
+		WHERE rp.permit_number = $1 AND rp.bus_owner_id = $2
 	`
 
-	permit := &models.RoutePermit{}
-	var masterRouteID sql.NullString
-	var totalDistanceKm sql.NullFloat64
-	var estimatedDurationMinutes sql.NullInt64
+	permit := &models.RoutePermitWithDetails{}
 	var maxTripsPerDay sql.NullInt64
 	var restrictions sql.NullString
 	var verifiedAt sql.NullTime
 	var permitDocumentURL sql.NullString
+	var via models.StringArray
+	var allowedBusTypes models.StringArray
+	var totalDistanceKm sql.NullFloat64
+	var estimatedDurationMinutes sql.NullInt64
+	var encodedPolyline sql.NullString
 
 	err := r.db.QueryRow(query, permitNumber, busOwnerID).Scan(
 		&permit.ID, &permit.BusOwnerID, &permit.PermitNumber, &permit.BusRegistrationNumber,
-		&masterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
-		&permit.FullDestinationCity, &permit.Via, &totalDistanceKm, &estimatedDurationMinutes,
+		&permit.MasterRouteID, &via,
 		&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &maxTripsPerDay,
-		&permit.AllowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
+		&allowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
 		&permit.CreatedAt, &permit.UpdatedAt,
+		&permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity, &permit.FullDestinationCity,
+		&totalDistanceKm, &estimatedDurationMinutes, &encodedPolyline,
 	)
 
 	if err != nil {
 		return nil, err
 	}
 
+	// Assign arrays
+	permit.Via = via
+	permit.AllowedBusTypes = allowedBusTypes
+
 	// Convert sql.Null* types to pointers
-	if masterRouteID.Valid {
-		permit.MasterRouteID = &masterRouteID.String
-	}
-	if totalDistanceKm.Valid {
-		permit.TotalDistanceKm = &totalDistanceKm.Float64
-	}
-	if estimatedDurationMinutes.Valid {
-		minutes := int(estimatedDurationMinutes.Int64)
-		permit.EstimatedDurationMinutes = &minutes
-	}
 	if maxTripsPerDay.Valid {
 		trips := int(maxTripsPerDay.Int64)
 		permit.MaxTripsPerDay = &trips
@@ -258,40 +260,55 @@ func (r *RoutePermitRepository) GetByPermitNumber(permitNumber string, busOwnerI
 	if permitDocumentURL.Valid {
 		permit.PermitDocumentURL = &permitDocumentURL.String
 	}
+	if totalDistanceKm.Valid {
+		permit.TotalDistanceKm = &totalDistanceKm.Float64
+	}
+	if estimatedDurationMinutes.Valid {
+		minutes := int(estimatedDurationMinutes.Int64)
+		permit.EstimatedDurationMinutes = &minutes
+	}
+	if encodedPolyline.Valid {
+		permit.EncodedPolyline = &encodedPolyline.String
+	}
 
 	return permit, nil
 }
 
-// GetByBusRegistration retrieves a permit by bus registration number
-func (r *RoutePermitRepository) GetByBusRegistration(busRegistration string, busOwnerID string) (*models.RoutePermit, error) {
+// GetByBusRegistration retrieves a permit by bus registration number with route details
+func (r *RoutePermitRepository) GetByBusRegistration(busRegistration string, busOwnerID string) (*models.RoutePermitWithDetails, error) {
 	query := `
 		SELECT
-			id, bus_owner_id, permit_number, bus_registration_number,
-			master_route_id, route_number, route_name, full_origin_city,
-			full_destination_city, via, total_distance_km, estimated_duration_minutes,
-			issue_date, expiry_date, permit_type, approved_fare, max_trips_per_day,
-			allowed_bus_types, restrictions, status, verified_at, permit_document_url,
-			created_at, updated_at
-		FROM route_permits
-		WHERE bus_registration_number = $1 AND bus_owner_id = $2
+			rp.id, rp.bus_owner_id, rp.permit_number, rp.bus_registration_number,
+			rp.master_route_id, rp.via,
+			rp.issue_date, rp.expiry_date, rp.permit_type, rp.approved_fare, rp.max_trips_per_day,
+			rp.allowed_bus_types, rp.restrictions, rp.status, rp.verified_at, rp.permit_document_url,
+			rp.created_at, rp.updated_at,
+			mr.route_number, mr.route_name, mr.origin_city, mr.destination_city,
+			mr.total_distance_km, mr.estimated_duration_minutes, mr.encoded_polyline
+		FROM route_permits rp
+		JOIN master_routes mr ON rp.master_route_id = mr.id
+		WHERE rp.bus_registration_number = $1 AND rp.bus_owner_id = $2
 	`
 
-	permit := &models.RoutePermit{}
-	var masterRouteID sql.NullString
-	var totalDistanceKm sql.NullFloat64
-	var estimatedDurationMinutes sql.NullInt64
+	permit := &models.RoutePermitWithDetails{}
 	var maxTripsPerDay sql.NullInt64
 	var restrictions sql.NullString
 	var verifiedAt sql.NullTime
 	var permitDocumentURL sql.NullString
+	var via models.StringArray
+	var allowedBusTypes models.StringArray
+	var totalDistanceKm sql.NullFloat64
+	var estimatedDurationMinutes sql.NullInt64
+	var encodedPolyline sql.NullString
 
 	err := r.db.QueryRow(query, busRegistration, busOwnerID).Scan(
 		&permit.ID, &permit.BusOwnerID, &permit.PermitNumber, &permit.BusRegistrationNumber,
-		&masterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
-		&permit.FullDestinationCity, &permit.Via, &totalDistanceKm, &estimatedDurationMinutes,
+		&permit.MasterRouteID, &via,
 		&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &maxTripsPerDay,
-		&permit.AllowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
+		&allowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
 		&permit.CreatedAt, &permit.UpdatedAt,
+		&permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity, &permit.FullDestinationCity,
+		&totalDistanceKm, &estimatedDurationMinutes, &encodedPolyline,
 	)
 
 	if err != nil {
@@ -301,17 +318,11 @@ func (r *RoutePermitRepository) GetByBusRegistration(busRegistration string, bus
 		return nil, err
 	}
 
+	// Assign arrays
+	permit.Via = via
+	permit.AllowedBusTypes = allowedBusTypes
+
 	// Convert sql.Null* types to pointers
-	if masterRouteID.Valid {
-		permit.MasterRouteID = &masterRouteID.String
-	}
-	if totalDistanceKm.Valid {
-		permit.TotalDistanceKm = &totalDistanceKm.Float64
-	}
-	if estimatedDurationMinutes.Valid {
-		minutes := int(estimatedDurationMinutes.Int64)
-		permit.EstimatedDurationMinutes = &minutes
-	}
 	if maxTripsPerDay.Valid {
 		trips := int(maxTripsPerDay.Int64)
 		permit.MaxTripsPerDay = &trips
@@ -324,6 +335,16 @@ func (r *RoutePermitRepository) GetByBusRegistration(busRegistration string, bus
 	}
 	if permitDocumentURL.Valid {
 		permit.PermitDocumentURL = &permitDocumentURL.String
+	}
+	if totalDistanceKm.Valid {
+		permit.TotalDistanceKm = &totalDistanceKm.Float64
+	}
+	if estimatedDurationMinutes.Valid {
+		minutes := int(estimatedDurationMinutes.Int64)
+		permit.EstimatedDurationMinutes = &minutes
+	}
+	if encodedPolyline.Valid {
+		permit.EncodedPolyline = &encodedPolyline.String
 	}
 
 	return permit, nil
@@ -365,18 +386,6 @@ func (r *RoutePermitRepository) Update(permitID string, req *models.UpdateRouteP
 		}
 		updates = append(updates, fmt.Sprintf("expiry_date = $%d", argCount))
 		args = append(args, expiryDate)
-		argCount++
-	}
-
-	if req.TotalDistanceKm != nil {
-		updates = append(updates, fmt.Sprintf("total_distance_km = $%d", argCount))
-		args = append(args, *req.TotalDistanceKm)
-		argCount++
-	}
-
-	if req.EstimatedDuration != nil {
-		updates = append(updates, fmt.Sprintf("estimated_duration_minutes = $%d", argCount))
-		args = append(args, *req.EstimatedDuration)
 		argCount++
 	}
 
@@ -438,21 +447,23 @@ func (r *RoutePermitRepository) Delete(permitID string, busOwnerID string) error
 	return nil
 }
 
-// GetValidPermits retrieves all valid permits for a bus owner
-func (r *RoutePermitRepository) GetValidPermits(busOwnerID string) ([]models.RoutePermit, error) {
+// GetValidPermits retrieves all valid permits for a bus owner with route details
+func (r *RoutePermitRepository) GetValidPermits(busOwnerID string) ([]models.RoutePermitWithDetails, error) {
 	query := `
 		SELECT
-			id, bus_owner_id, permit_number, bus_registration_number,
-			master_route_id, route_number, route_name, full_origin_city,
-			full_destination_city, via, total_distance_km, estimated_duration_minutes,
-			issue_date, expiry_date, permit_type, approved_fare, max_trips_per_day,
-			allowed_bus_types, restrictions, status, verified_at, permit_document_url,
-			created_at, updated_at
-		FROM route_permits
-		WHERE bus_owner_id = $1
-		  AND status = 'verified'
-		  AND expiry_date >= CURRENT_DATE
-		ORDER BY expiry_date ASC
+			rp.id, rp.bus_owner_id, rp.permit_number, rp.bus_registration_number,
+			rp.master_route_id, rp.via,
+			rp.issue_date, rp.expiry_date, rp.permit_type, rp.approved_fare, rp.max_trips_per_day,
+			rp.allowed_bus_types, rp.restrictions, rp.status, rp.verified_at, rp.permit_document_url,
+			rp.created_at, rp.updated_at,
+			mr.route_number, mr.route_name, mr.origin_city, mr.destination_city,
+			mr.total_distance_km, mr.estimated_duration_minutes, mr.encoded_polyline
+		FROM route_permits rp
+		JOIN master_routes mr ON rp.master_route_id = mr.id
+		WHERE rp.bus_owner_id = $1
+		  AND rp.status = 'verified'
+		  AND rp.expiry_date >= CURRENT_DATE
+		ORDER BY rp.expiry_date ASC
 	`
 
 	rows, err := r.db.Query(query, busOwnerID)
@@ -461,26 +472,27 @@ func (r *RoutePermitRepository) GetValidPermits(busOwnerID string) ([]models.Rou
 	}
 	defer rows.Close()
 
-	permits := []models.RoutePermit{}
+	permits := []models.RoutePermitWithDetails{}
 	for rows.Next() {
-		var permit models.RoutePermit
-		var masterRouteID sql.NullString
-		var totalDistanceKm sql.NullFloat64
-		var estimatedDurationMinutes sql.NullInt64
+		var permit models.RoutePermitWithDetails
 		var maxTripsPerDay sql.NullInt64
 		var restrictions sql.NullString
 		var verifiedAt sql.NullTime
 		var permitDocumentURL sql.NullString
 		var via models.StringArray
 		var allowedBusTypes models.StringArray
+		var totalDistanceKm sql.NullFloat64
+		var estimatedDurationMinutes sql.NullInt64
+		var encodedPolyline sql.NullString
 
 		err := rows.Scan(
 			&permit.ID, &permit.BusOwnerID, &permit.PermitNumber, &permit.BusRegistrationNumber,
-			&masterRouteID, &permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity,
-			&permit.FullDestinationCity, &via, &totalDistanceKm, &estimatedDurationMinutes,
+			&permit.MasterRouteID, &via,
 			&permit.IssueDate, &permit.ExpiryDate, &permit.PermitType, &permit.ApprovedFare, &maxTripsPerDay,
 			&allowedBusTypes, &restrictions, &permit.Status, &verifiedAt, &permitDocumentURL,
 			&permit.CreatedAt, &permit.UpdatedAt,
+			&permit.RouteNumber, &permit.RouteName, &permit.FullOriginCity, &permit.FullDestinationCity,
+			&totalDistanceKm, &estimatedDurationMinutes, &encodedPolyline,
 		)
 		if err != nil {
 			return nil, err
@@ -491,16 +503,6 @@ func (r *RoutePermitRepository) GetValidPermits(busOwnerID string) ([]models.Rou
 		permit.AllowedBusTypes = allowedBusTypes
 
 		// Convert sql.Null* types to pointers
-		if masterRouteID.Valid {
-			permit.MasterRouteID = &masterRouteID.String
-		}
-		if totalDistanceKm.Valid {
-			permit.TotalDistanceKm = &totalDistanceKm.Float64
-		}
-		if estimatedDurationMinutes.Valid {
-			minutes := int(estimatedDurationMinutes.Int64)
-			permit.EstimatedDurationMinutes = &minutes
-		}
 		if maxTripsPerDay.Valid {
 			trips := int(maxTripsPerDay.Int64)
 			permit.MaxTripsPerDay = &trips
@@ -513,6 +515,16 @@ func (r *RoutePermitRepository) GetValidPermits(busOwnerID string) ([]models.Rou
 		}
 		if permitDocumentURL.Valid {
 			permit.PermitDocumentURL = &permitDocumentURL.String
+		}
+		if totalDistanceKm.Valid {
+			permit.TotalDistanceKm = &totalDistanceKm.Float64
+		}
+		if estimatedDurationMinutes.Valid {
+			minutes := int(estimatedDurationMinutes.Int64)
+			permit.EstimatedDurationMinutes = &minutes
+		}
+		if encodedPolyline.Valid {
+			permit.EncodedPolyline = &encodedPolyline.String
 		}
 
 		permits = append(permits, permit)
