@@ -9,41 +9,109 @@ import (
 type RecurrenceType string
 
 const (
-	RecurrenceDaily        RecurrenceType = "daily"
-	RecurrenceWeekly       RecurrenceType = "weekly"
+	RecurrenceDaily    RecurrenceType = "daily"
+	RecurrenceWeekly   RecurrenceType = "weekly"
+	RecurrenceInterval RecurrenceType = "interval"
+	// Deprecated: RecurrenceSpecificDates is no longer used in timetable system
 	RecurrenceSpecificDates RecurrenceType = "specific_dates"
 )
 
-// TripSchedule represents a recurring trip template
+// TripSchedule represents a recurring trip template (timetable)
 type TripSchedule struct {
-	ID                    string         `json:"id" db:"id"`
-	BusOwnerID            string         `json:"bus_owner_id" db:"bus_owner_id"`
-	PermitID              string         `json:"permit_id" db:"permit_id"`
-	BusID                 *string        `json:"bus_id,omitempty" db:"bus_id"`
-	ScheduleName          *string        `json:"schedule_name,omitempty" db:"schedule_name"`
-	RecurrenceType        RecurrenceType `json:"recurrence_type" db:"recurrence_type"`
-	RecurrenceDays        IntArray       `json:"recurrence_days,omitempty" db:"recurrence_days"`
-	SpecificDates         DateArray      `json:"specific_dates,omitempty" db:"specific_dates"`
-	DepartureTime         string         `json:"departure_time" db:"departure_time"`                   // TIME type stored as string (HH:MM:SS)
-	EstimatedArrivalTime  *string        `json:"estimated_arrival_time,omitempty" db:"estimated_arrival_time"` // TIME type stored as string (HH:MM:SS)
-	Direction             string         `json:"direction" db:"direction"`                             // UP, DOWN, ROUND_TRIP
-	TripsPerDay           int            `json:"trips_per_day" db:"trips_per_day"`                     // Number of trips per day
-	BaseFare              float64        `json:"base_fare" db:"base_fare"`
-	IsBookable            bool           `json:"is_bookable" db:"is_bookable"`
-	MaxBookableSeats      *int           `json:"max_bookable_seats,omitempty" db:"max_bookable_seats"`
-	AdvanceBookingHours   int            `json:"advance_booking_hours" db:"advance_booking_hours"`
-	DefaultDriverID       *string        `json:"default_driver_id,omitempty" db:"default_driver_id"`
-	DefaultConductorID    *string        `json:"default_conductor_id,omitempty" db:"default_conductor_id"`
-	SelectedStopIDs       UUIDArray      `json:"selected_stop_ids,omitempty" db:"selected_stop_ids"`
-	IsActive              bool           `json:"is_active" db:"is_active"`
-	ValidFrom             time.Time      `json:"valid_from" db:"valid_from"`
-	ValidUntil            *time.Time     `json:"valid_until,omitempty" db:"valid_until"`
-	Notes                 *string        `json:"notes,omitempty" db:"notes"`
-	CreatedAt             time.Time      `json:"created_at" db:"created_at"`
-	UpdatedAt             time.Time      `json:"updated_at" db:"updated_at"`
+	ID                   string         `json:"id" db:"id"`
+	BusOwnerID           string         `json:"bus_owner_id" db:"bus_owner_id"`
+	PermitID             string         `json:"permit_id" db:"permit_id"`
+	CustomRouteID        *string        `json:"custom_route_id,omitempty" db:"custom_route_id"`       // NEW: Reference to bus_owner_routes
+	BusID                *string        `json:"bus_id,omitempty" db:"bus_id"`
+	ScheduleName         *string        `json:"schedule_name,omitempty" db:"schedule_name"`
+	RecurrenceType       RecurrenceType `json:"recurrence_type" db:"recurrence_type"`
+	RecurrenceDays       IntArray       `json:"recurrence_days,omitempty" db:"recurrence_days"`       // For weekly: [0,1,2...6]
+	RecurrenceInterval   *int           `json:"recurrence_interval,omitempty" db:"recurrence_interval"` // NEW: For interval: every N days
+	DepartureTime        string         `json:"departure_time" db:"departure_time"`                   // TIME type stored as string (HH:MM:SS)
+	EstimatedArrivalTime *string        `json:"estimated_arrival_time,omitempty" db:"estimated_arrival_time"` // TIME type stored as string (HH:MM:SS)
+	BaseFare             float64        `json:"base_fare" db:"base_fare"`
+	IsBookable           bool           `json:"is_bookable" db:"is_bookable"`
+	MaxBookableSeats     *int           `json:"max_bookable_seats,omitempty" db:"max_bookable_seats"`
+	BookingAdvanceHours  *int           `json:"booking_advance_hours,omitempty" db:"booking_advance_hours"` // NEW: NULL = use system default
+	IsActive             bool           `json:"is_active" db:"is_active"`
+	Notes                *string        `json:"notes,omitempty" db:"notes"`
+	CreatedAt            time.Time      `json:"created_at" db:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at" db:"updated_at"`
+
+	// Deprecated fields (kept for backward compatibility, renamed in DB to *_old)
+	Direction          string     `json:"direction,omitempty" db:"direction_old"`
+	TripsPerDay        int        `json:"trips_per_day,omitempty" db:"trips_per_day_old"`
+	AdvanceBookingHours int       `json:"advance_booking_hours,omitempty" db:"advance_booking_hours"`
+	DefaultDriverID    *string    `json:"default_driver_id,omitempty" db:"default_driver_id"`
+	DefaultConductorID *string    `json:"default_conductor_id,omitempty" db:"default_conductor_id"`
+	SelectedStopIDs    UUIDArray  `json:"selected_stop_ids,omitempty" db:"selected_stop_ids"`
+	ValidFrom          time.Time  `json:"valid_from,omitempty" db:"valid_from_old"`
+	ValidUntil         *time.Time `json:"valid_until,omitempty" db:"valid_until_old"`
+	SpecificDates      DateArray  `json:"specific_dates,omitempty" db:"specific_dates_old"`
 }
 
-// CreateTripScheduleRequest represents the request to create a trip schedule
+// CreateTimetableRequest represents the request to create a new timetable (trip schedule)
+type CreateTimetableRequest struct {
+	CustomRouteID        string   `json:"custom_route_id" binding:"required"`
+	PermitID             string   `json:"permit_id" binding:"required"`
+	ScheduleName         *string  `json:"schedule_name,omitempty"`
+	DepartureTime        string   `json:"departure_time" binding:"required"`
+	EstimatedArrivalTime *string  `json:"estimated_arrival_time,omitempty"`
+	BaseFare             float64  `json:"base_fare" binding:"required,gt=0"`
+	MaxBookableSeats     int      `json:"max_bookable_seats" binding:"required,gt=0"`
+	IsBookable           bool     `json:"is_bookable"`
+	BookingAdvanceHours  *int     `json:"booking_advance_hours,omitempty"` // NULL = use system default (72h)
+	RecurrenceType       string   `json:"recurrence_type" binding:"required,oneof=daily weekly interval"`
+	RecurrenceDays       []int    `json:"recurrence_days,omitempty"`     // Required for weekly
+	RecurrenceInterval   *int     `json:"recurrence_interval,omitempty"` // Required for interval
+	Notes                *string  `json:"notes,omitempty"`
+}
+
+// Validate validates the create timetable request
+func (r *CreateTimetableRequest) Validate() error {
+	// Validate recurrence type specific requirements
+	switch RecurrenceType(r.RecurrenceType) {
+	case RecurrenceWeekly:
+		if len(r.RecurrenceDays) == 0 {
+			return errors.New("recurrence_days is required for weekly schedules")
+		}
+		// Validate days are 0-6 (Sunday-Saturday)
+		for _, day := range r.RecurrenceDays {
+			if day < 0 || day > 6 {
+				return errors.New("recurrence_days must contain values between 0 (Sunday) and 6 (Saturday)")
+			}
+		}
+	case RecurrenceInterval:
+		if r.RecurrenceInterval == nil || *r.RecurrenceInterval < 2 {
+			return errors.New("recurrence_interval is required for interval schedules and must be >= 2")
+		}
+	}
+
+	// Validate departure time format (HH:MM or HH:MM:SS)
+	if _, err := time.Parse("15:04", r.DepartureTime); err != nil {
+		if _, err := time.Parse("15:04:05", r.DepartureTime); err != nil {
+			return errors.New("departure_time must be in HH:MM or HH:MM:SS format")
+		}
+	}
+
+	// Validate estimated arrival time format if provided
+	if r.EstimatedArrivalTime != nil {
+		if _, err := time.Parse("15:04", *r.EstimatedArrivalTime); err != nil {
+			if _, err := time.Parse("15:04:05", *r.EstimatedArrivalTime); err != nil {
+				return errors.New("estimated_arrival_time must be in HH:MM or HH:MM:SS format")
+			}
+		}
+	}
+
+	// Validate booking_advance_hours if provided (must be >= 72)
+	if r.BookingAdvanceHours != nil && *r.BookingAdvanceHours < 72 {
+		return errors.New("booking_advance_hours must be >= 72 (system minimum)")
+	}
+
+	return nil
+}
+
+// Deprecated: CreateTripScheduleRequest - use CreateTimetableRequest instead
 type CreateTripScheduleRequest struct {
 	PermitID             string   `json:"permit_id" binding:"required"`
 	BusID                *string  `json:"bus_id,omitempty"`
@@ -124,8 +192,8 @@ func (s *TripSchedule) IsValidForDate(date time.Time) bool {
 		return false
 	}
 
-	// Check if date is within valid range
-	if date.Before(s.ValidFrom) {
+	// For backward compatibility: Check if date is within valid range (old system)
+	if !s.ValidFrom.IsZero() && date.Before(s.ValidFrom) {
 		return false
 	}
 
@@ -145,7 +213,15 @@ func (s *TripSchedule) IsValidForDate(date time.Time) bool {
 			}
 		}
 		return false
+	case RecurrenceInterval:
+		// For interval: calculate days from creation date
+		if s.RecurrenceInterval == nil || *s.RecurrenceInterval <= 0 {
+			return false
+		}
+		daysDiff := int(date.Sub(s.CreatedAt).Hours() / 24)
+		return daysDiff >= 0 && daysDiff%*s.RecurrenceInterval == 0
 	case RecurrenceSpecificDates:
+		// Deprecated: for backward compatibility only
 		dateOnly := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
 		for _, specificDate := range s.SpecificDates {
 			specificDateOnly := time.Date(specificDate.Year(), specificDate.Month(), specificDate.Day(), 0, 0, 0, 0, time.UTC)
@@ -164,12 +240,30 @@ func (s *TripSchedule) GetNextOccurrences(n int) []time.Time {
 	dates := make([]time.Time, 0, n)
 	currentDate := time.Now()
 
-	// Start from valid_from if it's in the future
-	if s.ValidFrom.After(currentDate) {
+	// Start from valid_from if it's in the future (for backward compatibility)
+	if !s.ValidFrom.IsZero() && s.ValidFrom.After(currentDate) {
 		currentDate = s.ValidFrom
 	}
 
-	// Limit search to 365 days to prevent infinite loops
+	// For interval type, we can optimize by directly calculating occurrences
+	if s.RecurrenceType == RecurrenceInterval && s.RecurrenceInterval != nil {
+		interval := *s.RecurrenceInterval
+		// Find the next occurrence from creation date
+		daysSinceCreation := int(currentDate.Sub(s.CreatedAt).Hours() / 24)
+		daysUntilNext := interval - (daysSinceCreation % interval)
+		if daysUntilNext == interval {
+			daysUntilNext = 0 // Today is an occurrence
+		}
+
+		nextDate := currentDate.AddDate(0, 0, daysUntilNext)
+		for i := 0; i < n; i++ {
+			dates = append(dates, nextDate)
+			nextDate = nextDate.AddDate(0, 0, interval)
+		}
+		return dates
+	}
+
+	// For daily and weekly, iterate through days
 	maxDays := 365
 	dayCount := 0
 
