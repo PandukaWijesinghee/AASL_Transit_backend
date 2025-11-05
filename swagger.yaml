@@ -1266,6 +1266,226 @@ paths:
           $ref: "#/components/responses/InternalServerError"
 
   # ============================================================================
+  # Bus Owner Routes (Custom Route Configurations)
+  # ============================================================================
+  /api/v1/bus-owner-routes:
+    post:
+      summary: Create custom route configuration
+      description: |
+        Create a custom route configuration with selected stops for UP or DOWN direction.
+        First and last stops must be included.
+      operationId: createBusOwnerRoute
+      tags:
+        - Bus Owner Routes
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - master_route_id
+                - custom_route_name
+                - direction
+                - selected_stop_ids
+              properties:
+                master_route_id:
+                  type: string
+                  format: uuid
+                  example: "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d"
+                custom_route_name:
+                  type: string
+                  example: "Colombo Badulla Route for BlueBus"
+                direction:
+                  type: string
+                  enum: [UP, DOWN]
+                  example: "UP"
+                selected_stop_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  minItems: 2
+                  example: ["stop-id-1", "stop-id-2", "stop-id-3"]
+      responses:
+        "201":
+          description: Route created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusOwnerRoute"
+        "400":
+          description: Bad request - validation failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    get:
+      summary: Get all custom routes
+      description: Retrieve all custom route configurations for the authenticated bus owner
+      operationId: getBusOwnerRoutes
+      tags:
+        - Bus Owner Routes
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Routes retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BusOwnerRoute"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/bus-owner-routes/{id}:
+    get:
+      summary: Get custom route by ID
+      description: Retrieve a specific custom route configuration
+      operationId: getBusOwnerRouteById
+      tags:
+        - Bus Owner Routes
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Route retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusOwnerRoute"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Route not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    put:
+      summary: Update custom route
+      description: Update an existing custom route configuration
+      operationId: updateBusOwnerRoute
+      tags:
+        - Bus Owner Routes
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                custom_route_name:
+                  type: string
+                  example: "Updated Route Name"
+                selected_stop_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  minItems: 2
+      responses:
+        "200":
+          description: Route updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusOwnerRoute"
+        "400":
+          description: Bad request - validation failed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Route not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      summary: Delete custom route
+      description: Delete a custom route configuration
+      operationId: deleteBusOwnerRoute
+      tags:
+        - Bus Owner Routes
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Route deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Route deleted successfully"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Route not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/bus-owner-routes/by-master-route/{master_route_id}:
+    get:
+      summary: Get custom routes by master route
+      description: Retrieve all custom routes for a specific master route
+      operationId: getBusOwnerRoutesByMasterRoute
+      tags:
+        - Bus Owner Routes
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: master_route_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Routes retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BusOwnerRoute"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================================
   # Lounge Owner Endpoints
   # ============================================================================
   /api/v1/lounge-owner/register/business-info:
@@ -3491,6 +3711,43 @@ components:
         updated_at:
           type: string
           format: date-time
+
+    BusOwnerRoute:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d"
+        bus_owner_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        master_route_id:
+          type: string
+          format: uuid
+          example: "b2c3d4e5-f6a7-4b5c-9d0e-1f2a3b4c5d6e"
+        custom_route_name:
+          type: string
+          example: "Colombo Badulla Route for BlueBus"
+        direction:
+          type: string
+          enum: [UP, DOWN]
+          example: "UP"
+        selected_stop_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          example: ["stop-id-1", "stop-id-2", "stop-id-3"]
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-11-05T10:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2025-11-05T10:00:00Z"
 
     RoutePermit:
       type: object

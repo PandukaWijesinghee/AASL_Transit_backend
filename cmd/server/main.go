@@ -202,6 +202,10 @@ func main() {
 	busHandler := handlers.NewBusHandler(busRepository, permitRepository, ownerRepository)
 	masterRouteHandler := handlers.NewMasterRouteHandler(masterRouteRepo)
 
+	// Initialize bus owner route repository and handler
+	busOwnerRouteRepo := repository.NewBusOwnerRouteRepository(db)
+	busOwnerRouteHandler := handlers.NewBusOwnerRouteHandler(busOwnerRouteRepo)
+
 	// Initialize lounge owner, lounge, staff, and admin handlers
 	logger.Info("🔍 DEBUG: Initializing lounge handlers...")
 	loungeOwnerHandler := handlers.NewLoungeOwnerHandler(loungeOwnerRepository, userRepository)
@@ -332,6 +336,18 @@ func main() {
 			busOwner.POST("/complete-onboarding", busOwnerHandler.CompleteOnboarding)
 			busOwner.GET("/staff", busOwnerHandler.GetStaff)  // Get all staff (drivers & conductors)
 			busOwner.POST("/staff", busOwnerHandler.AddStaff) // Add driver or conductor
+		}
+
+		// Bus Owner Routes (custom route configurations)
+		busOwnerRoutes := v1.Group("/bus-owner-routes")
+		busOwnerRoutes.Use(middleware.AuthMiddleware(jwtService))
+		{
+			busOwnerRoutes.POST("", busOwnerRouteHandler.CreateRoute)
+			busOwnerRoutes.GET("", busOwnerRouteHandler.GetRoutes)
+			busOwnerRoutes.GET("/:id", busOwnerRouteHandler.GetRouteByID)
+			busOwnerRoutes.GET("/by-master-route/:master_route_id", busOwnerRouteHandler.GetRoutesByMasterRoute)
+			busOwnerRoutes.PUT("/:id", busOwnerRouteHandler.UpdateRoute)
+			busOwnerRoutes.DELETE("/:id", busOwnerRouteHandler.DeleteRoute)
 		}
 
 		// Lounge Owner routes (all protected)
