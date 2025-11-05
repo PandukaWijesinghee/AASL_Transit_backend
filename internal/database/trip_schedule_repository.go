@@ -18,15 +18,46 @@ func NewTripScheduleRepository(db DB) *TripScheduleRepository {
 	return &TripScheduleRepository{db: db}
 }
 
-// Create creates a new trip schedule
+// CreateTimetable creates a new timetable (trip schedule) using the new timetable system
+func (r *TripScheduleRepository) CreateTimetable(schedule *models.TripSchedule) error {
+	query := `
+		INSERT INTO trip_schedules (
+			id, bus_owner_id, permit_id, custom_route_id, schedule_name,
+			recurrence_type, recurrence_days, recurrence_interval, departure_time,
+			estimated_arrival_time, base_fare, is_bookable, max_bookable_seats,
+			booking_advance_hours, is_active, notes
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+			$11, $12, $13, $14, $15, $16
+		)
+		RETURNING created_at, updated_at
+	`
+
+	// Generate ID if not provided
+	if schedule.ID == "" {
+		schedule.ID = uuid.New().String()
+	}
+
+	err := r.db.QueryRow(
+		query,
+		schedule.ID, schedule.BusOwnerID, schedule.PermitID, schedule.CustomRouteID, schedule.ScheduleName,
+		schedule.RecurrenceType, schedule.RecurrenceDays, schedule.RecurrenceInterval, schedule.DepartureTime,
+		schedule.EstimatedArrivalTime, schedule.BaseFare, schedule.IsBookable, schedule.MaxBookableSeats,
+		schedule.BookingAdvanceHours, schedule.IsActive, schedule.Notes,
+	).Scan(&schedule.CreatedAt, &schedule.UpdatedAt)
+
+	return err
+}
+
+// Deprecated: Create creates a new trip schedule (old system, kept for backward compatibility)
 func (r *TripScheduleRepository) Create(schedule *models.TripSchedule) error {
 	query := `
 		INSERT INTO trip_schedules (
 			id, bus_owner_id, permit_id, bus_id, schedule_name,
-			recurrence_type, recurrence_days, specific_dates, departure_time,
+			recurrence_type, recurrence_days, specific_dates_old, departure_time,
 			base_fare, is_bookable, max_bookable_seats, advance_booking_hours,
 			default_driver_id, default_conductor_id, selected_stop_ids,
-			is_active, valid_from, valid_until, notes
+			is_active, valid_from_old, valid_until_old, notes
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
 			$11, $12, $13, $14, $15, $16, $17, $18, $19, $20
@@ -159,6 +190,51 @@ func (r *TripScheduleRepository) GetByPermitID(permitID string) ([]models.TripSc
 	return r.scanSchedules(rows)
 }
 
+// GetByCustomRouteID retrieves all timetables for a specific custom route
+func (r *TripScheduleRepository) GetByCustomRouteID(customRouteID string) ([]models.TripSchedule, error) {
+	query := `
+		SELECT id, bus_owner_id, permit_id, custom_route_id, schedule_name,
+			   recurrence_type, recurrence_days, recurrence_interval, departure_time,
+			   estimated_arrival_time, base_fare, is_bookable, max_bookable_seats,
+			   booking_advance_hours, is_active, notes,
+			   created_at, updated_at
+		FROM trip_schedules
+		WHERE custom_route_id = $1
+		ORDER BY departure_time
+	`
+
+	rows, err := r.db.Query(query, customRouteID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return r.scanTimetables(rows)
+}
+
+// GetAllActiveTimetables retrieves all active timetables (for cron job)
+func (r *TripScheduleRepository) GetAllActiveTimetables() ([]models.TripSchedule, error) {
+	query := `
+		SELECT id, bus_owner_id, permit_id, custom_route_id, schedule_name,
+			   recurrence_type, recurrence_days, recurrence_interval, departure_time,
+			   estimated_arrival_time, base_fare, is_bookable, max_bookable_seats,
+			   booking_advance_hours, is_active, notes,
+			   created_at, updated_at
+		FROM trip_schedules
+		WHERE is_active = true
+		  AND custom_route_id IS NOT NULL
+		ORDER BY bus_owner_id, departure_time
+	`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return r.scanTimetables(rows)
+}
+
 // GetActiveSchedulesForDate retrieves all active schedules for a specific date
 func (r *TripScheduleRepository) GetActiveSchedulesForDate(date time.Time) ([]models.TripSchedule, error) {
 	query := `
@@ -226,7 +302,7 @@ func (r *TripScheduleRepository) Deactivate(scheduleID string) error {
 	return err
 }
 
-// scanSchedules scans multiple schedules from rows
+// scanSchedules scans multiple schedules from rows (old system)
 func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSchedule, error) {
 	schedules := []models.TripSchedule{}
 
@@ -281,4 +357,62 @@ func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSch
 	}
 
 	return schedules, rows.Err()
+}
+
+// scanTimetables scans multiple timetables from rows (new system)
+func (r *TripScheduleRepository) scanTimetables(rows *sql.Rows) ([]models.TripSchedule, error) {
+	timetables := []models.TripSchedule{}
+
+	for rows.Next() {
+		var schedule models.TripSchedule
+		var customRouteID sql.NullString
+		var scheduleName sql.NullString
+		var recurrenceInterval sql.NullInt64
+		var estimatedArrivalTime sql.NullString
+		var maxBookableSeats sql.NullInt64
+		var bookingAdvanceHours sql.NullInt64
+		var notes sql.NullString
+
+		err := rows.Scan(
+			&schedule.ID, &schedule.BusOwnerID, &schedule.PermitID, &customRouteID, &scheduleName,
+			&schedule.RecurrenceType, &schedule.RecurrenceDays, &recurrenceInterval, &schedule.DepartureTime,
+			&estimatedArrivalTime, &schedule.BaseFare, &schedule.IsBookable, &maxBookableSeats,
+			&bookingAdvanceHours, &schedule.IsActive, &notes,
+			&schedule.CreatedAt, &schedule.UpdatedAt,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		// Convert sql.Null* types
+		if customRouteID.Valid {
+			schedule.CustomRouteID = &customRouteID.String
+		}
+		if scheduleName.Valid {
+			schedule.ScheduleName = &scheduleName.String
+		}
+		if recurrenceInterval.Valid {
+			interval := int(recurrenceInterval.Int64)
+			schedule.RecurrenceInterval = &interval
+		}
+		if estimatedArrivalTime.Valid {
+			schedule.EstimatedArrivalTime = &estimatedArrivalTime.String
+		}
+		if maxBookableSeats.Valid {
+			seats := int(maxBookableSeats.Int64)
+			schedule.MaxBookableSeats = &seats
+		}
+		if bookingAdvanceHours.Valid {
+			hours := int(bookingAdvanceHours.Int64)
+			schedule.BookingAdvanceHours = &hours
+		}
+		if notes.Valid {
+			schedule.Notes = &notes.String
+		}
+
+		timetables = append(timetables, schedule)
+	}
+
+	return timetables, rows.Err()
 }
