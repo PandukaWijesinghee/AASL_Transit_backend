@@ -134,34 +134,83 @@ func (s *TripGeneratorService) GenerateTripsForNewSchedule(schedule *models.Trip
 	return s.GenerateTripsForSchedule(schedule, startDate, endDate)
 }
 
-// GenerateFutureTrips generates trips for all active schedules for future dates (14-30 days)
-// This is called by the cron job
+// GenerateFutureTrips generates trips for all active timetables (maintains 7 occurrences ahead)
+// This is called by the cron job at 1-2 AM daily
 func (s *TripGeneratorService) GenerateFutureTrips() (int, error) {
-	// Get date range: from 14 days from now to 30 days from now
-	startDate := time.Now().AddDate(0, 0, 14)
-	endDate := time.Now().AddDate(0, 0, 30)
-
-	// Get all active schedules for this date range
-	schedules, err := s.scheduleRepo.GetActiveSchedulesForDate(startDate)
+	// Get all active timetables
+	timetables, err := s.scheduleRepo.GetAllActiveTimetables()
 	if err != nil {
-		return 0, fmt.Errorf("failed to fetch active schedules: %w", err)
+		return 0, fmt.Errorf("failed to fetch active timetables: %w", err)
 	}
 
 	totalGenerated := 0
 
-	for _, schedule := range schedules {
-		// Skip if schedule ends before our start date
-		if schedule.ValidUntil != nil && schedule.ValidUntil.Before(startDate) {
-			continue
-		}
+	for _, timetable := range timetables {
+		// Get next 7 occurrences for this timetable
+		nextDates := timetable.GetNextOccurrences(7)
 
-		generated, err := s.GenerateTripsForSchedule(&schedule, startDate, endDate)
-		if err != nil {
-			fmt.Printf("Error generating trips for schedule %s: %v\n", schedule.ID, err)
-			continue
-		}
+		for _, date := range nextDates {
+			// Check if trip already exists for this date
+			existing, err := s.scheduledTripRepo.GetByScheduleAndDate(timetable.ID, date)
+			if err == nil && existing != nil {
+				// Trip already exists, skip
+				continue
+			}
 
-		totalGenerated += generated
+			// Get total seats (default to permit seating capacity)
+			totalSeats := 50 // Default
+			maxBookableSeats := totalSeats
+			if timetable.MaxBookableSeats != nil {
+				maxBookableSeats = *timetable.MaxBookableSeats
+				totalSeats = *timetable.MaxBookableSeats
+			}
+
+			// Determine booking advance hours
+			bookingAdvanceHours := 72 // system default
+			if timetable.BookingAdvanceHours != nil {
+				bookingAdvanceHours = *timetable.BookingAdvanceHours
+			}
+
+			// Calculate assignment deadline (2 hours before departure)
+			assignmentDeadlineHours := 2
+			departureDateTime := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+			// Parse departure time
+			if t, err := time.Parse("15:04", timetable.DepartureTime); err == nil {
+				departureDateTime = time.Date(date.Year(), date.Month(), date.Day(), t.Hour(), t.Minute(), 0, 0, date.Location())
+			}
+			assignmentDeadline := departureDateTime.Add(-time.Duration(assignmentDeadlineHours) * time.Hour)
+
+			// Create scheduled trip
+			scheduleID := timetable.ID
+			trip := &models.ScheduledTrip{
+				ID:                   uuid.New().String(),
+				TripScheduleID:       &scheduleID,
+				CustomRouteID:        timetable.CustomRouteID,
+				PermitID:             timetable.PermitID,
+				BusID:                timetable.BusID,
+				TripDate:             date,
+				DepartureTime:        timetable.DepartureTime,
+				EstimatedArrivalTime: timetable.EstimatedArrivalTime,
+				AssignedDriverID:     timetable.DefaultDriverID,
+				AssignedConductorID:  timetable.DefaultConductorID,
+				IsBookable:           timetable.IsBookable,
+				TotalSeats:           totalSeats,
+				AvailableSeats:       maxBookableSeats,
+				BookedSeats:          0,
+				BaseFare:             timetable.BaseFare,
+				BookingAdvanceHours:  bookingAdvanceHours,
+				AssignmentDeadline:   &assignmentDeadline,
+				Status:               models.ScheduledTripStatusScheduled,
+				SelectedStopIDs:      timetable.SelectedStopIDs,
+			}
+
+			if err := s.scheduledTripRepo.Create(trip); err != nil {
+				fmt.Printf("Failed to create trip for timetable %s on %s: %v\n", timetable.ID, date.Format("2006-01-02"), err)
+				continue
+			}
+
+			totalGenerated++
+		}
 	}
 
 	return totalGenerated, nil
