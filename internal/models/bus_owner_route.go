@@ -1,8 +1,6 @@
 package models
 
 import (
-	"database/sql/driver"
-	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,12 +47,4 @@ func (r *CreateBusOwnerRouteRequest) Validate() error {
 	}
 
 	return nil
-}
-
-// Value implements the driver.Valuer interface for pq.StringArray
-func (s pq.StringArray) Value() (driver.Value, error) {
-	if len(s) == 0 {
-		return nil, nil
-	}
-	return json.Marshal(s)
 }
