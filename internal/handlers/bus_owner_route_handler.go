@@ -5,16 +5,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/smarttransit/sms-auth-backend/internal/database"
 	"github.com/smarttransit/sms-auth-backend/internal/middleware"
 	"github.com/smarttransit/sms-auth-backend/internal/models"
-	"github.com/smarttransit/sms-auth-backend/internal/repository"
 )
 
 type BusOwnerRouteHandler struct {
-	routeRepo *repository.BusOwnerRouteRepository
+	routeRepo *database.BusOwnerRouteRepository
 }
 
-func NewBusOwnerRouteHandler(routeRepo *repository.BusOwnerRouteRepository) *BusOwnerRouteHandler {
+func NewBusOwnerRouteHandler(routeRepo *database.BusOwnerRouteRepository) *BusOwnerRouteHandler {
 	return &BusOwnerRouteHandler{
 		routeRepo: routeRepo,
 	}
