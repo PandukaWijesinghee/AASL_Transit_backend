@@ -23,12 +23,12 @@ func NewScheduledTripRepository(db DB) *ScheduledTripRepository {
 func (r *ScheduledTripRepository) Create(trip *models.ScheduledTrip) error {
 	query := `
 		INSERT INTO scheduled_trips (
-			id, trip_schedule_id, permit_id, bus_id, trip_date, departure_time,
+			id, trip_schedule_id, custom_route_id, permit_id, bus_id, trip_date, departure_time,
 			estimated_arrival_time, assigned_driver_id, assigned_conductor_id,
 			is_bookable, total_seats, available_seats, booked_seats,
-			base_fare, status, selected_stop_ids
+			base_fare, booking_advance_hours, assignment_deadline, status, selected_stop_ids
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
 		)
 		RETURNING created_at, updated_at
 	`
@@ -40,10 +40,10 @@ func (r *ScheduledTripRepository) Create(trip *models.ScheduledTrip) error {
 
 	err := r.db.QueryRow(
 		query,
-		trip.ID, trip.TripScheduleID, trip.PermitID, trip.BusID, trip.TripDate, trip.DepartureTime,
+		trip.ID, trip.TripScheduleID, trip.CustomRouteID, trip.PermitID, trip.BusID, trip.TripDate, trip.DepartureTime,
 		trip.EstimatedArrivalTime, trip.AssignedDriverID, trip.AssignedConductorID,
 		trip.IsBookable, trip.TotalSeats, trip.AvailableSeats, trip.BookedSeats,
-		trip.BaseFare, trip.Status, trip.SelectedStopIDs,
+		trip.BaseFare, trip.BookingAdvanceHours, trip.AssignmentDeadline, trip.Status, trip.SelectedStopIDs,
 	).Scan(&trip.CreatedAt, &trip.UpdatedAt)
 
 	return err
