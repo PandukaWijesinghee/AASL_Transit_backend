@@ -18,6 +18,7 @@ type TripScheduleHandler struct {
 	permitRepo        *database.RoutePermitRepository
 	busOwnerRepo      *database.BusOwnerRepository
 	busRepo           *database.BusRepository
+	routeRepo         *database.BusOwnerRouteRepository
 	tripGeneratorSvc  *services.TripGeneratorService
 }
 
@@ -26,6 +27,7 @@ func NewTripScheduleHandler(
 	permitRepo *database.RoutePermitRepository,
 	busOwnerRepo *database.BusOwnerRepository,
 	busRepo *database.BusRepository,
+	routeRepo *database.BusOwnerRouteRepository,
 	tripGeneratorSvc *services.TripGeneratorService,
 ) *TripScheduleHandler {
 	return &TripScheduleHandler{
@@ -33,6 +35,7 @@ func NewTripScheduleHandler(
 		permitRepo:       permitRepo,
 		busOwnerRepo:     busOwnerRepo,
 		busRepo:          busRepo,
+		routeRepo:        routeRepo,
 		tripGeneratorSvc: tripGeneratorSvc,
 	}
 }
@@ -501,4 +504,125 @@ func (h *TripScheduleHandler) DeleteSchedule(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Schedule deleted successfully"})
+}
+
+// CreateTimetable creates a new timetable (trip schedule) using the new timetable system
+// POST /api/v1/timetables
+func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch profile"})
+		return
+	}
+
+	var req models.CreateTimetableRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "details": err.Error()})
+		return
+	}
+
+	// Validate request
+	if err := req.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Verify custom route ownership
+	customRoute, err := h.routeRepo.GetByID(req.CustomRouteID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Custom route not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch custom route"})
+		return
+	}
+
+	if customRoute.BusOwnerID != busOwner.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied to this custom route"})
+		return
+	}
+
+	// Verify permit ownership
+	permit, err := h.permitRepo.GetByID(req.PermitID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Permit not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch permit"})
+		return
+	}
+
+	if permit.BusOwnerID != busOwner.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied to this permit"})
+		return
+	}
+
+	// Check permit is valid
+	if !permit.IsValid() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Permit is not valid or expired"})
+		return
+	}
+
+	// Validate fare against permit approved fare
+	if req.BaseFare > permit.ApprovedFare {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Base fare exceeds permit approved fare",
+			"details": map[string]interface{}{
+				"requested_fare": req.BaseFare,
+				"approved_fare":  permit.ApprovedFare,
+			},
+		})
+		return
+	}
+
+	// Validate max bookable seats against permit approved seating capacity
+	if req.MaxBookableSeats > permit.ApprovedSeatingCapacity {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Max bookable seats exceeds permit approved seating capacity",
+			"details": map[string]interface{}{
+				"requested_seats": req.MaxBookableSeats,
+				"approved_seats":  permit.ApprovedSeatingCapacity,
+			},
+		})
+		return
+	}
+
+	// Create timetable
+	schedule := &models.TripSchedule{
+		ID:                   uuid.New().String(),
+		BusOwnerID:           busOwner.ID,
+		PermitID:             req.PermitID,
+		CustomRouteID:        &req.CustomRouteID,
+		ScheduleName:         req.ScheduleName,
+		RecurrenceType:       models.RecurrenceType(req.RecurrenceType),
+		RecurrenceDays:       req.RecurrenceDays,
+		RecurrenceInterval:   req.RecurrenceInterval,
+		DepartureTime:        req.DepartureTime,
+		EstimatedArrivalTime: req.EstimatedArrivalTime,
+		BaseFare:             req.BaseFare,
+		IsBookable:           req.IsBookable,
+		MaxBookableSeats:     &req.MaxBookableSeats,
+		BookingAdvanceHours:  req.BookingAdvanceHours,
+		IsActive:             true,
+		Notes:                req.Notes,
+	}
+
+	if err := h.scheduleRepo.CreateTimetable(schedule); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create timetable"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, schedule)
 }

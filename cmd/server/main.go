@@ -220,6 +220,7 @@ func main() {
 		permitRepository,
 		ownerRepository,
 		busRepository,
+		busOwnerRouteRepo,
 		tripGeneratorSvc,
 	)
 
@@ -460,6 +461,13 @@ func main() {
 			tripSchedules.PUT("/:id", tripScheduleHandler.UpdateSchedule)
 			tripSchedules.DELETE("/:id", tripScheduleHandler.DeleteSchedule)
 			tripSchedules.POST("/:id/deactivate", tripScheduleHandler.DeactivateSchedule)
+		}
+
+		// Timetable routes (new timetable system - all protected)
+		timetables := v1.Group("/timetables")
+		timetables.Use(middleware.AuthMiddleware(jwtService))
+		{
+			timetables.POST("", tripScheduleHandler.CreateTimetable)
 		}
 
 		// Scheduled Trip routes (all protected - bus owners only)
