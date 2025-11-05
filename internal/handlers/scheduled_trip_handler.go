@@ -16,6 +16,9 @@ type ScheduledTripHandler struct {
 	scheduleRepo  *database.TripScheduleRepository
 	permitRepo    *database.RoutePermitRepository
 	busOwnerRepo  *database.BusOwnerRepository
+	routeRepo     *database.BusOwnerRouteRepository
+	busRepo       *database.BusRepository
+	settingRepo   *database.SystemSettingRepository
 }
 
 func NewScheduledTripHandler(
@@ -23,12 +26,18 @@ func NewScheduledTripHandler(
 	scheduleRepo *database.TripScheduleRepository,
 	permitRepo *database.RoutePermitRepository,
 	busOwnerRepo *database.BusOwnerRepository,
+	routeRepo *database.BusOwnerRouteRepository,
+	busRepo *database.BusRepository,
+	settingRepo *database.SystemSettingRepository,
 ) *ScheduledTripHandler {
 	return &ScheduledTripHandler{
 		tripRepo:     tripRepo,
 		scheduleRepo: scheduleRepo,
 		permitRepo:   permitRepo,
 		busOwnerRepo: busOwnerRepo,
+		routeRepo:    routeRepo,
+		busRepo:      busRepo,
+		settingRepo:  settingRepo,
 	}
 }
 
@@ -375,4 +384,192 @@ func (h *ScheduledTripHandler) GetBookableTrips(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, trips)
+}
+
+// CreateSpecialTrip creates a special one-time trip (not from timetable)
+// POST /api/v1/special-trips
+func (h *ScheduledTripHandler) CreateSpecialTrip(c *gin.Context) {
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch profile"})
+		return
+	}
+
+	var req models.CreateSpecialTripRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "details": err.Error()})
+		return
+	}
+
+	// Validate request
+	if err := req.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Verify custom route ownership
+	customRoute, err := h.routeRepo.GetByID(req.CustomRouteID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Custom route not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch custom route"})
+		return
+	}
+
+	if customRoute.BusOwnerID != busOwner.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied to this custom route"})
+		return
+	}
+
+	// Verify permit ownership
+	permit, err := h.permitRepo.GetByID(req.PermitID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Permit not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch permit"})
+		return
+	}
+
+	if permit.BusOwnerID != busOwner.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied to this permit"})
+		return
+	}
+
+	// Check permit is valid
+	if !permit.IsValid() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Permit is not valid or expired"})
+		return
+	}
+
+	// Validate fare against permit approved fare
+	if req.BaseFare > permit.ApprovedFare {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Base fare exceeds permit approved fare",
+			"details": map[string]interface{}{
+				"requested_fare": req.BaseFare,
+				"approved_fare":  permit.ApprovedFare,
+			},
+		})
+		return
+	}
+
+	// Validate max bookable seats against permit approved seating capacity
+	if req.MaxBookableSeats > permit.ApprovedSeatingCapacity {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Max bookable seats exceeds permit approved seating capacity",
+			"details": map[string]interface{}{
+				"requested_seats": req.MaxBookableSeats,
+				"approved_seats":  permit.ApprovedSeatingCapacity,
+			},
+		})
+		return
+	}
+
+	// Parse trip date
+	tripDate, _ := time.Parse("2006-01-02", req.TripDate) // Already validated in Validate()
+
+	// Parse departure time
+	var departureHour, departureMinute int
+	if t, err := time.Parse("15:04", req.DepartureTime); err == nil {
+		departureHour = t.Hour()
+		departureMinute = t.Minute()
+	} else if t, err := time.Parse("15:04:05", req.DepartureTime); err == nil {
+		departureHour = t.Hour()
+		departureMinute = t.Minute()
+	}
+
+	// Calculate departure datetime
+	departureDateTime := time.Date(
+		tripDate.Year(), tripDate.Month(), tripDate.Day(),
+		departureHour, departureMinute, 0, 0, time.Local,
+	)
+
+	// Get system settings
+	assignmentDeadlineHours := h.settingRepo.GetIntValue("assignment_deadline_hours", 2)
+	defaultBookingAdvanceHours := h.settingRepo.GetIntValue("booking_advance_hours_default", 72)
+
+	// Determine booking advance hours
+	bookingAdvanceHours := defaultBookingAdvanceHours
+	if req.BookingAdvanceHours != nil {
+		bookingAdvanceHours = *req.BookingAdvanceHours
+	}
+
+	// Calculate assignment deadline
+	assignmentDeadline := departureDateTime.Add(-time.Duration(assignmentDeadlineHours) * time.Hour)
+
+	// Check if trip is too soon (assignment deadline has passed or will pass soon)
+	now := time.Now()
+	requiresImmediateAssignment := assignmentDeadline.Before(now) || assignmentDeadline.Sub(now) < 1*time.Hour
+
+	if requiresImmediateAssignment {
+		// Verify resources are assigned
+		if req.BusID == nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Trip date is too soon. Bus assignment is required.",
+				"details": map[string]interface{}{
+					"assignment_deadline": assignmentDeadline.Format(time.RFC3339),
+					"current_time":        now.Format(time.RFC3339),
+				},
+			})
+			return
+		}
+
+		// Verify bus ownership
+		bus, err := h.busRepo.GetByID(*req.BusID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Bus not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bus"})
+			return
+		}
+
+		if bus.BusOwnerID != busOwner.ID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied to this bus"})
+			return
+		}
+	}
+
+	// Create special trip
+	trip := &models.ScheduledTrip{
+		TripScheduleID:       nil, // Special trip - no timetable
+		CustomRouteID:        &req.CustomRouteID,
+		PermitID:             req.PermitID,
+		BusID:                req.BusID,
+		TripDate:             tripDate,
+		DepartureTime:        req.DepartureTime,
+		EstimatedArrivalTime: req.EstimatedArrivalTime,
+		AssignedDriverID:     req.AssignedDriverID,
+		AssignedConductorID:  req.AssignedConductorID,
+		IsBookable:           req.IsBookable,
+		TotalSeats:           req.MaxBookableSeats,
+		AvailableSeats:       req.MaxBookableSeats,
+		BookedSeats:          0,
+		BaseFare:             req.BaseFare,
+		BookingAdvanceHours:  bookingAdvanceHours,
+		AssignmentDeadline:   &assignmentDeadline,
+		Status:               models.ScheduledTripStatusScheduled,
+	}
+
+	if err := h.tripRepo.Create(trip); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create special trip"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, trip)
 }

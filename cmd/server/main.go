@@ -230,6 +230,9 @@ func main() {
 		tripScheduleRepo,
 		permitRepository,
 		ownerRepository,
+		busOwnerRouteRepo,
+		busRepository,
+		systemSettingRepo,
 	)
 	systemSettingHandler := handlers.NewSystemSettingHandler(systemSettingRepo)
 	logger.Info("Trip scheduling handlers initialized")
@@ -470,6 +473,13 @@ func main() {
 		timetables.Use(middleware.AuthMiddleware(jwtService))
 		{
 			timetables.POST("", tripScheduleHandler.CreateTimetable)
+		}
+
+		// Special Trip routes (one-time trips, not from timetable - all protected)
+		specialTrips := v1.Group("/special-trips")
+		specialTrips.Use(middleware.AuthMiddleware(jwtService))
+		{
+			specialTrips.POST("", scheduledTripHandler.CreateSpecialTrip)
 		}
 
 		// Scheduled Trip routes (all protected - bus owners only)
