@@ -112,6 +112,7 @@ func main() {
 	tripScheduleRepo := database.NewTripScheduleRepository(sqlxDB.DB)
 	scheduledTripRepo := database.NewScheduledTripRepository(sqlxDB.DB)
 	masterRouteRepo := database.NewMasterRouteRepository(sqlxDB.DB)
+	systemSettingRepo := database.NewSystemSettingRepository(sqlxDB.DB)
 
 	// Initialize trip generator service
 	tripGeneratorSvc := services.NewTripGeneratorService(
@@ -230,6 +231,7 @@ func main() {
 		permitRepository,
 		ownerRepository,
 	)
+	systemSettingHandler := handlers.NewSystemSettingHandler(systemSettingRepo)
 	logger.Info("Trip scheduling handlers initialized")
 
 	// Initialize Gin router
@@ -486,6 +488,15 @@ func main() {
 
 		// Public bookable trips (no auth required)
 		v1.GET("/bookable-trips", scheduledTripHandler.GetBookableTrips)
+
+		// System Settings routes (protected)
+		systemSettings := v1.Group("/system-settings")
+		systemSettings.Use(middleware.AuthMiddleware(jwtService))
+		{
+			systemSettings.GET("", systemSettingHandler.GetAllSettings)
+			systemSettings.GET("/:key", systemSettingHandler.GetSettingByKey)
+			systemSettings.PUT("/:key", systemSettingHandler.UpdateSetting)
+		}
 
 		// Admin cron management routes (optional - for testing)
 		admin := v1.Group("/admin")
