@@ -60,15 +60,33 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 				maxBookableSeats = *schedule.MaxBookableSeats
 			}
 
+			// Determine booking advance hours (use schedule's or default)
+			bookingAdvanceHours := 72 // system default
+			if schedule.BookingAdvanceHours != nil {
+				bookingAdvanceHours = *schedule.BookingAdvanceHours
+			}
+
+			// Calculate assignment deadline (e.g., 2 hours before departure)
+			// TODO: Get assignment_deadline_hours from system settings
+			assignmentDeadlineHours := 2
+			departureDateTime := time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), 0, 0, 0, 0, currentDate.Location())
+			// Parse departure time and add to date
+			if t, err := time.Parse("15:04", schedule.DepartureTime); err == nil {
+				departureDateTime = time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), t.Hour(), t.Minute(), 0, 0, currentDate.Location())
+			}
+			assignmentDeadline := departureDateTime.Add(-time.Duration(assignmentDeadlineHours) * time.Hour)
+
 			// Create scheduled trip
+			scheduleID := schedule.ID
 			trip := &models.ScheduledTrip{
 				ID:                   uuid.New().String(),
-				TripScheduleID:       schedule.ID,
+				TripScheduleID:       &scheduleID,
+				CustomRouteID:        schedule.CustomRouteID,
 				PermitID:             schedule.PermitID,
 				BusID:                schedule.BusID,
 				TripDate:             currentDate,
 				DepartureTime:        schedule.DepartureTime,
-				EstimatedArrivalTime: nil, // Can be calculated based on route
+				EstimatedArrivalTime: schedule.EstimatedArrivalTime,
 				AssignedDriverID:     schedule.DefaultDriverID,
 				AssignedConductorID:  schedule.DefaultConductorID,
 				IsBookable:           schedule.IsBookable,
@@ -76,6 +94,8 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 				AvailableSeats:       maxBookableSeats,
 				BookedSeats:          0,
 				BaseFare:             schedule.BaseFare,
+				BookingAdvanceHours:  bookingAdvanceHours,
+				AssignmentDeadline:   &assignmentDeadline,
 				Status:               models.ScheduledTripStatusScheduled,
 				SelectedStopIDs:      schedule.SelectedStopIDs,
 			}
