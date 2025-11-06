@@ -74,6 +74,19 @@ CREATE TABLE public.bookings (
   CONSTRAINT bookings_boarding_stop_id_fkey FOREIGN KEY (boarding_stop_id) REFERENCES public.master_route_stops(id),
   CONSTRAINT bookings_alighting_stop_id_fkey FOREIGN KEY (alighting_stop_id) REFERENCES public.master_route_stops(id)
 );
+CREATE TABLE public.bus_owner_routes (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  bus_owner_id uuid NOT NULL,
+  master_route_id uuid NOT NULL,
+  custom_route_name character varying NOT NULL,
+  direction character varying NOT NULL CHECK (direction::text = ANY (ARRAY['UP'::character varying, 'DOWN'::character varying]::text[])),
+  selected_stop_ids ARRAY NOT NULL CHECK (array_length(selected_stop_ids, 1) >= 2),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT bus_owner_routes_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_bus_owner_routes_master_route FOREIGN KEY (master_route_id) REFERENCES public.master_routes(id),
+  CONSTRAINT fk_bus_owner_routes_bus_owner FOREIGN KEY (bus_owner_id) REFERENCES public.bus_owners(id)
+);
 CREATE TABLE public.bus_owners (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   user_id uuid NOT NULL UNIQUE,
@@ -316,13 +329,14 @@ CREATE TABLE public.route_permits (
   restrictions text,
   verified_at timestamp with time zone,
   permit_document_url text,
+  approved_seating_capacity integer CHECK (approved_seating_capacity IS NULL OR approved_seating_capacity > 0),
   CONSTRAINT route_permits_pkey PRIMARY KEY (id),
   CONSTRAINT route_permits_bus_owner_id_fkey FOREIGN KEY (bus_owner_id) REFERENCES public.bus_owners(id),
   CONSTRAINT route_permits_master_route_id_fkey FOREIGN KEY (master_route_id) REFERENCES public.master_routes(id)
 );
 CREATE TABLE public.scheduled_trips (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  trip_schedule_id uuid NOT NULL,
+  trip_schedule_id uuid,
   permit_id uuid NOT NULL,
   bus_id uuid,
   trip_date date NOT NULL,
@@ -341,12 +355,25 @@ CREATE TABLE public.scheduled_trips (
   selected_stop_ids ARRAY,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  custom_route_id uuid,
+  booking_advance_hours integer NOT NULL DEFAULT 72 CHECK (booking_advance_hours > 0),
+  assignment_deadline timestamp with time zone,
   CONSTRAINT scheduled_trips_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_scheduled_trips_custom_route FOREIGN KEY (custom_route_id) REFERENCES public.bus_owner_routes(id),
   CONSTRAINT scheduled_trips_trip_schedule_id_fkey FOREIGN KEY (trip_schedule_id) REFERENCES public.trip_schedules(id),
   CONSTRAINT scheduled_trips_permit_id_fkey FOREIGN KEY (permit_id) REFERENCES public.route_permits(id),
   CONSTRAINT scheduled_trips_bus_id_fkey FOREIGN KEY (bus_id) REFERENCES public.buses(id),
   CONSTRAINT scheduled_trips_assigned_driver_id_fkey FOREIGN KEY (assigned_driver_id) REFERENCES public.bus_staff(id),
   CONSTRAINT scheduled_trips_assigned_conductor_id_fkey FOREIGN KEY (assigned_conductor_id) REFERENCES public.bus_staff(id)
+);
+CREATE TABLE public.system_settings (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  setting_key character varying NOT NULL UNIQUE,
+  setting_value text NOT NULL,
+  description text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT system_settings_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.trip_schedules (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -354,9 +381,9 @@ CREATE TABLE public.trip_schedules (
   permit_id uuid NOT NULL,
   bus_id uuid,
   schedule_name character varying,
-  recurrence_type character varying NOT NULL CHECK (recurrence_type::text = ANY (ARRAY['daily'::character varying, 'weekly'::character varying, 'specific_dates'::character varying]::text[])),
+  recurrence_type character varying NOT NULL CHECK (recurrence_type::text = ANY (ARRAY['daily'::character varying, 'weekly'::character varying, 'interval'::character varying]::text[])),
   recurrence_days ARRAY,
-  specific_dates ARRAY,
+  specific_dates_old ARRAY,
   departure_time time without time zone NOT NULL,
   base_fare numeric NOT NULL CHECK (base_fare > 0::numeric),
   is_bookable boolean DEFAULT false,
@@ -366,15 +393,19 @@ CREATE TABLE public.trip_schedules (
   default_conductor_id uuid,
   selected_stop_ids ARRAY,
   is_active boolean DEFAULT true,
-  valid_from date NOT NULL,
-  valid_until date,
+  valid_from_old date NOT NULL,
+  valid_until_old date,
   notes text,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
-  direction character varying NOT NULL DEFAULT 'UP'::character varying CHECK (direction::text = ANY (ARRAY['UP'::character varying, 'DOWN'::character varying, 'ROUND_TRIP'::character varying]::text[])),
-  trips_per_day integer NOT NULL DEFAULT 1 CHECK (trips_per_day > 0 AND trips_per_day <= 10),
+  direction_old character varying NOT NULL DEFAULT 'UP'::character varying CHECK (direction_old::text = ANY (ARRAY['UP'::character varying, 'DOWN'::character varying, 'ROUND_TRIP'::character varying]::text[])),
+  trips_per_day_old integer NOT NULL DEFAULT 1 CHECK (trips_per_day_old > 0 AND trips_per_day_old <= 10),
   estimated_arrival_time time without time zone,
+  custom_route_id uuid,
+  booking_advance_hours integer CHECK (booking_advance_hours IS NULL OR booking_advance_hours >= 0),
+  recurrence_interval integer CHECK (recurrence_interval IS NULL OR recurrence_interval > 0),
   CONSTRAINT trip_schedules_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_trip_schedules_custom_route FOREIGN KEY (custom_route_id) REFERENCES public.bus_owner_routes(id),
   CONSTRAINT trip_schedules_bus_owner_id_fkey FOREIGN KEY (bus_owner_id) REFERENCES public.bus_owners(id),
   CONSTRAINT trip_schedules_permit_id_fkey FOREIGN KEY (permit_id) REFERENCES public.route_permits(id),
   CONSTRAINT trip_schedules_bus_id_fkey FOREIGN KEY (bus_id) REFERENCES public.buses(id),

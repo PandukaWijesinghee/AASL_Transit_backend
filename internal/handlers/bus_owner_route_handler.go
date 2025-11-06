@@ -100,7 +100,10 @@ func (h *BusOwnerRouteHandler) GetRoutes(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, routes)
+	c.JSON(http.StatusOK, gin.H{
+		"routes": routes,
+		"count":  len(routes),
+	})
 }
 
 // GetRouteByID retrieves a specific custom route
