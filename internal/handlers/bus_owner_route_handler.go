@@ -53,7 +53,7 @@ func (h *BusOwnerRouteHandler) CreateRoute(c *gin.Context) {
 	if err != nil {
 		log.Printf("❌ [BUS OWNER ROUTE] Stop validation error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to validate stops",
+			"error":   "Failed to validate stops",
 			"details": err.Error(),
 		})
 		return
@@ -62,7 +62,7 @@ func (h *BusOwnerRouteHandler) CreateRoute(c *gin.Context) {
 	if !stopsExist {
 		log.Printf("⚠️ [BUS OWNER ROUTE] Some stops don't exist in master route")
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "One or more selected stops do not exist in the master route",
+			"error":   "One or more selected stops do not exist in the master route",
 			"details": "Please ensure the master route has stops configured",
 		})
 		return
@@ -75,7 +75,7 @@ func (h *BusOwnerRouteHandler) CreateRoute(c *gin.Context) {
 	if err != nil {
 		log.Printf("❌ [BUS OWNER ROUTE] First/last stop validation error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to validate first and last stops",
+			"error":   "Failed to validate first and last stops",
 			"details": err.Error(),
 		})
 		return
@@ -84,7 +84,7 @@ func (h *BusOwnerRouteHandler) CreateRoute(c *gin.Context) {
 	if !hasFirstAndLast {
 		log.Printf("⚠️ [BUS OWNER ROUTE] First or last stop missing")
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "First and last stops of the route must be included",
+			"error":   "First and last stops of the route must be included",
 			"details": "The origin and destination stops are required",
 		})
 		return
@@ -107,7 +107,7 @@ func (h *BusOwnerRouteHandler) CreateRoute(c *gin.Context) {
 	if err := h.routeRepo.Create(route); err != nil {
 		log.Printf("❌ [BUS OWNER ROUTE] Failed to create route: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to create route",
+			"error":   "Failed to create route",
 			"details": err.Error(),
 		})
 		return
