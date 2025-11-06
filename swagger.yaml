@@ -1337,9 +1337,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/BusOwnerRoute"
+                type: object
+                properties:
+                  routes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BusOwnerRoute"
+                  count:
+                    type: integer
+                    example: 3
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
@@ -1477,9 +1483,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/BusOwnerRoute"
+                type: object
+                properties:
+                  routes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BusOwnerRoute"
+                  count:
+                    type: integer
+                    example: 2
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":

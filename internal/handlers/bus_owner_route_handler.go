@@ -149,7 +149,10 @@ func (h *BusOwnerRouteHandler) GetRoutesByMasterRoute(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, routes)
+	c.JSON(http.StatusOK, gin.H{
+		"routes": routes,
+		"count":  len(routes),
+	})
 }
 
 // UpdateRoute updates an existing custom route
