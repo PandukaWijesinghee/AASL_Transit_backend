@@ -555,7 +555,7 @@ func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
 	}
 
 	// Permit validation is optional - permit will be assigned later to specific trips
-	// If provided, validate ownership and limits
+	// If provided, validate ownership only (no fare/seat limits enforcement)
 	if req.PermitID != nil && *req.PermitID != "" {
 		permit, err := h.permitRepo.GetByID(*req.PermitID)
 		if err != nil {
@@ -578,29 +578,8 @@ func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
 			return
 		}
 
-		// Validate fare against permit approved fare
-		if req.BaseFare > permit.ApprovedFare {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "Base fare exceeds permit approved fare",
-				"details": map[string]interface{}{
-					"requested_fare": req.BaseFare,
-					"approved_fare":  permit.ApprovedFare,
-				},
-			})
-			return
-		}
-
-		// Validate max bookable seats against permit approved seating capacity
-		if req.MaxBookableSeats > permit.ApprovedSeatingCapacity {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "Max bookable seats exceeds permit approved seating capacity",
-				"details": map[string]interface{}{
-					"requested_seats": req.MaxBookableSeats,
-					"approved_seats":  permit.ApprovedSeatingCapacity,
-				},
-			})
-			return
-		}
+		// Note: Permit details (approved_fare, approved_seating_capacity) are shown in UI
+		// but not enforced here. User decides what fare and seats to set for the timetable.
 	}
 
 	// Create timetable
