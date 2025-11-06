@@ -553,50 +553,53 @@ func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
 		return
 	}
 
-	// Verify permit ownership
-	permit, err := h.permitRepo.GetByID(req.PermitID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Permit not found"})
+	// Permit validation is optional - permit will be assigned later to specific trips
+	// If provided, validate ownership and limits
+	if req.PermitID != nil && *req.PermitID != "" {
+		permit, err := h.permitRepo.GetByID(*req.PermitID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Permit not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch permit"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch permit"})
-		return
-	}
 
-	if permit.BusOwnerID != busOwner.ID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied to this permit"})
-		return
-	}
+		if permit.BusOwnerID != busOwner.ID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied to this permit"})
+			return
+		}
 
-	// Check permit is valid
-	if !permit.IsValid() {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Permit is not valid or expired"})
-		return
-	}
+		// Check permit is valid
+		if !permit.IsValid() {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Permit is not valid or expired"})
+			return
+		}
 
-	// Validate fare against permit approved fare
-	if req.BaseFare > permit.ApprovedFare {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Base fare exceeds permit approved fare",
-			"details": map[string]interface{}{
-				"requested_fare": req.BaseFare,
-				"approved_fare":  permit.ApprovedFare,
-			},
-		})
-		return
-	}
+		// Validate fare against permit approved fare
+		if req.BaseFare > permit.ApprovedFare {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Base fare exceeds permit approved fare",
+				"details": map[string]interface{}{
+					"requested_fare": req.BaseFare,
+					"approved_fare":  permit.ApprovedFare,
+				},
+			})
+			return
+		}
 
-	// Validate max bookable seats against permit approved seating capacity
-	if req.MaxBookableSeats > permit.ApprovedSeatingCapacity {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Max bookable seats exceeds permit approved seating capacity",
-			"details": map[string]interface{}{
-				"requested_seats": req.MaxBookableSeats,
-				"approved_seats":  permit.ApprovedSeatingCapacity,
-			},
-		})
-		return
+		// Validate max bookable seats against permit approved seating capacity
+		if req.MaxBookableSeats > permit.ApprovedSeatingCapacity {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Max bookable seats exceeds permit approved seating capacity",
+				"details": map[string]interface{}{
+					"requested_seats": req.MaxBookableSeats,
+					"approved_seats":  permit.ApprovedSeatingCapacity,
+				},
+			})
+			return
+		}
 	}
 
 	// Create timetable

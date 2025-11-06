@@ -20,7 +20,7 @@ const (
 type TripSchedule struct {
 	ID                   string         `json:"id" db:"id"`
 	BusOwnerID           string         `json:"bus_owner_id" db:"bus_owner_id"`
-	PermitID             string         `json:"permit_id" db:"permit_id"`
+	PermitID             *string        `json:"permit_id,omitempty" db:"permit_id"`               // Optional - assigned later to specific trips
 	CustomRouteID        *string        `json:"custom_route_id,omitempty" db:"custom_route_id"`       // NEW: Reference to bus_owner_routes
 	BusID                *string        `json:"bus_id,omitempty" db:"bus_id"`
 	ScheduleName         *string        `json:"schedule_name,omitempty" db:"schedule_name"`
@@ -53,7 +53,7 @@ type TripSchedule struct {
 // CreateTimetableRequest represents the request to create a new timetable (trip schedule)
 type CreateTimetableRequest struct {
 	CustomRouteID        string   `json:"custom_route_id" binding:"required"`
-	PermitID             string   `json:"permit_id" binding:"required"`
+	PermitID             *string  `json:"permit_id,omitempty"`  // Optional - assigned later to specific trips
 	ScheduleName         *string  `json:"schedule_name,omitempty"`
 	DepartureTime        string   `json:"departure_time" binding:"required"`
 	EstimatedArrivalTime *string  `json:"estimated_arrival_time,omitempty"`
