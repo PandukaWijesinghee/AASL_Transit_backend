@@ -12,12 +12,14 @@ import (
 )
 
 type BusOwnerRouteHandler struct {
-	routeRepo *database.BusOwnerRouteRepository
+	routeRepo    *database.BusOwnerRouteRepository
+	busOwnerRepo *database.BusOwnerRepository
 }
 
-func NewBusOwnerRouteHandler(routeRepo *database.BusOwnerRouteRepository) *BusOwnerRouteHandler {
+func NewBusOwnerRouteHandler(routeRepo *database.BusOwnerRouteRepository, busOwnerRepo *database.BusOwnerRepository) *BusOwnerRouteHandler {
 	return &BusOwnerRouteHandler{
-		routeRepo: routeRepo,
+		routeRepo:    routeRepo,
+		busOwnerRepo: busOwnerRepo,
 	}
 }
 
@@ -37,8 +39,21 @@ func (h *BusOwnerRouteHandler) CreateRoute(c *gin.Context) {
 	}
 
 	// Log the request for debugging
-	log.Printf("🚌 [BUS OWNER ROUTE] CreateRoute - BusOwner: %s, MasterRoute: %s, Name: %s, Direction: %s, Stops: %d",
+	log.Printf("🚌 [BUS OWNER ROUTE] CreateRoute - User: %s, MasterRoute: %s, Name: %s, Direction: %s, Stops: %d",
 		userCtx.UserID.String(), req.MasterRouteID, req.CustomRouteName, req.Direction, len(req.SelectedStopIDs))
+
+	// Get bus owner record by user_id
+	log.Printf("🔍 [BUS OWNER ROUTE] Fetching bus owner for user: %s", userCtx.UserID.String())
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		log.Printf("❌ [BUS OWNER ROUTE] Failed to find bus owner: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "Bus owner profile not found",
+			"details": "Please complete your bus owner registration first",
+		})
+		return
+	}
+	log.Printf("✅ [BUS OWNER ROUTE] Found bus owner: %s", busOwner.ID)
 
 	// Validate request
 	if err := req.Validate(); err != nil {
@@ -97,7 +112,7 @@ func (h *BusOwnerRouteHandler) CreateRoute(c *gin.Context) {
 	log.Printf("💾 [BUS OWNER ROUTE] Creating route in database...")
 	route := &models.BusOwnerRoute{
 		ID:              uuid.New().String(),
-		BusOwnerID:      userCtx.UserID.String(),
+		BusOwnerID:      busOwner.ID, // Use bus_owners.id, not users.id
 		MasterRouteID:   req.MasterRouteID,
 		CustomRouteName: req.CustomRouteName,
 		Direction:       req.Direction,
@@ -126,7 +141,17 @@ func (h *BusOwnerRouteHandler) GetRoutes(c *gin.Context) {
 		return
 	}
 
-	routes, err := h.routeRepo.GetByBusOwnerID(userCtx.UserID.String())
+	// Get bus owner record by user_id
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "Bus owner profile not found",
+			"details": "Please complete your bus owner registration first",
+		})
+		return
+	}
+
+	routes, err := h.routeRepo.GetByBusOwnerID(busOwner.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch routes"})
 		return
@@ -155,8 +180,15 @@ func (h *BusOwnerRouteHandler) GetRouteByID(c *gin.Context) {
 		return
 	}
 
+	// Get bus owner to verify ownership
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
+		return
+	}
+
 	// Verify ownership
-	if route.BusOwnerID != userCtx.UserID.String() {
+	if route.BusOwnerID != busOwner.ID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
@@ -175,7 +207,14 @@ func (h *BusOwnerRouteHandler) GetRoutesByMasterRoute(c *gin.Context) {
 
 	masterRouteID := c.Param("master_route_id")
 
-	routes, err := h.routeRepo.GetByMasterRouteID(userCtx.UserID.String(), masterRouteID)
+	// Get bus owner record by user_id
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
+		return
+	}
+
+	routes, err := h.routeRepo.GetByMasterRouteID(busOwner.ID, masterRouteID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch routes"})
 		return
@@ -211,8 +250,15 @@ func (h *BusOwnerRouteHandler) UpdateRoute(c *gin.Context) {
 		return
 	}
 
+	// Get bus owner to verify ownership
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
+		return
+	}
+
 	// Verify ownership
-	if existingRoute.BusOwnerID != userCtx.UserID.String() {
+	if existingRoute.BusOwnerID != busOwner.ID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
@@ -269,7 +315,14 @@ func (h *BusOwnerRouteHandler) DeleteRoute(c *gin.Context) {
 
 	routeID := c.Param("id")
 
-	if err := h.routeRepo.Delete(routeID, userCtx.UserID.String()); err != nil {
+	// Get bus owner record by user_id
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
+		return
+	}
+
+	if err := h.routeRepo.Delete(routeID, busOwner.ID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete route"})
 		return
 	}

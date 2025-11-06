@@ -205,7 +205,7 @@ func main() {
 
 	// Initialize bus owner route repository and handler
 	busOwnerRouteRepo := database.NewBusOwnerRouteRepository(db)
-	busOwnerRouteHandler := handlers.NewBusOwnerRouteHandler(busOwnerRouteRepo)
+	busOwnerRouteHandler := handlers.NewBusOwnerRouteHandler(busOwnerRouteRepo, ownerRepository)
 
 	// Initialize lounge owner, lounge, staff, and admin handlers
 	logger.Info("🔍 DEBUG: Initializing lounge handlers...")
