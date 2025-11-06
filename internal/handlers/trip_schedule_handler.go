@@ -14,12 +14,12 @@ import (
 )
 
 type TripScheduleHandler struct {
-	scheduleRepo      *database.TripScheduleRepository
-	permitRepo        *database.RoutePermitRepository
-	busOwnerRepo      *database.BusOwnerRepository
-	busRepo           *database.BusRepository
-	routeRepo         *database.BusOwnerRouteRepository
-	tripGeneratorSvc  *services.TripGeneratorService
+	scheduleRepo     *database.TripScheduleRepository
+	permitRepo       *database.RoutePermitRepository
+	busOwnerRepo     *database.BusOwnerRepository
+	busRepo          *database.BusRepository
+	routeRepo        *database.BusOwnerRouteRepository
+	tripGeneratorSvc *services.TripGeneratorService
 }
 
 func NewTripScheduleHandler(
@@ -254,10 +254,11 @@ func (h *TripScheduleHandler) CreateSchedule(c *gin.Context) {
 	}
 
 	// Create schedule
+	permitID := req.PermitID
 	schedule := &models.TripSchedule{
 		ID:                   uuid.New().String(),
 		BusOwnerID:           busOwner.ID,
-		PermitID:             req.PermitID,
+		PermitID:             &permitID,
 		BusID:                req.BusID,
 		ScheduleName:         req.ScheduleName,
 		RecurrenceType:       models.RecurrenceType(req.RecurrenceType),

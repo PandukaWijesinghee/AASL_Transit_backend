@@ -11,9 +11,9 @@ import (
 
 // TripGeneratorService handles automatic generation of scheduled trips from schedules
 type TripGeneratorService struct {
-	scheduleRepo     *database.TripScheduleRepository
+	scheduleRepo      *database.TripScheduleRepository
 	scheduledTripRepo *database.ScheduledTripRepository
-	busRepo          *database.BusRepository
+	busRepo           *database.BusRepository
 }
 
 // NewTripGeneratorService creates a new TripGeneratorService
@@ -23,9 +23,9 @@ func NewTripGeneratorService(
 	busRepo *database.BusRepository,
 ) *TripGeneratorService {
 	return &TripGeneratorService{
-		scheduleRepo:     scheduleRepo,
+		scheduleRepo:      scheduleRepo,
 		scheduledTripRepo: scheduledTripRepo,
-		busRepo:          busRepo,
+		busRepo:           busRepo,
 	}
 }
 
@@ -78,11 +78,15 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 
 			// Create scheduled trip
 			scheduleID := schedule.ID
+			permitID := ""
+			if schedule.PermitID != nil {
+				permitID = *schedule.PermitID
+			}
 			trip := &models.ScheduledTrip{
 				ID:                   uuid.New().String(),
 				TripScheduleID:       &scheduleID,
 				CustomRouteID:        schedule.CustomRouteID,
-				PermitID:             schedule.PermitID,
+				PermitID:             permitID,
 				BusID:                schedule.BusID,
 				TripDate:             currentDate,
 				DepartureTime:        schedule.DepartureTime,
@@ -182,11 +186,15 @@ func (s *TripGeneratorService) GenerateFutureTrips() (int, error) {
 
 			// Create scheduled trip
 			scheduleID := timetable.ID
+			permitID := ""
+			if timetable.PermitID != nil {
+				permitID = *timetable.PermitID
+			}
 			trip := &models.ScheduledTrip{
 				ID:                   uuid.New().String(),
 				TripScheduleID:       &scheduleID,
 				CustomRouteID:        timetable.CustomRouteID,
-				PermitID:             timetable.PermitID,
+				PermitID:             permitID,
 				BusID:                timetable.BusID,
 				TripDate:             date,
 				DepartureTime:        timetable.DepartureTime,
@@ -274,12 +282,12 @@ func (s *TripGeneratorService) FillMissingTrips() (int, error) {
 
 // GetGenerationStats returns statistics about trip generation
 type GenerationStats struct {
-	TotalSchedules     int       `json:"total_schedules"`
-	ActiveSchedules    int       `json:"active_schedules"`
-	TripsGenerated     int       `json:"trips_generated"`
-	NextRunDate        time.Time `json:"next_run_date"`
-	LastRunDate        time.Time `json:"last_run_date"`
-	AverageTripPerDay  float64   `json:"average_trips_per_day"`
+	TotalSchedules    int       `json:"total_schedules"`
+	ActiveSchedules   int       `json:"active_schedules"`
+	TripsGenerated    int       `json:"trips_generated"`
+	NextRunDate       time.Time `json:"next_run_date"`
+	LastRunDate       time.Time `json:"last_run_date"`
+	AverageTripPerDay float64   `json:"average_trips_per_day"`
 }
 
 // GetStats returns generation statistics

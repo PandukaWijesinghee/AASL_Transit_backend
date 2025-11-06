@@ -170,7 +170,7 @@ func testOTPService(db database.DB) {
 	phone := "0771234567"
 
 	// Generate OTP
-	otp, err := otpService.GenerateOTP(phone)
+	otp, err := otpService.GenerateOTP(phone, "127.0.0.1", "test-client")
 	if err != nil {
 		fmt.Printf("  ❌ Failed to generate OTP: %v\n", err)
 		return
