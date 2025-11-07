@@ -82,11 +82,10 @@ func (r *ScheduledTripRepository) GetByScheduleAndDate(scheduleID string, date t
 // GetByDateRange retrieves scheduled trips within a date range
 func (r *ScheduledTripRepository) GetByDateRange(startDate, endDate time.Time) ([]models.ScheduledTrip, error) {
 	query := `
-		SELECT id, trip_schedule_id, permit_id, bus_id, trip_date, departure_time,
+		SELECT id, trip_schedule_id, permit_id, trip_date, departure_time,
 			   estimated_arrival_time, assigned_driver_id, assigned_conductor_id,
-			   is_bookable, total_seats, available_seats, booked_seats,
-			   base_fare, status, cancellation_reason, cancelled_at,
-			   selected_stop_ids, created_at, updated_at
+			   is_bookable, base_fare, status, cancellation_reason, cancelled_at,
+			   created_at, updated_at, is_published
 		FROM scheduled_trips
 		WHERE trip_date BETWEEN $1 AND $2
 		ORDER BY trip_date, departure_time
@@ -251,19 +250,18 @@ func (r *ScheduledTripRepository) Cancel(tripID string, reason string) error {
 // scanTrip scans a single trip
 func (r *ScheduledTripRepository) scanTrip(row scanner) (*models.ScheduledTrip, error) {
 	trip := &models.ScheduledTrip{}
-	var busID sql.NullString
 	var estimatedArrivalTime sql.NullString
 	var assignedDriverID sql.NullString
 	var assignedConductorID sql.NullString
 	var cancellationReason sql.NullString
 	var cancelledAt sql.NullTime
+	var isPublished sql.NullBool
 
 	err := row.Scan(
-		&trip.ID, &trip.TripScheduleID, &trip.PermitID, &busID, &trip.TripDate, &trip.DepartureTime,
+		&trip.ID, &trip.TripScheduleID, &trip.PermitID, &trip.TripDate, &trip.DepartureTime,
 		&estimatedArrivalTime, &assignedDriverID, &assignedConductorID,
-		&trip.IsBookable, &trip.TotalSeats, &trip.AvailableSeats, &trip.BookedSeats,
-		&trip.BaseFare, &trip.Status, &cancellationReason, &cancelledAt,
-		&trip.SelectedStopIDs, &trip.CreatedAt, &trip.UpdatedAt,
+		&trip.IsBookable, &trip.BaseFare, &trip.Status, &cancellationReason, &cancelledAt,
+		&trip.CreatedAt, &trip.UpdatedAt, &isPublished,
 	)
 
 	if err != nil {
@@ -271,9 +269,6 @@ func (r *ScheduledTripRepository) scanTrip(row scanner) (*models.ScheduledTrip, 
 	}
 
 	// Convert sql.Null* types
-	if busID.Valid {
-		trip.BusID = &busID.String
-	}
 	if estimatedArrivalTime.Valid {
 		trip.EstimatedArrivalTime = &estimatedArrivalTime.String
 	}
@@ -289,6 +284,11 @@ func (r *ScheduledTripRepository) scanTrip(row scanner) (*models.ScheduledTrip, 
 	if cancelledAt.Valid {
 		trip.CancelledAt = &cancelledAt.Time
 	}
+	if isPublished.Valid {
+		trip.IsPublished = isPublished.Bool
+	} else {
+		trip.IsPublished = true // Default to true if NULL
+	}
 
 	return trip, nil
 }
@@ -299,19 +299,18 @@ func (r *ScheduledTripRepository) scanTrips(rows *sql.Rows) ([]models.ScheduledT
 
 	for rows.Next() {
 		var trip models.ScheduledTrip
-		var busID sql.NullString
 		var estimatedArrivalTime sql.NullString
 		var assignedDriverID sql.NullString
 		var assignedConductorID sql.NullString
 		var cancellationReason sql.NullString
 		var cancelledAt sql.NullTime
+		var isPublished sql.NullBool
 
 		err := rows.Scan(
-			&trip.ID, &trip.TripScheduleID, &trip.PermitID, &busID, &trip.TripDate, &trip.DepartureTime,
+			&trip.ID, &trip.TripScheduleID, &trip.PermitID, &trip.TripDate, &trip.DepartureTime,
 			&estimatedArrivalTime, &assignedDriverID, &assignedConductorID,
-			&trip.IsBookable, &trip.TotalSeats, &trip.AvailableSeats, &trip.BookedSeats,
-			&trip.BaseFare, &trip.Status, &cancellationReason, &cancelledAt,
-			&trip.SelectedStopIDs, &trip.CreatedAt, &trip.UpdatedAt,
+			&trip.IsBookable, &trip.BaseFare, &trip.Status, &cancellationReason, &cancelledAt,
+			&trip.CreatedAt, &trip.UpdatedAt, &isPublished,
 		)
 
 		if err != nil {
@@ -319,9 +318,6 @@ func (r *ScheduledTripRepository) scanTrips(rows *sql.Rows) ([]models.ScheduledT
 		}
 
 		// Convert sql.Null* types
-		if busID.Valid {
-			trip.BusID = &busID.String
-		}
 		if estimatedArrivalTime.Valid {
 			trip.EstimatedArrivalTime = &estimatedArrivalTime.String
 		}
@@ -336,6 +332,11 @@ func (r *ScheduledTripRepository) scanTrips(rows *sql.Rows) ([]models.ScheduledT
 		}
 		if cancelledAt.Valid {
 			trip.CancelledAt = &cancelledAt.Time
+		}
+		if isPublished.Valid {
+			trip.IsPublished = isPublished.Bool
+		} else {
+			trip.IsPublished = true // Default to true if NULL
 		}
 
 		trips = append(trips, trip)
