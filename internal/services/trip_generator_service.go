@@ -14,6 +14,7 @@ type TripGeneratorService struct {
 	scheduleRepo      *database.TripScheduleRepository
 	scheduledTripRepo *database.ScheduledTripRepository
 	busRepo           *database.BusRepository
+	settingsRepo      *database.SystemSettingRepository
 }
 
 // NewTripGeneratorService creates a new TripGeneratorService
@@ -21,11 +22,13 @@ func NewTripGeneratorService(
 	scheduleRepo *database.TripScheduleRepository,
 	scheduledTripRepo *database.ScheduledTripRepository,
 	busRepo *database.BusRepository,
+	settingsRepo *database.SystemSettingRepository,
 ) *TripGeneratorService {
 	return &TripGeneratorService{
 		scheduleRepo:      scheduleRepo,
 		scheduledTripRepo: scheduledTripRepo,
 		busRepo:           busRepo,
+		settingsRepo:      settingsRepo,
 	}
 }
 
@@ -118,7 +121,8 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 	return generated, nil
 }
 
-// GenerateTripsForNewSchedule generates trips for a newly created schedule (next 14 days)
+// GenerateTripsForNewSchedule generates trips for a newly created schedule
+// Uses trip_generation_days_ahead from system_settings (default: 7 days)
 func (s *TripGeneratorService) GenerateTripsForNewSchedule(schedule *models.TripSchedule) (int, error) {
 	startDate := time.Now()
 
@@ -127,8 +131,11 @@ func (s *TripGeneratorService) GenerateTripsForNewSchedule(schedule *models.Trip
 		startDate = schedule.ValidFrom
 	}
 
-	// Generate for next 14 days
-	endDate := startDate.AddDate(0, 0, 14)
+	// Get days ahead from system settings (default: 7)
+	daysAhead := s.settingsRepo.GetIntValue("trip_generation_days_ahead", 7)
+
+	// Generate for configured days ahead
+	endDate := startDate.AddDate(0, 0, daysAhead)
 
 	// Don't exceed valid_until
 	if schedule.ValidUntil != nil && endDate.After(*schedule.ValidUntil) {
@@ -226,6 +233,7 @@ func (s *TripGeneratorService) GenerateFutureTrips() (int, error) {
 
 // RegenerateTripsForSchedule regenerates trips for a schedule (useful after updates)
 // Regenerates only future trips that haven't started yet
+// Uses trip_generation_days_ahead from system_settings (default: 7 days)
 func (s *TripGeneratorService) RegenerateTripsForSchedule(schedule *models.TripSchedule) (int, error) {
 	startDate := time.Now()
 
@@ -234,8 +242,11 @@ func (s *TripGeneratorService) RegenerateTripsForSchedule(schedule *models.TripS
 		startDate = schedule.ValidFrom
 	}
 
-	// Generate for next 14 days
-	endDate := startDate.AddDate(0, 0, 14)
+	// Get days ahead from system settings (default: 7)
+	daysAhead := s.settingsRepo.GetIntValue("trip_generation_days_ahead", 7)
+
+	// Generate for configured days ahead
+	endDate := startDate.AddDate(0, 0, daysAhead)
 
 	// Don't exceed valid_until
 	if schedule.ValidUntil != nil && endDate.After(*schedule.ValidUntil) {
@@ -256,9 +267,13 @@ func (s *TripGeneratorService) CleanupOldTrips(daysToKeep int) error {
 
 // FillMissingTrips scans for any gaps in scheduled trips and fills them
 // Useful for recovering from downtime or errors
+// Uses trip_generation_days_ahead from system_settings for range
 func (s *TripGeneratorService) FillMissingTrips() (int, error) {
 	startDate := time.Now()
-	endDate := startDate.AddDate(0, 0, 30)
+
+	// Get days ahead from system settings (default: 7)
+	daysAhead := s.settingsRepo.GetIntValue("trip_generation_days_ahead", 7)
+	endDate := startDate.AddDate(0, 0, daysAhead)
 
 	schedules, err := s.scheduleRepo.GetActiveSchedulesForDate(startDate)
 	if err != nil {
@@ -268,7 +283,18 @@ func (s *TripGeneratorService) FillMissingTrips() (int, error) {
 	totalGenerated := 0
 
 	for _, schedule := range schedules {
-		generated, err := s.GenerateTripsForSchedule(&schedule, startDate, endDate)
+		// Respect schedule's valid_from and valid_until
+		scheduleStartDate := startDate
+		if schedule.ValidFrom.After(startDate) {
+			scheduleStartDate = schedule.ValidFrom
+		}
+
+		scheduleEndDate := endDate
+		if schedule.ValidUntil != nil && endDate.After(*schedule.ValidUntil) {
+			scheduleEndDate = *schedule.ValidUntil
+		}
+
+		generated, err := s.GenerateTripsForSchedule(&schedule, scheduleStartDate, scheduleEndDate)
 		if err != nil {
 			fmt.Printf("Error filling missing trips for schedule %s: %v\n", schedule.ID, err)
 			continue

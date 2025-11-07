@@ -119,6 +119,7 @@ func main() {
 		tripScheduleRepo,
 		scheduledTripRepo,
 		busRepository,
+		systemSettingRepo,
 	)
 
 	// Initialize and start cron service
