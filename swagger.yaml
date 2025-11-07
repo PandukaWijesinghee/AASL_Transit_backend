@@ -1539,12 +1539,12 @@ paths:
                   description: Optional descriptive name for the timetable
                 departure_time:
                   type: string
-                  pattern: '^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$'
+                  pattern: "^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
                   example: "09:30"
                   description: Departure time in HH:MM or HH:MM:SS format
                 estimated_arrival_time:
                   type: string
-                  pattern: '^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$'
+                  pattern: "^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
                   example: "15:45"
                   description: Estimated arrival time (optional)
                 base_fare:
@@ -1663,11 +1663,11 @@ paths:
                   description: Trip date (YYYY-MM-DD, cannot be in past)
                 departure_time:
                   type: string
-                  pattern: '^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$'
+                  pattern: "^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
                   example: "10:00"
                 estimated_arrival_time:
                   type: string
-                  pattern: '^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$'
+                  pattern: "^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
                   example: "16:30"
                 base_fare:
                   type: number
@@ -1718,7 +1718,8 @@ paths:
                     format: date
                   status:
                     type: string
-                    enum: [scheduled, confirmed, in_progress, completed, cancelled]
+                    enum:
+                      [scheduled, confirmed, in_progress, completed, cancelled]
         "400":
           description: Bad request - validation failed or trip too soon without bus assignment
           content:
@@ -1938,7 +1939,7 @@ paths:
                   description: Manager's full legal name
                 manager_nic_number:
                   type: string
-                  pattern: '^[0-9]{9}[VXvx]$|^[0-9]{12}$'
+                  pattern: "^[0-9]{9}[VXvx]$|^[0-9]{12}$"
                   example: "200012345678"
                   description: Manager's NIC (one person can manage only one business)
                 manager_email:
@@ -2092,7 +2093,11 @@ paths:
                   items:
                     type: string
                     format: uri
-                  example: ["https://storage.supabase.co/lounge1.jpg", "https://storage.supabase.co/lounge2.jpg"]
+                  example:
+                    [
+                      "https://storage.supabase.co/lounge1.jpg",
+                      "https://storage.supabase.co/lounge2.jpg",
+                    ]
                   description: Array of lounge image URLs
       responses:
         "201":
@@ -2142,7 +2147,14 @@ paths:
                 properties:
                   registration_step:
                     type: string
-                    enum: ["phone_verified", "business_info", "nic_uploaded", "lounge_added", "completed"]
+                    enum:
+                      [
+                        "phone_verified",
+                        "business_info",
+                        "nic_uploaded",
+                        "lounge_added",
+                        "completed",
+                      ]
                     example: "business_info"
                   profile_completed:
                     type: boolean
@@ -2241,7 +2253,14 @@ paths:
                     example: "https://storage.supabase.co/path/to/manager_nic_back.jpg"
                   registration_step:
                     type: string
-                    enum: ["phone_verified", "business_info", "nic_uploaded", "lounge_added", "completed"]
+                    enum:
+                      [
+                        "phone_verified",
+                        "business_info",
+                        "nic_uploaded",
+                        "lounge_added",
+                        "completed",
+                      ]
                     example: "completed"
                   profile_completed:
                     type: boolean
@@ -3742,7 +3761,8 @@ paths:
                   format: uuid
                 status:
                   type: string
-                  enum: [scheduled, confirmed, in_progress, completed, cancelled]
+                  enum:
+                    [scheduled, confirmed, in_progress, completed, cancelled]
       responses:
         "200":
           description: Trip updated successfully
@@ -3754,6 +3774,206 @@ paths:
           description: Trip not found
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/scheduled-trips/{id}/publish:
+    put:
+      summary: Publish a scheduled trip
+      description: Make a scheduled trip visible to passengers for booking. Only the trip owner can publish their trips.
+      operationId: publishScheduledTrip
+      tags:
+        - Scheduled Trips
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the trip to publish
+      responses:
+        "200":
+          description: Trip published successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Trip published successfully"
+                  trip_id:
+                    type: string
+                    format: uuid
+                    example: "123e4567-e89b-12d3-a456-426614174000"
+        "400":
+          description: Invalid trip ID
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Only bus owners can publish trips
+        "404":
+          description: Trip not found or access denied
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/scheduled-trips/{id}/unpublish:
+    put:
+      summary: Unpublish a scheduled trip
+      description: Hide a scheduled trip from passengers (not bookable). Only the trip owner can unpublish their trips.
+      operationId: unpublishScheduledTrip
+      tags:
+        - Scheduled Trips
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the trip to unpublish
+      responses:
+        "200":
+          description: Trip unpublished successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Trip unpublished successfully"
+                  trip_id:
+                    type: string
+                    format: uuid
+                    example: "123e4567-e89b-12d3-a456-426614174000"
+        "400":
+          description: Invalid trip ID
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Only bus owners can unpublish trips
+        "404":
+          description: Trip not found or access denied
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/scheduled-trips/bulk-publish:
+    post:
+      summary: Bulk publish scheduled trips
+      description: Publish multiple scheduled trips at once. Only the trip owner can publish their trips.
+      operationId: bulkPublishScheduledTrips
+      tags:
+        - Scheduled Trips
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - trip_ids
+              properties:
+                trip_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: Array of trip IDs to publish
+                  example:
+                    [
+                      "123e4567-e89b-12d3-a456-426614174000",
+                      "123e4567-e89b-12d3-a456-426614174001",
+                    ]
+      responses:
+        "200":
+          description: Trips published successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Trips published successfully"
+                  published_count:
+                    type: integer
+                    description: Number of trips actually published
+                    example: 5
+                  requested_count:
+                    type: integer
+                    description: Number of trip IDs requested
+                    example: 5
+        "400":
+          description: Invalid request body or no trip IDs provided
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Only bus owners can publish trips
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/scheduled-trips/bulk-unpublish:
+    post:
+      summary: Bulk unpublish scheduled trips
+      description: Unpublish multiple scheduled trips at once. Only the trip owner can unpublish their trips.
+      operationId: bulkUnpublishScheduledTrips
+      tags:
+        - Scheduled Trips
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - trip_ids
+              properties:
+                trip_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: Array of trip IDs to unpublish
+                  example:
+                    [
+                      "123e4567-e89b-12d3-a456-426614174000",
+                      "123e4567-e89b-12d3-a456-426614174001",
+                    ]
+      responses:
+        "200":
+          description: Trips unpublished successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Trips unpublished successfully"
+                  unpublished_count:
+                    type: integer
+                    description: Number of trips actually unpublished
+                    example: 3
+                  requested_count:
+                    type: integer
+                    description: Number of trip IDs requested
+                    example: 3
+        "400":
+          description: Invalid request body or no trip IDs provided
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Only bus owners can unpublish trips
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -3954,7 +4174,11 @@ components:
           type: array
           items:
             type: string
-          example: ["https://example.com/lounge1.jpg", "https://example.com/lounge2.jpg"]
+          example:
+            [
+              "https://example.com/lounge1.jpg",
+              "https://example.com/lounge2.jpg",
+            ]
         status:
           type: string
           enum: [pending, active, inactive, suspended]
@@ -4622,6 +4846,11 @@ components:
         is_bookable:
           type: boolean
           example: true
+          description: Whether this trip accepts passenger bookings
+        is_published:
+          type: boolean
+          example: true
+          description: Whether this trip is visible to passengers (published trips can be viewed and booked)
         total_seats:
           type: integer
           example: 45
@@ -4687,6 +4916,38 @@ components:
               value:
                 error: Unauthorized
                 details: Authorization header required
+
+    Forbidden:
+      description: Forbidden - Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            insufficientPermissions:
+              value:
+                error: Forbidden
+                details: You do not have permission to perform this action
+            roleRequired:
+              value:
+                error: Forbidden
+                details: Only bus owners can access this resource
+
+    NotFound:
+      description: Not Found - Resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            resourceNotFound:
+              value:
+                error: Not Found
+                details: The requested resource does not exist
+            tripNotFound:
+              value:
+                error: Not Found
+                details: Trip not found or access denied
 
     InvalidOtp:
       description: Invalid OTP

@@ -491,6 +491,12 @@ func main() {
 			scheduledTrips.GET("/:id", scheduledTripHandler.GetTripByID)
 			scheduledTrips.PATCH("/:id", scheduledTripHandler.UpdateTrip)
 			scheduledTrips.POST("/:id/cancel", scheduledTripHandler.CancelTrip)
+
+			// NEW: Publish/Unpublish endpoints
+			scheduledTrips.PUT("/:id/publish", scheduledTripHandler.PublishTrip)
+			scheduledTrips.PUT("/:id/unpublish", scheduledTripHandler.UnpublishTrip)
+			scheduledTrips.POST("/bulk-publish", scheduledTripHandler.BulkPublishTrips)
+			scheduledTrips.POST("/bulk-unpublish", scheduledTripHandler.BulkUnpublishTrips)
 		}
 
 		// Permit-specific trip routes

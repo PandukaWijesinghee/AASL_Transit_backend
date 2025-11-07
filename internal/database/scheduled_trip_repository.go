@@ -344,6 +344,118 @@ func (r *ScheduledTripRepository) scanTrips(rows *sql.Rows) ([]models.ScheduledT
 	return trips, rows.Err()
 }
 
+// PublishTrip sets is_published to true for a specific trip
+func (r *ScheduledTripRepository) PublishTrip(tripID string, busOwnerID string) error {
+	query := `
+		UPDATE scheduled_trips st
+		SET is_published = true, updated_at = NOW()
+		FROM trip_schedules ts
+		WHERE st.id = $1
+		  AND st.trip_schedule_id = ts.id
+		  AND ts.bus_owner_id = $2
+	`
+
+	result, err := r.db.Exec(query, tripID, busOwnerID)
+	if err != nil {
+		return fmt.Errorf("failed to publish trip: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("trip not found or unauthorized")
+	}
+
+	return nil
+}
+
+// UnpublishTrip sets is_published to false for a specific trip
+func (r *ScheduledTripRepository) UnpublishTrip(tripID string, busOwnerID string) error {
+	query := `
+		UPDATE scheduled_trips st
+		SET is_published = false, updated_at = NOW()
+		FROM trip_schedules ts
+		WHERE st.id = $1
+		  AND st.trip_schedule_id = ts.id
+		  AND ts.bus_owner_id = $2
+	`
+
+	result, err := r.db.Exec(query, tripID, busOwnerID)
+	if err != nil {
+		return fmt.Errorf("failed to unpublish trip: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("trip not found or unauthorized")
+	}
+
+	return nil
+}
+
+// BulkPublishTrips publishes multiple trips at once
+func (r *ScheduledTripRepository) BulkPublishTrips(tripIDs []string, busOwnerID string) (int, error) {
+	if len(tripIDs) == 0 {
+		return 0, fmt.Errorf("no trip IDs provided")
+	}
+
+	query := `
+		UPDATE scheduled_trips st
+		SET is_published = true, updated_at = NOW()
+		FROM trip_schedules ts
+		WHERE st.id = ANY($1)
+		  AND st.trip_schedule_id = ts.id
+		  AND ts.bus_owner_id = $2
+	`
+
+	result, err := r.db.Exec(query, tripIDs, busOwnerID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to bulk publish trips: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return int(rowsAffected), nil
+}
+
+// BulkUnpublishTrips unpublishes multiple trips at once
+func (r *ScheduledTripRepository) BulkUnpublishTrips(tripIDs []string, busOwnerID string) (int, error) {
+	if len(tripIDs) == 0 {
+		return 0, fmt.Errorf("no trip IDs provided")
+	}
+
+	query := `
+		UPDATE scheduled_trips st
+		SET is_published = false, updated_at = NOW()
+		FROM trip_schedules ts
+		WHERE st.id = ANY($1)
+		  AND st.trip_schedule_id = ts.id
+		  AND ts.bus_owner_id = $2
+	`
+
+	result, err := r.db.Exec(query, tripIDs, busOwnerID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to bulk unpublish trips: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return int(rowsAffected), nil
+}
+
 // scanner interface for QueryRow and Rows
 type scanner interface {
 	Scan(dest ...interface{}) error

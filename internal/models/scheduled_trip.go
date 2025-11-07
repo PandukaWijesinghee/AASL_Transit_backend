@@ -29,11 +29,12 @@ type ScheduledTrip struct {
 	AssignedDriverID     *string             `json:"assigned_driver_id,omitempty" db:"assigned_driver_id"`
 	AssignedConductorID  *string             `json:"assigned_conductor_id,omitempty" db:"assigned_conductor_id"`
 	IsBookable           bool                `json:"is_bookable" db:"is_bookable"`
+	IsPublished          bool                `json:"is_published" db:"is_published"` // NEW: Controls passenger visibility
 	TotalSeats           int                 `json:"total_seats" db:"total_seats"`
 	AvailableSeats       int                 `json:"available_seats" db:"available_seats"`
 	BookedSeats          int                 `json:"booked_seats" db:"booked_seats"`
 	BaseFare             float64             `json:"base_fare" db:"base_fare"`
-	BookingAdvanceHours  int                 `json:"booking_advance_hours" db:"booking_advance_hours"` // NEW: Hours before trip that booking opens
+	BookingAdvanceHours  int                 `json:"booking_advance_hours" db:"booking_advance_hours"`       // NEW: Hours before trip that booking opens
 	AssignmentDeadline   *time.Time          `json:"assignment_deadline,omitempty" db:"assignment_deadline"` // NEW: Deadline to assign resources
 	Status               ScheduledTripStatus `json:"status" db:"status"`
 	CancellationReason   *string             `json:"cancellation_reason,omitempty" db:"cancellation_reason"`
@@ -56,9 +57,9 @@ type CreateScheduledTripRequest struct {
 type CreateSpecialTripRequest struct {
 	CustomRouteID        string  `json:"custom_route_id" binding:"required"`
 	PermitID             string  `json:"permit_id" binding:"required"`
-	TripDate             string  `json:"trip_date" binding:"required"`              // YYYY-MM-DD
-	DepartureTime        string  `json:"departure_time" binding:"required"`         // HH:MM or HH:MM:SS
-	EstimatedArrivalTime *string `json:"estimated_arrival_time,omitempty"`         // HH:MM or HH:MM:SS
+	TripDate             string  `json:"trip_date" binding:"required"`      // YYYY-MM-DD
+	DepartureTime        string  `json:"departure_time" binding:"required"` // HH:MM or HH:MM:SS
+	EstimatedArrivalTime *string `json:"estimated_arrival_time,omitempty"`  // HH:MM or HH:MM:SS
 	BaseFare             float64 `json:"base_fare" binding:"required,gt=0"`
 	MaxBookableSeats     int     `json:"max_bookable_seats" binding:"required,gt=0"`
 	IsBookable           bool    `json:"is_bookable"`

@@ -12,13 +12,13 @@ import (
 )
 
 type ScheduledTripHandler struct {
-	tripRepo      *database.ScheduledTripRepository
-	scheduleRepo  *database.TripScheduleRepository
-	permitRepo    *database.RoutePermitRepository
-	busOwnerRepo  *database.BusOwnerRepository
-	routeRepo     *database.BusOwnerRouteRepository
-	busRepo       *database.BusRepository
-	settingRepo   *database.SystemSettingRepository
+	tripRepo     *database.ScheduledTripRepository
+	scheduleRepo *database.TripScheduleRepository
+	permitRepo   *database.RoutePermitRepository
+	busOwnerRepo *database.BusOwnerRepository
+	routeRepo    *database.BusOwnerRouteRepository
+	busRepo      *database.BusRepository
+	settingRepo  *database.SystemSettingRepository
 }
 
 func NewScheduledTripHandler(
@@ -572,4 +572,184 @@ func (h *ScheduledTripHandler) CreateSpecialTrip(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, trip)
+}
+
+// PublishTrip publishes a single scheduled trip
+// PUT /api/v1/scheduled-trips/:id/publish
+func (h *ScheduledTripHandler) PublishTrip(c *gin.Context) {
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	tripID := c.Param("id")
+	if tripID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Trip ID is required"})
+		return
+	}
+
+	// Get bus owner
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Only bus owners can publish trips"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bus owner"})
+		return
+	}
+
+	// Publish the trip
+	if err := h.tripRepo.PublishTrip(tripID, busOwner.ID); err != nil {
+		if err.Error() == "trip not found or unauthorized" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Trip not found or access denied"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish trip"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Trip published successfully",
+		"trip_id": tripID,
+	})
+}
+
+// UnpublishTrip unpublishes a single scheduled trip
+// PUT /api/v1/scheduled-trips/:id/unpublish
+func (h *ScheduledTripHandler) UnpublishTrip(c *gin.Context) {
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	tripID := c.Param("id")
+	if tripID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Trip ID is required"})
+		return
+	}
+
+	// Get bus owner
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Only bus owners can unpublish trips"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bus owner"})
+		return
+	}
+
+	// Unpublish the trip
+	if err := h.tripRepo.UnpublishTrip(tripID, busOwner.ID); err != nil {
+		if err.Error() == "trip not found or unauthorized" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Trip not found or access denied"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unpublish trip"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Trip unpublished successfully",
+		"trip_id": tripID,
+	})
+}
+
+// BulkPublishTrips publishes multiple scheduled trips at once
+// POST /api/v1/scheduled-trips/bulk-publish
+func (h *ScheduledTripHandler) BulkPublishTrips(c *gin.Context) {
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req struct {
+		TripIDs []string `json:"trip_ids" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	if len(req.TripIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one trip ID is required"})
+		return
+	}
+
+	// Get bus owner
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Only bus owners can publish trips"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bus owner"})
+		return
+	}
+
+	// Bulk publish trips
+	publishedCount, err := h.tripRepo.BulkPublishTrips(req.TripIDs, busOwner.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish trips"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":         "Trips published successfully",
+		"published_count": publishedCount,
+		"requested_count": len(req.TripIDs),
+	})
+}
+
+// BulkUnpublishTrips unpublishes multiple scheduled trips at once
+// POST /api/v1/scheduled-trips/bulk-unpublish
+func (h *ScheduledTripHandler) BulkUnpublishTrips(c *gin.Context) {
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req struct {
+		TripIDs []string `json:"trip_ids" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	if len(req.TripIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one trip ID is required"})
+		return
+	}
+
+	// Get bus owner
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Only bus owners can unpublish trips"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bus owner"})
+		return
+	}
+
+	// Bulk unpublish trips
+	unpublishedCount, err := h.tripRepo.BulkUnpublishTrips(req.TripIDs, busOwner.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unpublish trips"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":           "Trips unpublished successfully",
+		"unpublished_count": unpublishedCount,
+		"requested_count":   len(req.TripIDs),
+	})
 }
