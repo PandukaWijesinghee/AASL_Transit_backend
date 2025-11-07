@@ -4797,9 +4797,6 @@ components:
         - permit_id
         - trip_date
         - departure_time
-        - total_seats
-        - available_seats
-        - booked_seats
         - base_fare
         - status
       properties:
@@ -4815,10 +4812,6 @@ components:
           type: string
           format: uuid
           example: "c2eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
-        bus_id:
-          type: string
-          format: uuid
-          example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
         trip_date:
           type: string
           format: date
@@ -4851,15 +4844,6 @@ components:
           type: boolean
           example: true
           description: Whether this trip is visible to passengers (published trips can be viewed and booked)
-        total_seats:
-          type: integer
-          example: 45
-        available_seats:
-          type: integer
-          example: 30
-        booked_seats:
-          type: integer
-          example: 15
         base_fare:
           type: number
           format: double
