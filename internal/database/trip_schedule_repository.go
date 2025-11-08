@@ -144,11 +144,11 @@ func (r *TripScheduleRepository) GetByID(scheduleID string) (*models.TripSchedul
 // GetByBusOwnerID retrieves all trip schedules for a bus owner
 func (r *TripScheduleRepository) GetByBusOwnerID(busOwnerID string) ([]models.TripSchedule, error) {
 	query := `
-		SELECT id, bus_owner_id, permit_id, bus_id, schedule_name,
-			   recurrence_type, recurrence_days, specific_dates, departure_time,
-			   base_fare, is_bookable, max_bookable_seats, advance_booking_hours,
-			   default_driver_id, default_conductor_id, selected_stop_ids,
-			   is_active, valid_from, valid_until, notes,
+		SELECT id, bus_owner_id, bus_owner_route_id, schedule_name,
+			   recurrence_type, recurrence_days, recurrence_interval, 
+			   departure_time, estimated_arrival_time,
+			   base_fare, is_active, notes,
+			   valid_from, valid_until, specific_dates,
 			   created_at, updated_at
 		FROM trip_schedules
 		WHERE bus_owner_id = $1
@@ -303,20 +303,20 @@ func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSch
 
 	for rows.Next() {
 		var schedule models.TripSchedule
-		var busID sql.NullString
+		var customRouteID sql.NullString
 		var scheduleName sql.NullString
-		var maxBookableSeats sql.NullInt64
-		var defaultDriverID sql.NullString
-		var defaultConductorID sql.NullString
+		var recurrenceInterval sql.NullInt64
+		var estimatedArrivalTime sql.NullString
+		var validFrom sql.NullTime
 		var validUntil sql.NullTime
 		var notes sql.NullString
 
 		err := rows.Scan(
-			&schedule.ID, &schedule.BusOwnerID, &schedule.PermitID, &busID, &scheduleName,
-			&schedule.RecurrenceType, &schedule.RecurrenceDays, &schedule.SpecificDates, &schedule.DepartureTime,
-			&schedule.BaseFare, &schedule.IsBookable, &maxBookableSeats, &schedule.AdvanceBookingHours,
-			&defaultDriverID, &defaultConductorID, &schedule.SelectedStopIDs,
-			&schedule.IsActive, &schedule.ValidFrom, &validUntil, &notes,
+			&schedule.ID, &schedule.BusOwnerID, &customRouteID, &scheduleName,
+			&schedule.RecurrenceType, &schedule.RecurrenceDays, &recurrenceInterval,
+			&schedule.DepartureTime, &estimatedArrivalTime,
+			&schedule.BaseFare, &schedule.IsActive, &notes,
+			&validFrom, &validUntil, &schedule.SpecificDates,
 			&schedule.CreatedAt, &schedule.UpdatedAt,
 		)
 
@@ -325,21 +325,21 @@ func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSch
 		}
 
 		// Convert sql.Null* types
-		if busID.Valid {
-			schedule.BusID = &busID.String
+		if customRouteID.Valid {
+			schedule.CustomRouteID = &customRouteID.String
 		}
 		if scheduleName.Valid {
 			schedule.ScheduleName = &scheduleName.String
 		}
-		if maxBookableSeats.Valid {
-			seats := int(maxBookableSeats.Int64)
-			schedule.MaxBookableSeats = &seats
+		if recurrenceInterval.Valid {
+			interval := int(recurrenceInterval.Int64)
+			schedule.RecurrenceInterval = &interval
 		}
-		if defaultDriverID.Valid {
-			schedule.DefaultDriverID = &defaultDriverID.String
+		if estimatedArrivalTime.Valid {
+			schedule.EstimatedArrivalTime = &estimatedArrivalTime.String
 		}
-		if defaultConductorID.Valid {
-			schedule.DefaultConductorID = &defaultConductorID.String
+		if validFrom.Valid {
+			schedule.ValidFrom = validFrom.Time
 		}
 		if validUntil.Valid {
 			schedule.ValidUntil = &validUntil.Time
@@ -351,7 +351,11 @@ func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSch
 		schedules = append(schedules, schedule)
 	}
 
-	return schedules, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return schedules, nil
 }
 
 // scanTimetables scans multiple timetables from rows (new system)
