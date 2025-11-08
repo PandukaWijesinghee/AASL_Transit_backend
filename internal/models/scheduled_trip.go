@@ -56,7 +56,7 @@ type CreateScheduledTripRequest struct {
 // CreateSpecialTripRequest represents the request to create a special one-time trip (no timetable)
 type CreateSpecialTripRequest struct {
 	CustomRouteID        string  `json:"custom_route_id" binding:"required"`
-	PermitID             *string `json:"permit_id,omitempty"` // Changed to pointer for nullable
+	PermitID             *string `json:"permit_id,omitempty"`               // Changed to pointer for nullable
 	TripDate             string  `json:"trip_date" binding:"required"`      // YYYY-MM-DD
 	DepartureTime        string  `json:"departure_time" binding:"required"` // HH:MM or HH:MM:SS
 	EstimatedArrivalTime *string `json:"estimated_arrival_time,omitempty"`  // HH:MM or HH:MM:SS

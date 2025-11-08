@@ -78,9 +78,9 @@ func (r *ScheduledTripRepository) GetByScheduleAndDate(scheduleID string, date t
 
 // GetByScheduleIDsAndDateRange retrieves trips for specific schedule IDs within a date range
 func (r *ScheduledTripRepository) GetByScheduleIDsAndDateRange(scheduleIDs []string, startDate, endDate time.Time) ([]models.ScheduledTrip, error) {
-	fmt.Printf("🔍 REPO: GetByScheduleIDsAndDateRange called with %d schedule IDs, dates: %s to %s\n", 
+	fmt.Printf("🔍 REPO: GetByScheduleIDsAndDateRange called with %d schedule IDs, dates: %s to %s\n",
 		len(scheduleIDs), startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
-	
+
 	if len(scheduleIDs) == 0 {
 		fmt.Println("⚠️  REPO: No schedule IDs provided, returning empty array")
 		return []models.ScheduledTrip{}, nil
@@ -106,7 +106,7 @@ func (r *ScheduledTripRepository) GetByScheduleIDsAndDateRange(scheduleIDs []str
 	`, strings.Join(placeholders, ", "))
 
 	fmt.Printf("📝 REPO: Executing SQL query:\n%s\n", query)
-	fmt.Printf("📝 REPO: Query args: $1=%s, $2=%s, schedule_ids=%v\n", 
+	fmt.Printf("📝 REPO: Query args: $1=%s, $2=%s, schedule_ids=%v\n",
 		startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), scheduleIDs)
 
 	rows, err := r.db.Query(query, args...)
@@ -122,7 +122,7 @@ func (r *ScheduledTripRepository) GetByScheduleIDsAndDateRange(scheduleIDs []str
 		fmt.Printf("❌ REPO: Error scanning trips: %v\n", scanErr)
 		return nil, scanErr
 	}
-	
+
 	fmt.Printf("✅ REPO: Successfully scanned %d trips from database\n", len(trips))
 	return trips, nil
 }

@@ -616,8 +616,8 @@ func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
 		IsBookable:           req.IsBookable,
 		MaxBookableSeats:     &req.MaxBookableSeats,
 		BookingAdvanceHours:  req.BookingAdvanceHours,
-		ValidFrom:            validFrom,   // NEW: Set validity start date
-		ValidUntil:           validUntil,  // NEW: Set validity end date
+		ValidFrom:            validFrom,  // NEW: Set validity start date
+		ValidUntil:           validUntil, // NEW: Set validity end date
 		IsActive:             true,
 		Notes:                req.Notes,
 	}

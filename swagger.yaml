@@ -3676,13 +3676,13 @@ paths:
       summary: Get scheduled trips by date range
       description: |
         Retrieve scheduled trips within a specified date range for the authenticated bus owner.
-        
+
         Efficient filtering logic:
         1. Gets bus_owner_id from authenticated user
         2. Queries trip_schedules table: WHERE bus_owner_id = X
         3. Extracts schedule IDs
         4. Queries scheduled_trips: WHERE trip_schedule_id IN (...) AND trip_date BETWEEN start AND end
-        
+
         This ensures only trips from the bus owner's timetables are returned,
         using a single optimized SQL query with IN clause.
       operationId: getScheduledTrips

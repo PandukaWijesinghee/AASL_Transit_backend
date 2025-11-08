@@ -46,7 +46,7 @@ func NewScheduledTripHandler(
 // GET /api/v1/scheduled-trips?start_date=2024-01-01&end_date=2024-01-31
 func (h *ScheduledTripHandler) GetTripsByDateRange(c *gin.Context) {
 	fmt.Println("========== SCHEDULED TRIPS FETCH START ==========")
-	
+
 	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		fmt.Println("❌ ERROR: No user context found")
@@ -123,7 +123,7 @@ func (h *ScheduledTripHandler) GetTripsByDateRange(c *gin.Context) {
 	fmt.Printf("✅ STEP 5: Extracted %d schedule IDs\n", len(scheduleIDs))
 
 	// Get trips directly by schedule IDs and date range
-	fmt.Printf("🔍 STEP 6: Querying scheduled_trips WHERE trip_schedule_id IN (%d IDs) AND date BETWEEN %s AND %s\n", 
+	fmt.Printf("🔍 STEP 6: Querying scheduled_trips WHERE trip_schedule_id IN (%d IDs) AND date BETWEEN %s AND %s\n",
 		len(scheduleIDs), startDateStr, endDateStr)
 	ownerTrips, err := h.tripRepo.GetByScheduleIDsAndDateRange(scheduleIDs, startDate, endDate)
 	if err != nil {
@@ -135,7 +135,7 @@ func (h *ScheduledTripHandler) GetTripsByDateRange(c *gin.Context) {
 	fmt.Printf("✅ STEP 6 RESULT: Found %d trips in scheduled_trips table\n", len(ownerTrips))
 	if len(ownerTrips) > 0 {
 		for i, trip := range ownerTrips {
-			fmt.Printf("   - Trip[%d]: id=%s, date=%s, time=%s, schedule_id=%v\n", 
+			fmt.Printf("   - Trip[%d]: id=%s, date=%s, time=%s, schedule_id=%v\n",
 				i+1, trip.ID, trip.TripDate.Format("2006-01-02"), trip.DepartureTime, trip.TripScheduleID)
 		}
 	}
@@ -236,29 +236,29 @@ func (h *ScheduledTripHandler) GetTripByID(c *gin.Context) {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Trip not found"})
-	return
-}
-c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trip"})
-return
-}
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trip"})
+		return
+	}
 
-// Verify ownership through permit
-if trip.PermitID == nil {
-	c.JSON(http.StatusForbidden, gin.H{"error": "Trip has no permit assigned"})
-	return
-}
-permit, err := h.permitRepo.GetByID(*trip.PermitID)
-if err != nil {
-	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ownership"})
-	return
-}
+	// Verify ownership through permit
+	if trip.PermitID == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Trip has no permit assigned"})
+		return
+	}
+	permit, err := h.permitRepo.GetByID(*trip.PermitID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ownership"})
+		return
+	}
 
-if permit.BusOwnerID != busOwner.ID {
-	c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
-	return
-}
+	if permit.BusOwnerID != busOwner.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
 
-c.JSON(http.StatusOK, trip)
+	c.JSON(http.StatusOK, trip)
 }
 
 // UpdateTrip updates a scheduled trip (staff assignment, status, etc.)
@@ -278,41 +278,41 @@ func (h *ScheduledTripHandler) UpdateTrip(c *gin.Context) {
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch profile"})
 		return
-}
+	}
 
-tripID := c.Param("id")
+	tripID := c.Param("id")
 
-trip, err := h.tripRepo.GetByID(tripID)
-if err != nil {
-	if err == sql.ErrNoRows {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Trip not found"})
+	trip, err := h.tripRepo.GetByID(tripID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Trip not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trip"})
 		return
 	}
-	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trip"})
-	return
-}
 
-// Verify ownership
-if trip.PermitID == nil {
-	c.JSON(http.StatusForbidden, gin.H{"error": "Trip has no permit assigned"})
-	return
-}
-permit, err := h.permitRepo.GetByID(*trip.PermitID)
-if err != nil {
-	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ownership"})
-	return
-}
+	// Verify ownership
+	if trip.PermitID == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Trip has no permit assigned"})
+		return
+	}
+	permit, err := h.permitRepo.GetByID(*trip.PermitID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ownership"})
+		return
+	}
 
-if permit.BusOwnerID != busOwner.ID {
-	c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
-	return
-}
+	if permit.BusOwnerID != busOwner.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
 
-var req models.UpdateScheduledTripRequest
-if err := c.ShouldBindJSON(&req); err != nil {
-	c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "details": err.Error()})
-	return
-}	// Update fields if provided
+	var req models.UpdateScheduledTripRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "details": err.Error()})
+		return
+	} // Update fields if provided
 	if req.BusID != nil {
 		trip.BusID = req.BusID
 	}
@@ -368,13 +368,13 @@ func (h *ScheduledTripHandler) CancelTrip(c *gin.Context) {
 		return
 	}
 
-// Verify ownership
-if trip.PermitID == nil {
-	c.JSON(http.StatusForbidden, gin.H{"error": "Trip has no permit assigned"})
-	return
-}
-permit, err := h.permitRepo.GetByID(*trip.PermitID)
-if err != nil {
+	// Verify ownership
+	if trip.PermitID == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Trip has no permit assigned"})
+		return
+	}
+	permit, err := h.permitRepo.GetByID(*trip.PermitID)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ownership"})
 		return
 	}
@@ -489,53 +489,53 @@ func (h *ScheduledTripHandler) CreateSpecialTrip(c *gin.Context) {
 	// Verify permit ownership (optional)
 	if req.PermitID != nil {
 		permit, err := h.permitRepo.GetByID(*req.PermitID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Permit not found"})
+		if err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Permit not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch permit"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch permit"})
-		return
+
+		if permit.BusOwnerID != busOwner.ID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied to this permit"})
+			return
+		}
+
+		// Check permit is valid
+		if !permit.IsValid() {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Permit is not valid or expired"})
+			return
+		}
+
+		// Validate fare against permit approved fare
+		if req.BaseFare > permit.ApprovedFare {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Base fare exceeds permit approved fare",
+				"details": map[string]interface{}{
+					"requested_fare": req.BaseFare,
+					"approved_fare":  permit.ApprovedFare,
+				},
+			})
+			return
+		}
+
+		// Validate max bookable seats against permit approved seating capacity
+		if req.MaxBookableSeats > permit.ApprovedSeatingCapacity {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Max bookable seats exceeds permit approved seating capacity",
+				"details": map[string]interface{}{
+					"requested_seats": req.MaxBookableSeats,
+					"approved_seats":  permit.ApprovedSeatingCapacity,
+				},
+			})
+			return
+		}
 	}
 
-	if permit.BusOwnerID != busOwner.ID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied to this permit"})
-		return
-	}
-
-	// Check permit is valid
-	if !permit.IsValid() {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Permit is not valid or expired"})
-		return
-	}
-
-	// Validate fare against permit approved fare
-	if req.BaseFare > permit.ApprovedFare {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Base fare exceeds permit approved fare",
-			"details": map[string]interface{}{
-				"requested_fare": req.BaseFare,
-				"approved_fare":  permit.ApprovedFare,
-			},
-		})
-		return
-	}
-
-	// Validate max bookable seats against permit approved seating capacity
-	if req.MaxBookableSeats > permit.ApprovedSeatingCapacity {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Max bookable seats exceeds permit approved seating capacity",
-			"details": map[string]interface{}{
-			"requested_seats": req.MaxBookableSeats,
-			"approved_seats":  permit.ApprovedSeatingCapacity,
-		},
-	})
-	return
-	}
-}
-
-// Parse trip date
-tripDate, _ := time.Parse("2006-01-02", req.TripDate) // Already validated in Validate()	// Parse departure time
+	// Parse trip date
+	tripDate, _ := time.Parse("2006-01-02", req.TripDate) // Already validated in Validate()	// Parse departure time
 	var departureHour, departureMinute int
 	if t, err := time.Parse("15:04", req.DepartureTime); err == nil {
 		departureHour = t.Hour()
