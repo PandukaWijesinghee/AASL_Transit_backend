@@ -3677,12 +3677,14 @@ paths:
       description: |
         Retrieve scheduled trips within a specified date range for the authenticated bus owner.
         
-        Filtering logic:
-        1. Fetches all trip_schedules (timetables) owned by the bus owner
-        2. Returns all scheduled_trips that reference those trip_schedule_ids within the date range
+        Efficient filtering logic:
+        1. Gets bus_owner_id from authenticated user
+        2. Queries trip_schedules table: WHERE bus_owner_id = X
+        3. Extracts schedule IDs
+        4. Queries scheduled_trips: WHERE trip_schedule_id IN (...) AND trip_date BETWEEN start AND end
         
-        This ensures all trips generated from the bus owner's timetables are returned,
-        regardless of permit assignment status.
+        This ensures only trips from the bus owner's timetables are returned,
+        using a single optimized SQL query with IN clause.
       operationId: getScheduledTrips
       tags:
         - Scheduled Trips
