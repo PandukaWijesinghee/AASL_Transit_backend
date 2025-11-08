@@ -351,6 +351,7 @@ CREATE TABLE public.scheduled_trips (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   assignment_deadline timestamp with time zone,
+  is_published boolean NOT NULL DEFAULT false,
   CONSTRAINT scheduled_trips_pkey PRIMARY KEY (id),
   CONSTRAINT scheduled_trips_trip_schedule_id_fkey FOREIGN KEY (trip_schedule_id) REFERENCES public.trip_schedules(id),
   CONSTRAINT scheduled_trips_permit_id_fkey FOREIGN KEY (permit_id) REFERENCES public.route_permits(id),

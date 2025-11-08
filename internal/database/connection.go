@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq" // PostgreSQL driver
@@ -32,16 +33,31 @@ func NewConnection(cfg config.DatabaseConfig) (DB, error) {
 		return nil, fmt.Errorf("database URL is required")
 	}
 
+	// Add connection pooler compatibility parameters if not present
+	// This fixes "bind message has N result formats but query has M columns" errors
+	// with Supavisor and other connection poolers
+	connectionURL := cfg.URL
+	if !strings.Contains(connectionURL, "prefer_simple_protocol") {
+		separator := "?"
+		if strings.Contains(connectionURL, "?") {
+			separator = "&"
+		}
+		connectionURL = connectionURL + separator + "prefer_simple_protocol=true"
+	}
+
 	// Connect to database
-	db, err := sqlx.Connect("postgres", cfg.URL)
+	db, err := sqlx.Connect("postgres", connectionURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	// Configure connection pool
+	// Configure connection pool for better stability with connection poolers
 	db.SetMaxOpenConns(cfg.MaxConnections)
 	db.SetMaxIdleConns(cfg.MaxIdleConnections)
 	db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+	
+	// Add idle timeout to prevent stale connections
+	db.SetConnMaxIdleTime(cfg.ConnMaxLifetime / 2) // Half of max lifetime
 
 	// Verify connection
 	if err := db.Ping(); err != nil {
