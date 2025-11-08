@@ -282,13 +282,13 @@ func (r *TripScheduleRepository) Deactivate(scheduleID string) error {
 	return err
 }
 
-// scanSchedules scans multiple schedules from rows (old system)
+// scanSchedules scans multiple schedules from rows (NEW SCHEMA - matches GetByBusOwnerID query)
 func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSchedule, error) {
 	schedules := []models.TripSchedule{}
 
 	for rows.Next() {
 		var schedule models.TripSchedule
-		var customRouteID sql.NullString
+		var busOwnerRouteID sql.NullString // NEW: renamed from customRouteID
 		var scheduleName sql.NullString
 		var recurrenceInterval sql.NullInt64
 		var estimatedArrivalTime sql.NullString
@@ -296,8 +296,15 @@ func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSch
 		var validUntil sql.NullTime
 		var notes sql.NullString
 
+		// Must match the SELECT order from GetByBusOwnerID:
+		// id, bus_owner_id, bus_owner_route_id, schedule_name,
+		// recurrence_type, recurrence_days, recurrence_interval, 
+		// departure_time, estimated_arrival_time,
+		// base_fare, is_active, notes,
+		// valid_from, valid_until, specific_dates,
+		// created_at, updated_at
 		err := rows.Scan(
-			&schedule.ID, &schedule.BusOwnerID, &customRouteID, &scheduleName,
+			&schedule.ID, &schedule.BusOwnerID, &busOwnerRouteID, &scheduleName,
 			&schedule.RecurrenceType, &schedule.RecurrenceDays, &recurrenceInterval,
 			&schedule.DepartureTime, &estimatedArrivalTime,
 			&schedule.BaseFare, &schedule.IsActive, &notes,
@@ -310,8 +317,8 @@ func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSch
 		}
 
 		// Convert sql.Null* types
-		if customRouteID.Valid {
-			schedule.CustomRouteID = &customRouteID.String
+		if busOwnerRouteID.Valid {
+			schedule.CustomRouteID = &busOwnerRouteID.String
 		}
 		if scheduleName.Valid {
 			schedule.ScheduleName = &scheduleName.String
