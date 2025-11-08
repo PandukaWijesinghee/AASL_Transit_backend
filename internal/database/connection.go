@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -26,6 +27,13 @@ type PostgresDB struct {
 	*sqlx.DB
 }
 
+// maskPassword masks the password in a database URL for safe logging
+func maskPassword(url string) string {
+	// Replace password in postgres://user:password@host format
+	re := regexp.MustCompile(`(postgres(?:ql)?://[^:]+:)([^@]+)(@.+)`)
+	return re.ReplaceAllString(url, "${1}****${3}")
+}
+
 // NewConnection creates a new database connection
 func NewConnection(cfg config.DatabaseConfig) (DB, error) {
 	// Parse and validate connection string
@@ -33,17 +41,35 @@ func NewConnection(cfg config.DatabaseConfig) (DB, error) {
 		return nil, fmt.Errorf("database URL is required")
 	}
 
-	// Add connection pooler compatibility parameters if not present
-	// This fixes "bind message has N result formats but query has M columns" errors
-	// with Supavisor and other connection poolers
+	// Add connection pooler compatibility parameters
+	// For lib/pq driver with Supavisor/PgBouncer, we need binary_parameters=no
+	// This disables binary encoding which causes "bind message" errors with pooled connections
 	connectionURL := cfg.URL
-	if !strings.Contains(connectionURL, "prefer_simple_protocol") {
+	
+	fmt.Printf("INFO: Original database URL: %s\n", maskPassword(cfg.URL))
+	
+	// Add sslmode if not present (required for Supabase)
+	if !strings.Contains(connectionURL, "sslmode") {
 		separator := "?"
 		if strings.Contains(connectionURL, "?") {
 			separator = "&"
 		}
-		connectionURL = connectionURL + separator + "prefer_simple_protocol=true"
+		connectionURL = connectionURL + separator + "sslmode=require"
+		fmt.Printf("INFO: Added sslmode=require\n")
 	}
+	
+	// Disable binary parameters to fix bind message errors with connection poolers
+	// binary_parameters=no forces text protocol which doesn't have prepared statement issues
+	if !strings.Contains(connectionURL, "binary_parameters") {
+		separator := "?"
+		if strings.Contains(connectionURL, "?") {
+			separator = "&"
+		}
+		connectionURL = connectionURL + separator + "binary_parameters=no"
+		fmt.Printf("INFO: Added binary_parameters=no (fixes connection pooler issues)\n")
+	}
+	
+	fmt.Printf("INFO: Final connection URL: %s\n", maskPassword(connectionURL))
 
 	// Connect to database
 	db, err := sqlx.Connect("postgres", connectionURL)
@@ -55,7 +81,7 @@ func NewConnection(cfg config.DatabaseConfig) (DB, error) {
 	db.SetMaxOpenConns(cfg.MaxConnections)
 	db.SetMaxIdleConns(cfg.MaxIdleConnections)
 	db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
-	
+
 	// Add idle timeout to prevent stale connections
 	db.SetConnMaxIdleTime(cfg.ConnMaxLifetime / 2) // Half of max lifetime
 
