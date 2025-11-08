@@ -607,5 +607,19 @@ func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, schedule)
+	// IMMEDIATE GENERATION: Generate trips for next 7 days (configurable via system_settings)
+	tripsGenerated, err := h.tripGeneratorSvc.GenerateTripsForNewSchedule(schedule)
+	if err != nil {
+		// Log error but don't fail the request - timetable was created successfully
+		println("WARNING: Failed to generate trips for timetable:", schedule.ID, "Error:", err.Error())
+	}
+
+	// Return timetable with trip count
+	response := gin.H{
+		"schedule":        schedule,
+		"trips_generated": tripsGenerated,
+		"message":         "Timetable created successfully. Trips generated for next 7 days.",
+	}
+
+	c.JSON(http.StatusCreated, response)
 }
