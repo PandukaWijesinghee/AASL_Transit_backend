@@ -3674,7 +3674,14 @@ paths:
   /api/v1/scheduled-trips:
     get:
       summary: Get scheduled trips by date range
-      description: Retrieve scheduled trips within a specified date range
+      description: |
+        Retrieve scheduled trips within a specified date range for the authenticated bus owner.
+        
+        Returns trips where:
+        - Trip has a permit assigned AND permit belongs to the bus owner, OR
+        - Trip has a custom route AND route belongs to the bus owner
+        
+        This allows fetching both trips with assigned permits and newly created trips without permits.
       operationId: getScheduledTrips
       tags:
         - Scheduled Trips
