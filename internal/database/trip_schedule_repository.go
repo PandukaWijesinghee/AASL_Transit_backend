@@ -305,13 +305,17 @@ func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSch
 		fmt.Printf("📋 REPO scanSchedules: Processing row #%d\n", rowNum)
 		
 		var schedule models.TripSchedule
-		var busOwnerRouteID sql.NullString // NEW: renamed from customRouteID
+		var busOwnerRouteID sql.NullString
 		var scheduleName sql.NullString
 		var recurrenceInterval sql.NullInt64
 		var estimatedArrivalTime sql.NullString
 		var validFrom sql.NullTime
 		var validUntil sql.NullTime
 		var notes sql.NullString
+		
+		// Temporary slices for scanning arrays - pq driver needs explicit types
+		var recurrenceDaysTemp []int
+		var specificDatesTemp []time.Time
 
 		fmt.Printf("🔍 REPO: About to scan row #%d with columns: id, bus_owner_id, bus_owner_route_id, schedule_name, recurrence_type, recurrence_days...\n", rowNum)
 		
@@ -324,19 +328,22 @@ func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSch
 		// created_at, updated_at
 		err := rows.Scan(
 			&schedule.ID, &schedule.BusOwnerID, &busOwnerRouteID, &scheduleName,
-			&schedule.RecurrenceType, &schedule.RecurrenceDays, &recurrenceInterval,
+			&schedule.RecurrenceType, &recurrenceDaysTemp, &recurrenceInterval,
 			&schedule.DepartureTime, &estimatedArrivalTime,
 			&schedule.BaseFare, &schedule.IsActive, &notes,
-			&validFrom, &validUntil, &schedule.SpecificDates,
+			&validFrom, &validUntil, &specificDatesTemp,
 			&schedule.CreatedAt, &schedule.UpdatedAt,
 		)
 
 		if err != nil {
 			fmt.Printf("❌ REPO: Scan FAILED on row #%d: %v\n", rowNum, err)
 			fmt.Printf("   Schedule ID (if scanned): %s\n", schedule.ID)
-			fmt.Printf("   RecurrenceDays value: %v (type: %T)\n", schedule.RecurrenceDays, schedule.RecurrenceDays)
 			return nil, err
 		}
+		
+		// Convert temp slices to custom types
+		schedule.RecurrenceDays = models.IntArray(recurrenceDaysTemp)
+		schedule.SpecificDates = models.DateArray(specificDatesTemp)
 		
 		fmt.Printf("✅ REPO: Row #%d scanned successfully - ID=%s, RecurrenceDays=%v, SpecificDates=%v\n", 
 			rowNum, schedule.ID, schedule.RecurrenceDays, schedule.SpecificDates)
