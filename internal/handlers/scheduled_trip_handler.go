@@ -81,13 +81,6 @@ func (h *ScheduledTripHandler) GetTripsByDateRange(c *gin.Context) {
 		return
 	}
 
-	// Get all scheduled trips in date range (we'll filter by owner)
-	allTrips, err := h.tripRepo.GetByDateRange(startDate, endDate)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trips"})
-		return
-	}
-
 	// Get all trip schedules (timetables) for this bus owner
 	ownerSchedules, err := h.scheduleRepo.GetByBusOwnerID(busOwner.ID)
 	if err != nil {
@@ -95,19 +88,17 @@ func (h *ScheduledTripHandler) GetTripsByDateRange(c *gin.Context) {
 		return
 	}
 
-	// Create a map of schedule IDs for quick lookup
-	scheduleIDMap := make(map[string]bool)
-	for _, schedule := range ownerSchedules {
-		scheduleIDMap[schedule.ID] = true
+	// Extract schedule IDs
+	scheduleIDs := make([]string, len(ownerSchedules))
+	for i, schedule := range ownerSchedules {
+		scheduleIDs[i] = schedule.ID
 	}
 
-	// Filter trips that belong to this bus owner's schedules
-	ownerTrips := []models.ScheduledTrip{}
-	for _, trip := range allTrips {
-		// Check if trip's schedule belongs to this bus owner
-		if trip.TripScheduleID != nil && scheduleIDMap[*trip.TripScheduleID] {
-			ownerTrips = append(ownerTrips, trip)
-		}
+	// Get trips directly by schedule IDs and date range
+	ownerTrips, err := h.tripRepo.GetByScheduleIDsAndDateRange(scheduleIDs, startDate, endDate)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trips"})
+		return
 	}
 
 	c.JSON(http.StatusOK, ownerTrips)

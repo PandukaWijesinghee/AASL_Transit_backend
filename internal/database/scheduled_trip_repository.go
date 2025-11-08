@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -73,6 +74,40 @@ func (r *ScheduledTripRepository) GetByScheduleAndDate(scheduleID string, date t
 	`
 
 	return r.scanTrip(r.db.QueryRow(query, scheduleID, date))
+}
+
+// GetByScheduleIDsAndDateRange retrieves trips for specific schedule IDs within a date range
+func (r *ScheduledTripRepository) GetByScheduleIDsAndDateRange(scheduleIDs []string, startDate, endDate time.Time) ([]models.ScheduledTrip, error) {
+	if len(scheduleIDs) == 0 {
+		return []models.ScheduledTrip{}, nil
+	}
+
+	// Build placeholders for IN clause: $3, $4, $5, ...
+	placeholders := make([]string, len(scheduleIDs))
+	args := []interface{}{startDate, endDate}
+	for i, id := range scheduleIDs {
+		placeholders[i] = fmt.Sprintf("$%d", i+3) // Start from $3 since $1 and $2 are dates
+		args = append(args, id)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, trip_schedule_id, permit_id, trip_date, departure_time,
+			   estimated_arrival_time, assigned_driver_id, assigned_conductor_id,
+			   is_bookable, base_fare, status, cancellation_reason, cancelled_at,
+			   assignment_deadline, is_published, created_at, updated_at
+		FROM scheduled_trips
+		WHERE trip_schedule_id IN (%s)
+		  AND trip_date BETWEEN $1 AND $2
+		ORDER BY trip_date, departure_time
+	`, strings.Join(placeholders, ", "))
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return r.scanTrips(rows)
 }
 
 // GetByDateRange retrieves scheduled trips within a date range
