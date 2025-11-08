@@ -3677,11 +3677,12 @@ paths:
       description: |
         Retrieve scheduled trips within a specified date range for the authenticated bus owner.
         
-        Returns trips where:
-        - Trip has a permit assigned AND permit belongs to the bus owner, OR
-        - Trip has a custom route AND route belongs to the bus owner
+        Filtering logic:
+        1. Fetches all trip_schedules (timetables) owned by the bus owner
+        2. Returns all scheduled_trips that reference those trip_schedule_ids within the date range
         
-        This allows fetching both trips with assigned permits and newly created trips without permits.
+        This ensures all trips generated from the bus owner's timetables are returned,
+        regardless of permit assignment status.
       operationId: getScheduledTrips
       tags:
         - Scheduled Trips
