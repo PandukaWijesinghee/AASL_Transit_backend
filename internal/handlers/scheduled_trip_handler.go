@@ -88,28 +88,24 @@ func (h *ScheduledTripHandler) GetTripsByDateRange(c *gin.Context) {
 		return
 	}
 
-	// Filter trips that belong to this bus owner
+	// Get all trip schedules (timetables) for this bus owner
+	ownerSchedules, err := h.scheduleRepo.GetByBusOwnerID(busOwner.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch schedules"})
+		return
+	}
+
+	// Create a map of schedule IDs for quick lookup
+	scheduleIDMap := make(map[string]bool)
+	for _, schedule := range ownerSchedules {
+		scheduleIDMap[schedule.ID] = true
+	}
+
+	// Filter trips that belong to this bus owner's schedules
 	ownerTrips := []models.ScheduledTrip{}
 	for _, trip := range allTrips {
-		belongsToOwner := false
-
-		// Check if trip has a permit and it belongs to this bus owner
-		if trip.PermitID != nil {
-			permit, err := h.permitRepo.GetByID(*trip.PermitID)
-			if err == nil && permit.BusOwnerID == busOwner.ID {
-				belongsToOwner = true
-			}
-		}
-
-		// Also check if trip has a custom route and it belongs to this bus owner
-		if !belongsToOwner && trip.CustomRouteID != nil {
-			customRoute, err := h.routeRepo.GetByID(*trip.CustomRouteID)
-			if err == nil && customRoute.BusOwnerID == busOwner.ID {
-				belongsToOwner = true
-			}
-		}
-
-		if belongsToOwner {
+		// Check if trip's schedule belongs to this bus owner
+		if trip.TripScheduleID != nil && scheduleIDMap[*trip.TripScheduleID] {
 			ownerTrips = append(ownerTrips, trip)
 		}
 	}
