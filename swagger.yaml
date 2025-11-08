@@ -1506,9 +1506,9 @@ paths:
       description: |
         Creates a timetable for automatic trip generation. Upon creation, the system immediately generates 
         trips for the next 7 days (configurable via system_settings.trip_generation_days_ahead). 
-        
+
         A daily cron job (runs at 2 AM) maintains a rolling 7-day window by generating new trips for upcoming dates.
-        
+
         After creation, use the publish/unpublish endpoints to control which trips are visible to passengers.
       operationId: createTimetable
       tags:
