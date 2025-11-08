@@ -1504,8 +1504,12 @@ paths:
     post:
       summary: Create a new timetable (repeating trip schedule)
       description: |
-        Creates a timetable for automatic trip generation. A timetable is a template that the cron job uses
-        to automatically generate scheduled trips. The system maintains 7 future occurrences for each timetable.
+        Creates a timetable for automatic trip generation. Upon creation, the system immediately generates 
+        trips for the next 7 days (configurable via system_settings.trip_generation_days_ahead). 
+        
+        A daily cron job (runs at 2 AM) maintains a rolling 7-day window by generating new trips for upcoming dates.
+        
+        After creation, use the publish/unpublish endpoints to control which trips are visible to passengers.
       operationId: createTimetable
       tags:
         - Timetables
@@ -1590,28 +1594,21 @@ paths:
                   description: Optional notes about the timetable
       responses:
         "201":
-          description: Timetable created successfully
+          description: Timetable created successfully with instant trip generation
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  id:
+                  schedule:
+                    $ref: "#/components/schemas/TripSchedule"
+                  trips_generated:
+                    type: integer
+                    example: 7
+                    description: Number of trips automatically generated for the next 7 days
+                  message:
                     type: string
-                    format: uuid
-                  custom_route_id:
-                    type: string
-                    format: uuid
-                  permit_id:
-                    type: string
-                    format: uuid
-                  departure_time:
-                    type: string
-                  recurrence_type:
-                    type: string
-                  created_at:
-                    type: string
-                    format: date-time
+                    example: "Timetable created successfully. Trips generated for next 7 days."
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
