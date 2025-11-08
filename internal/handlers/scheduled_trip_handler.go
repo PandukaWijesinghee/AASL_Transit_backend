@@ -91,12 +91,26 @@ func (h *ScheduledTripHandler) GetTripsByDateRange(c *gin.Context) {
 	// Filter trips that belong to this bus owner
 	ownerTrips := []models.ScheduledTrip{}
 	for _, trip := range allTrips {
-		// Check if permit belongs to this bus owner
+		belongsToOwner := false
+
+		// Check if trip has a permit and it belongs to this bus owner
 		if trip.PermitID != nil {
 			permit, err := h.permitRepo.GetByID(*trip.PermitID)
 			if err == nil && permit.BusOwnerID == busOwner.ID {
-				ownerTrips = append(ownerTrips, trip)
+				belongsToOwner = true
 			}
+		}
+
+		// Also check if trip has a custom route and it belongs to this bus owner
+		if !belongsToOwner && trip.CustomRouteID != nil {
+			customRoute, err := h.routeRepo.GetByID(*trip.CustomRouteID)
+			if err == nil && customRoute.BusOwnerID == busOwner.ID {
+				belongsToOwner = true
+			}
+		}
+
+		if belongsToOwner {
+			ownerTrips = append(ownerTrips, trip)
 		}
 	}
 
