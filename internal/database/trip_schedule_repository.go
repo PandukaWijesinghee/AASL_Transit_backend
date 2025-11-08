@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/smarttransit/sms-auth-backend/internal/models"
 )
 
@@ -305,10 +306,10 @@ func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSch
 		// created_at, updated_at
 		err := rows.Scan(
 			&schedule.ID, &schedule.BusOwnerID, &busOwnerRouteID, &scheduleName,
-			&schedule.RecurrenceType, &schedule.RecurrenceDays, &recurrenceInterval,
+			&schedule.RecurrenceType, pq.Array(&schedule.RecurrenceDays), &recurrenceInterval,
 			&schedule.DepartureTime, &estimatedArrivalTime,
 			&schedule.BaseFare, &schedule.IsActive, &notes,
-			&validFrom, &validUntil, &schedule.SpecificDates,
+			&validFrom, &validUntil, pq.Array(&schedule.SpecificDates),
 			&schedule.CreatedAt, &schedule.UpdatedAt,
 		)
 
