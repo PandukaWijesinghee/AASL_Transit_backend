@@ -82,31 +82,31 @@ func (r *TripScheduleRepository) Create(schedule *models.TripSchedule) error {
 // GetByID retrieves a trip schedule by ID
 func (r *TripScheduleRepository) GetByID(scheduleID string) (*models.TripSchedule, error) {
 	query := `
-		SELECT id, bus_owner_id, permit_id, bus_id, schedule_name,
-			   recurrence_type, recurrence_days, specific_dates, departure_time,
-			   base_fare, is_bookable, max_bookable_seats, advance_booking_hours,
-			   default_driver_id, default_conductor_id, selected_stop_ids,
-			   is_active, valid_from, valid_until, notes,
+		SELECT id, bus_owner_id, bus_owner_route_id, schedule_name,
+			   recurrence_type, recurrence_days, recurrence_interval, 
+			   departure_time, estimated_arrival_time,
+			   base_fare, is_active, notes,
+			   valid_from, valid_until, specific_dates,
 			   created_at, updated_at
 		FROM trip_schedules
 		WHERE id = $1
 	`
 
 	schedule := &models.TripSchedule{}
-	var busID sql.NullString
+	var customRouteID sql.NullString
 	var scheduleName sql.NullString
-	var maxBookableSeats sql.NullInt64
-	var defaultDriverID sql.NullString
-	var defaultConductorID sql.NullString
+	var recurrenceInterval sql.NullInt64
+	var estimatedArrivalTime sql.NullString
+	var validFrom sql.NullTime
 	var validUntil sql.NullTime
 	var notes sql.NullString
 
 	err := r.db.QueryRow(query, scheduleID).Scan(
-		&schedule.ID, &schedule.BusOwnerID, &schedule.PermitID, &busID, &scheduleName,
-		&schedule.RecurrenceType, &schedule.RecurrenceDays, &schedule.SpecificDates, &schedule.DepartureTime,
-		&schedule.BaseFare, &schedule.IsBookable, &maxBookableSeats, &schedule.AdvanceBookingHours,
-		&defaultDriverID, &defaultConductorID, &schedule.SelectedStopIDs,
-		&schedule.IsActive, &schedule.ValidFrom, &validUntil, &notes,
+		&schedule.ID, &schedule.BusOwnerID, &customRouteID, &scheduleName,
+		&schedule.RecurrenceType, &schedule.RecurrenceDays, &recurrenceInterval,
+		&schedule.DepartureTime, &estimatedArrivalTime,
+		&schedule.BaseFare, &schedule.IsActive, &notes,
+		&validFrom, &validUntil, &schedule.SpecificDates,
 		&schedule.CreatedAt, &schedule.UpdatedAt,
 	)
 
@@ -115,21 +115,21 @@ func (r *TripScheduleRepository) GetByID(scheduleID string) (*models.TripSchedul
 	}
 
 	// Convert sql.Null* types
-	if busID.Valid {
-		schedule.BusID = &busID.String
+	if customRouteID.Valid {
+		schedule.CustomRouteID = &customRouteID.String
 	}
 	if scheduleName.Valid {
 		schedule.ScheduleName = &scheduleName.String
 	}
-	if maxBookableSeats.Valid {
-		seats := int(maxBookableSeats.Int64)
-		schedule.MaxBookableSeats = &seats
+	if recurrenceInterval.Valid {
+		interval := int(recurrenceInterval.Int64)
+		schedule.RecurrenceInterval = &interval
 	}
-	if defaultDriverID.Valid {
-		schedule.DefaultDriverID = &defaultDriverID.String
+	if estimatedArrivalTime.Valid {
+		schedule.EstimatedArrivalTime = &estimatedArrivalTime.String
 	}
-	if defaultConductorID.Valid {
-		schedule.DefaultConductorID = &defaultConductorID.String
+	if validFrom.Valid {
+		schedule.ValidFrom = validFrom.Time
 	}
 	if validUntil.Valid {
 		schedule.ValidUntil = &validUntil.Time
@@ -165,26 +165,11 @@ func (r *TripScheduleRepository) GetByBusOwnerID(busOwnerID string) ([]models.Tr
 }
 
 // GetByPermitID retrieves all trip schedules for a permit
+// GetByPermitID retrieves all timetables for a specific permit (DEPRECATED - use bus_owner_route_id)
 func (r *TripScheduleRepository) GetByPermitID(permitID string) ([]models.TripSchedule, error) {
-	query := `
-		SELECT id, bus_owner_id, permit_id, bus_id, schedule_name,
-			   recurrence_type, recurrence_days, specific_dates, departure_time,
-			   base_fare, is_bookable, max_bookable_seats, advance_booking_hours,
-			   default_driver_id, default_conductor_id, selected_stop_ids,
-			   is_active, valid_from, valid_until, notes,
-			   created_at, updated_at
-		FROM trip_schedules
-		WHERE permit_id = $1
-		ORDER BY departure_time
-	`
-
-	rows, err := r.db.Query(query, permitID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	return r.scanSchedules(rows)
+	// Note: permit_id doesn't exist in trip_schedules table anymore
+	// This function is kept for backward compatibility but returns empty
+	return []models.TripSchedule{}, nil
 }
 
 // GetByCustomRouteID retrieves all timetables for a specific custom route
@@ -233,11 +218,11 @@ func (r *TripScheduleRepository) GetAllActiveTimetables() ([]models.TripSchedule
 // GetActiveSchedulesForDate retrieves all active schedules for a specific date
 func (r *TripScheduleRepository) GetActiveSchedulesForDate(date time.Time) ([]models.TripSchedule, error) {
 	query := `
-		SELECT id, bus_owner_id, permit_id, bus_id, schedule_name,
-			   recurrence_type, recurrence_days, specific_dates, departure_time,
-			   base_fare, is_bookable, max_bookable_seats, advance_booking_hours,
-			   default_driver_id, default_conductor_id, selected_stop_ids,
-			   is_active, valid_from, valid_until, notes,
+		SELECT id, bus_owner_id, bus_owner_route_id, schedule_name,
+			   recurrence_type, recurrence_days, recurrence_interval, 
+			   departure_time, estimated_arrival_time,
+			   base_fare, is_active, notes,
+			   valid_from, valid_until, specific_dates,
 			   created_at, updated_at
 		FROM trip_schedules
 		WHERE is_active = true
