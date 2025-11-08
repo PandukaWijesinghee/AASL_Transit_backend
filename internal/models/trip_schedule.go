@@ -64,6 +64,8 @@ type CreateTimetableRequest struct {
 	RecurrenceType       string   `json:"recurrence_type" binding:"required,oneof=daily weekly interval"`
 	RecurrenceDays       []int    `json:"recurrence_days,omitempty"`     // Required for weekly
 	RecurrenceInterval   *int     `json:"recurrence_interval,omitempty"` // Required for interval
+	ValidFrom            string   `json:"valid_from" binding:"required"` // NEW: Timetable validity start date
+	ValidUntil           *string  `json:"valid_until,omitempty"`        // NEW: Optional end date
 	Notes                *string  `json:"notes,omitempty"`
 }
 
@@ -100,6 +102,24 @@ func (r *CreateTimetableRequest) Validate() error {
 			if _, err := time.Parse("15:04:05", *r.EstimatedArrivalTime); err != nil {
 				return errors.New("estimated_arrival_time must be in HH:MM or HH:MM:SS format")
 			}
+		}
+	}
+
+	// Validate valid_from date format (YYYY-MM-DD)
+	validFrom, err := time.Parse("2006-01-02", r.ValidFrom)
+	if err != nil {
+		return errors.New("valid_from must be in YYYY-MM-DD format")
+	}
+
+	// Validate valid_until date format if provided
+	if r.ValidUntil != nil {
+		validUntil, err := time.Parse("2006-01-02", *r.ValidUntil)
+		if err != nil {
+			return errors.New("valid_until must be in YYYY-MM-DD format")
+		}
+		// valid_until must be after valid_from
+		if validUntil.Before(validFrom) {
+			return errors.New("valid_until must be after valid_from")
 		}
 	}
 

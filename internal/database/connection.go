@@ -45,9 +45,9 @@ func NewConnection(cfg config.DatabaseConfig) (DB, error) {
 	// For lib/pq driver with Supavisor/PgBouncer, we need binary_parameters=no
 	// This disables binary encoding which causes "bind message" errors with pooled connections
 	connectionURL := cfg.URL
-	
+
 	fmt.Printf("INFO: Original database URL: %s\n", maskPassword(cfg.URL))
-	
+
 	// Add sslmode if not present (required for Supabase)
 	if !strings.Contains(connectionURL, "sslmode") {
 		separator := "?"
@@ -57,7 +57,7 @@ func NewConnection(cfg config.DatabaseConfig) (DB, error) {
 		connectionURL = connectionURL + separator + "sslmode=require"
 		fmt.Printf("INFO: Added sslmode=require\n")
 	}
-	
+
 	// Disable binary parameters to fix bind message errors with connection poolers
 	// binary_parameters=no forces text protocol which doesn't have prepared statement issues
 	if !strings.Contains(connectionURL, "binary_parameters") {
@@ -68,7 +68,7 @@ func NewConnection(cfg config.DatabaseConfig) (DB, error) {
 		connectionURL = connectionURL + separator + "binary_parameters=no"
 		fmt.Printf("INFO: Added binary_parameters=no (fixes connection pooler issues)\n")
 	}
-	
+
 	fmt.Printf("INFO: Final connection URL: %s\n", maskPassword(connectionURL))
 
 	// Connect to database

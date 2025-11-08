@@ -582,6 +582,24 @@ func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
 		// but not enforced here. User decides what fare and seats to set for the timetable.
 	}
 
+	// Parse valid_from date
+	validFrom, err := time.Parse("2006-01-02", req.ValidFrom)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid valid_from date format"})
+		return
+	}
+
+	// Parse valid_until date if provided
+	var validUntil *time.Time
+	if req.ValidUntil != nil {
+		parsedUntil, err := time.Parse("2006-01-02", *req.ValidUntil)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid valid_until date format"})
+			return
+		}
+		validUntil = &parsedUntil
+	}
+
 	// Create timetable
 	schedule := &models.TripSchedule{
 		ID:                   uuid.New().String(),
@@ -598,6 +616,8 @@ func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
 		IsBookable:           req.IsBookable,
 		MaxBookableSeats:     &req.MaxBookableSeats,
 		BookingAdvanceHours:  req.BookingAdvanceHours,
+		ValidFrom:            validFrom,   // NEW: Set validity start date
+		ValidUntil:           validUntil,  // NEW: Set validity end date
 		IsActive:             true,
 		Notes:                req.Notes,
 	}

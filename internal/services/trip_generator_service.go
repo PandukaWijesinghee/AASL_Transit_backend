@@ -81,15 +81,11 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 
 			// Create scheduled trip
 			scheduleID := schedule.ID
-			permitID := ""
-			if schedule.PermitID != nil {
-				permitID = *schedule.PermitID
-			}
 			trip := &models.ScheduledTrip{
 				ID:                   uuid.New().String(),
 				TripScheduleID:       &scheduleID,
 				CustomRouteID:        schedule.CustomRouteID,
-				PermitID:             permitID,
+				PermitID:             schedule.PermitID, // Pass pointer directly (nil if not set)
 				BusID:                schedule.BusID,
 				TripDate:             currentDate,
 				DepartureTime:        schedule.DepartureTime,
@@ -193,15 +189,11 @@ func (s *TripGeneratorService) GenerateFutureTrips() (int, error) {
 
 			// Create scheduled trip
 			scheduleID := timetable.ID
-			permitID := ""
-			if timetable.PermitID != nil {
-				permitID = *timetable.PermitID
-			}
 			trip := &models.ScheduledTrip{
 				ID:                   uuid.New().String(),
 				TripScheduleID:       &scheduleID,
 				CustomRouteID:        timetable.CustomRouteID,
-				PermitID:             permitID,
+				PermitID:             timetable.PermitID, // Pass pointer directly (nil if not set)
 				BusID:                timetable.BusID,
 				TripDate:             date,
 				DepartureTime:        timetable.DepartureTime,
