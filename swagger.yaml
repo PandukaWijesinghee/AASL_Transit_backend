@@ -4687,31 +4687,31 @@ components:
       type: object
       required:
         - id
-        - permit_id
+        - bus_owner_id
         - recurrence_type
         - departure_time
-        - direction
-        - trips_per_day
         - base_fare
-        - valid_from
         - is_active
       properties:
         id:
           type: string
           format: uuid
           example: "d3eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
-        permit_id:
+        bus_owner_id:
           type: string
           format: uuid
-          example: "c2eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
-        bus_id:
+          example: "a1eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        bus_owner_route_id:
           type: string
           format: uuid
+          example: "b2eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+          description: "Reference to the custom route (bus_owner_routes table)"
         schedule_name:
           type: string
+          example: "Morning Express"
         recurrence_type:
           type: string
-          enum: [daily, weekly, specific_dates]
+          enum: [daily, weekly, interval]
           example: "weekly"
         recurrence_days:
           type: array
@@ -4720,52 +4720,24 @@ components:
             minimum: 0
             maximum: 6
           example: [1, 2, 3, 4, 5]
-          description: "Days of week: 0=Sunday, 6=Saturday"
-        specific_dates:
-          type: array
-          items:
-            type: string
-            format: date
-          example: ["2025-11-05", "2025-11-12"]
+          description: "Days of week: 0=Sunday, 6=Saturday (for weekly recurrence)"
+        recurrence_interval:
+          type: integer
+          example: 3
+          description: "For interval recurrence: repeat every N days"
         departure_time:
           type: string
           example: "08:00:00"
         estimated_arrival_time:
           type: string
           example: "10:30:00"
-        direction:
-          type: string
-          enum: [UP, DOWN, ROUND_TRIP]
-          example: "UP"
-        trips_per_day:
-          type: integer
-          minimum: 1
-          maximum: 10
-          example: 2
         base_fare:
           type: number
           format: double
           example: 350.00
-        is_bookable:
+        is_active:
           type: boolean
           example: true
-        max_bookable_seats:
-          type: integer
-          example: 45
-        advance_booking_hours:
-          type: integer
-          example: 24
-        default_driver_id:
-          type: string
-          format: uuid
-        default_conductor_id:
-          type: string
-          format: uuid
-        selected_stop_ids:
-          type: array
-          items:
-            type: string
-            format: uuid
         valid_from:
           type: string
           format: date
@@ -4774,9 +4746,6 @@ components:
           type: string
           format: date
           example: "2025-12-31"
-        is_active:
-          type: boolean
-          example: true
         notes:
           type: string
           example: "Regular weekday service"
