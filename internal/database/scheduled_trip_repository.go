@@ -127,6 +127,64 @@ func (r *ScheduledTripRepository) GetByScheduleIDsAndDateRange(scheduleIDs []str
 	return trips, nil
 }
 
+// GetByScheduleIDsAndDateRangeWithRouteInfo retrieves trips with route information for specific schedule IDs within a date range
+func (r *ScheduledTripRepository) GetByScheduleIDsAndDateRangeWithRouteInfo(scheduleIDs []string, startDate, endDate time.Time) ([]models.ScheduledTripWithRouteInfo, error) {
+	fmt.Printf("🔍 REPO: GetByScheduleIDsAndDateRangeWithRouteInfo called with %d schedule IDs, dates: %s to %s\n",
+		len(scheduleIDs), startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+
+	if len(scheduleIDs) == 0 {
+		fmt.Println("⚠️  REPO: No schedule IDs provided, returning empty array")
+		return []models.ScheduledTripWithRouteInfo{}, nil
+	}
+
+	// Build placeholders for IN clause: $3, $4, $5, ...
+	placeholders := make([]string, len(scheduleIDs))
+	args := []interface{}{startDate, endDate}
+	for i, id := range scheduleIDs {
+		placeholders[i] = fmt.Sprintf("$%d", i+3) // Start from $3 since $1 and $2 are dates
+		args = append(args, id)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT 
+			st.id, st.trip_schedule_id, st.permit_id, st.trip_date, st.departure_time,
+			st.estimated_arrival_time, st.assigned_driver_id, st.assigned_conductor_id,
+			st.is_bookable, st.base_fare, st.status, st.cancellation_reason, st.cancelled_at,
+			st.assignment_deadline, st.is_published, st.created_at, st.updated_at,
+			mr.route_number, mr.origin_city, mr.destination_city,
+			bor.is_up_direction
+		FROM scheduled_trips st
+		LEFT JOIN trip_schedules ts ON st.trip_schedule_id = ts.id
+		LEFT JOIN route_permits rp ON COALESCE(ts.permit_id, st.permit_id) = rp.id
+		LEFT JOIN master_routes mr ON rp.master_route_id = mr.id
+		LEFT JOIN bus_owner_routes bor ON ts.custom_route_id = bor.id
+		WHERE st.trip_schedule_id IN (%s)
+		  AND st.trip_date BETWEEN $1 AND $2
+		ORDER BY st.trip_date, st.departure_time
+	`, strings.Join(placeholders, ", "))
+
+	fmt.Printf("📝 REPO: Executing SQL query with route info:\n%s\n", query)
+	fmt.Printf("📝 REPO: Query args: $1=%s, $2=%s, schedule_ids=%v\n",
+		startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), scheduleIDs)
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		fmt.Printf("❌ REPO: SQL query error: %v\n", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	fmt.Println("✅ REPO: SQL query executed successfully, scanning results with route info...")
+	trips, scanErr := r.scanTripsWithRouteInfo(rows)
+	if scanErr != nil {
+		fmt.Printf("❌ REPO: Error scanning trips with route info: %v\n", scanErr)
+		return nil, scanErr
+	}
+
+	fmt.Printf("✅ REPO: Successfully scanned %d trips with route info from database\n", len(trips))
+	return trips, nil
+}
+
 // GetByDateRange retrieves scheduled trips within a date range
 func (r *ScheduledTripRepository) GetByDateRange(startDate, endDate time.Time) ([]models.ScheduledTrip, error) {
 	query := `
@@ -404,6 +462,105 @@ func (r *ScheduledTripRepository) scanTrips(rows *sql.Rows) ([]models.ScheduledT
 		}
 
 		trips = append(trips, trip)
+	}
+
+	return trips, rows.Err()
+}
+
+// scanTripsWithRouteInfo scans rows into ScheduledTripWithRouteInfo structs
+func (r *ScheduledTripRepository) scanTripsWithRouteInfo(rows *sql.Rows) ([]models.ScheduledTripWithRouteInfo, error) {
+	trips := []models.ScheduledTripWithRouteInfo{}
+
+	for rows.Next() {
+		var tripWithRoute models.ScheduledTripWithRouteInfo
+		var tripScheduleID sql.NullString
+		var permitID sql.NullString
+		var estimatedArrivalTime sql.NullString
+		var assignedDriverID sql.NullString
+		var assignedConductorID sql.NullString
+		var assignmentDeadline sql.NullTime
+		var cancellationReason sql.NullString
+		var cancelledAt sql.NullTime
+		var routeNumber sql.NullString
+		var originCity sql.NullString
+		var destinationCity sql.NullString
+		var isUpDirection sql.NullBool
+
+		// Must match SELECT order (21 columns):
+		// st.id, st.trip_schedule_id, st.permit_id, st.trip_date, st.departure_time,
+		// st.estimated_arrival_time, st.assigned_driver_id, st.assigned_conductor_id,
+		// st.is_bookable, st.base_fare, st.status, st.cancellation_reason, st.cancelled_at,
+		// st.assignment_deadline, st.is_published, st.created_at, st.updated_at,
+		// mr.route_number, mr.origin_city, mr.destination_city, bor.is_up_direction
+		err := rows.Scan(
+			&tripWithRoute.ID,
+			&tripScheduleID,
+			&permitID,
+			&tripWithRoute.TripDate,
+			&tripWithRoute.DepartureTime,
+			&estimatedArrivalTime,
+			&assignedDriverID,
+			&assignedConductorID,
+			&tripWithRoute.IsBookable,
+			&tripWithRoute.BaseFare,
+			&tripWithRoute.Status,
+			&cancellationReason,
+			&cancelledAt,
+			&assignmentDeadline,
+			&tripWithRoute.IsPublished,
+			&tripWithRoute.CreatedAt,
+			&tripWithRoute.UpdatedAt,
+			&routeNumber,
+			&originCity,
+			&destinationCity,
+			&isUpDirection,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		// Convert sql.Null* types to pointers for ScheduledTrip fields
+		if tripScheduleID.Valid {
+			tripWithRoute.TripScheduleID = &tripScheduleID.String
+		}
+		if permitID.Valid {
+			tripWithRoute.PermitID = &permitID.String
+		}
+		if estimatedArrivalTime.Valid {
+			tripWithRoute.EstimatedArrivalTime = &estimatedArrivalTime.String
+		}
+		if assignedDriverID.Valid {
+			tripWithRoute.AssignedDriverID = &assignedDriverID.String
+		}
+		if assignedConductorID.Valid {
+			tripWithRoute.AssignedConductorID = &assignedConductorID.String
+		}
+		if assignmentDeadline.Valid {
+			tripWithRoute.AssignmentDeadline = &assignmentDeadline.Time
+		}
+		if cancellationReason.Valid {
+			tripWithRoute.CancellationReason = &cancellationReason.String
+		}
+		if cancelledAt.Valid {
+			tripWithRoute.CancelledAt = &cancelledAt.Time
+		}
+
+		// Convert sql.Null* types to pointers for route info fields
+		if routeNumber.Valid {
+			tripWithRoute.RouteNumber = &routeNumber.String
+		}
+		if originCity.Valid {
+			tripWithRoute.OriginCity = &originCity.String
+		}
+		if destinationCity.Valid {
+			tripWithRoute.DestinationCity = &destinationCity.String
+		}
+		if isUpDirection.Valid {
+			tripWithRoute.IsUpDirection = &isUpDirection.Bool
+		}
+
+		trips = append(trips, tripWithRoute)
 	}
 
 	return trips, rows.Err()

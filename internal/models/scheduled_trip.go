@@ -209,3 +209,12 @@ func (s *ScheduledTrip) OccupancyPercentage() float64 {
 	}
 	return float64(s.BookedSeats) / float64(s.TotalSeats) * 100
 }
+
+// ScheduledTripWithRouteInfo extends ScheduledTrip with route details
+type ScheduledTripWithRouteInfo struct {
+	ScheduledTrip
+	RouteNumber      *string `json:"route_number,omitempty"`
+	OriginCity       *string `json:"origin_city,omitempty"`
+	DestinationCity  *string `json:"destination_city,omitempty"`
+	IsUpDirection    *bool   `json:"is_up_direction,omitempty"`
+}

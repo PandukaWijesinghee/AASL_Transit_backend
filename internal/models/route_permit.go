@@ -37,8 +37,8 @@ func (a *StringArray) Scan(src interface{}) error {
 // RoutePermit represents a government-issued route permit for a bus owner
 // Route details (number, origin, destination, etc.) are stored in master_routes table
 type RoutePermit struct {
-	ID                    string             `json:"id" db:"id"`
-	BusOwnerID            string             `json:"bus_owner_id" db:"bus_owner_id"`
+	ID                      string             `json:"id" db:"id"`
+	BusOwnerID              string             `json:"bus_owner_id" db:"bus_owner_id"`
 	PermitNumber            string             `json:"permit_number" db:"permit_number"`
 	BusRegistrationNumber   string             `json:"bus_registration_number" db:"bus_registration_number"`
 	MasterRouteID           string             `json:"master_route_id" db:"master_route_id"` // FK to master_routes
@@ -49,13 +49,13 @@ type RoutePermit struct {
 	ApprovedFare            float64            `json:"approved_fare" db:"approved_fare"`
 	ApprovedSeatingCapacity *int               `json:"approved_seating_capacity,omitempty" db:"approved_seating_capacity"`
 	MaxTripsPerDay          *int               `json:"max_trips_per_day,omitempty" db:"max_trips_per_day"`
-	AllowedBusTypes       StringArray        `json:"allowed_bus_types,omitempty" db:"allowed_bus_types"`
-	Restrictions          *string            `json:"restrictions,omitempty" db:"restrictions"`
-	Status                VerificationStatus `json:"status" db:"status"`
-	VerifiedAt            *time.Time         `json:"verified_at,omitempty" db:"verified_at"`
-	PermitDocumentURL     *string            `json:"permit_document_url,omitempty" db:"permit_document_url"`
-	CreatedAt             time.Time          `json:"created_at" db:"created_at"`
-	UpdatedAt             time.Time          `json:"updated_at" db:"updated_at"`
+	AllowedBusTypes         StringArray        `json:"allowed_bus_types,omitempty" db:"allowed_bus_types"`
+	Restrictions            *string            `json:"restrictions,omitempty" db:"restrictions"`
+	Status                  VerificationStatus `json:"status" db:"status"`
+	VerifiedAt              *time.Time         `json:"verified_at,omitempty" db:"verified_at"`
+	PermitDocumentURL       *string            `json:"permit_document_url,omitempty" db:"permit_document_url"`
+	CreatedAt               time.Time          `json:"created_at" db:"created_at"`
+	UpdatedAt               time.Time          `json:"updated_at" db:"updated_at"`
 }
 
 // RoutePermitWithDetails includes route information from master_routes (for API responses)
@@ -100,21 +100,21 @@ func (p *RoutePermitWithDetails) RouteDisplayName() string {
 // CreateRoutePermitRequest represents the request body for creating a permit
 type CreateRoutePermitRequest struct {
 	// Core required fields
-	PermitNumber          string   `json:"permit_number" binding:"required"`
-	BusRegistrationNumber string   `json:"bus_registration_number" binding:"required"`
-	MasterRouteID         string   `json:"master_route_id" binding:"required"` // REQUIRED: Must select from master routes
-	ApprovedFare          float64  `json:"approved_fare" binding:"required,gt=0"`
-	ValidityFrom          string   `json:"validity_from" binding:"required"` // Date format: YYYY-MM-DD
-	ValidityTo            string   `json:"validity_to" binding:"required"`   // Date format: YYYY-MM-DD
+	PermitNumber          string  `json:"permit_number" binding:"required"`
+	BusRegistrationNumber string  `json:"bus_registration_number" binding:"required"`
+	MasterRouteID         string  `json:"master_route_id" binding:"required"` // REQUIRED: Must select from master routes
+	ApprovedFare          float64 `json:"approved_fare" binding:"required,gt=0"`
+	ValidityFrom          string  `json:"validity_from" binding:"required"` // Date format: YYYY-MM-DD
+	ValidityTo            string  `json:"validity_to" binding:"required"`   // Date format: YYYY-MM-DD
 
 	// Optional: Permit-specific intermediate stops (can differ from master route)
-	Via                   *string  `json:"via,omitempty"`
+	Via *string `json:"via,omitempty"`
 
 	// Optional permit details
-	PermitType            *string  `json:"permit_type,omitempty"`
-	MaxTripsPerDay        *int     `json:"max_trips_per_day,omitempty"`
-	AllowedBusTypes       []string `json:"allowed_bus_types,omitempty"`
-	Restrictions          *string  `json:"restrictions,omitempty"`
+	PermitType      *string  `json:"permit_type,omitempty"`
+	MaxTripsPerDay  *int     `json:"max_trips_per_day,omitempty"`
+	AllowedBusTypes []string `json:"allowed_bus_types,omitempty"`
+	Restrictions    *string  `json:"restrictions,omitempty"`
 }
 
 // Validate validates the create permit request
@@ -170,15 +170,15 @@ type UpdateRoutePermitRequest struct {
 
 // RoutePermitStop represents a stop on a route permit
 type RoutePermitStop struct {
-	ID                     string     `json:"id" db:"id"`
-	RoutePermitID          string     `json:"route_permit_id" db:"route_permit_id"`
-	StopName               string     `json:"stop_name" db:"stop_name"`
-	StopOrder              int        `json:"stop_order" db:"stop_order"`
-	Latitude               *float64   `json:"latitude,omitempty" db:"latitude"`
-	Longitude              *float64   `json:"longitude,omitempty" db:"longitude"`
-	ArrivalTimeOffsetMins  *int       `json:"arrival_time_offset_minutes,omitempty" db:"arrival_time_offset_minutes"`
-	IsMajorStop            bool       `json:"is_major_stop" db:"is_major_stop"`
-	CreatedAt              time.Time  `json:"created_at" db:"created_at"`
+	ID                    string    `json:"id" db:"id"`
+	RoutePermitID         string    `json:"route_permit_id" db:"route_permit_id"`
+	StopName              string    `json:"stop_name" db:"stop_name"`
+	StopOrder             int       `json:"stop_order" db:"stop_order"`
+	Latitude              *float64  `json:"latitude,omitempty" db:"latitude"`
+	Longitude             *float64  `json:"longitude,omitempty" db:"longitude"`
+	ArrivalTimeOffsetMins *int      `json:"arrival_time_offset_minutes,omitempty" db:"arrival_time_offset_minutes"`
+	IsMajorStop           bool      `json:"is_major_stop" db:"is_major_stop"`
+	CreatedAt             time.Time `json:"created_at" db:"created_at"`
 }
 
 // NewRoutePermitFromRequest creates a RoutePermit from a CreateRoutePermitRequest
@@ -230,7 +230,7 @@ func NewRoutePermitFromRequest(busOwnerID string, req *CreateRoutePermitRequest)
 		PermitNumber:          req.PermitNumber,
 		BusRegistrationNumber: req.BusRegistrationNumber,
 		MasterRouteID:         req.MasterRouteID, // FK to master_routes
-		Via:                   via,                // Permit-specific stops (optional)
+		Via:                   via,               // Permit-specific stops (optional)
 		ApprovedFare:          req.ApprovedFare,
 		IssueDate:             issueDate,
 		ExpiryDate:            expiryDate,

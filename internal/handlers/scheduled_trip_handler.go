@@ -116,7 +116,7 @@ func (h *ScheduledTripHandler) GetTripsByDateRange(c *gin.Context) {
 
 	if len(scheduleIDs) == 0 {
 		fmt.Println("⚠️  WARNING: No schedules found - returning empty trips array")
-		c.JSON(http.StatusOK, []models.ScheduledTrip{})
+		c.JSON(http.StatusOK, []models.ScheduledTripWithRouteInfo{})
 		return
 	}
 
@@ -125,18 +125,22 @@ func (h *ScheduledTripHandler) GetTripsByDateRange(c *gin.Context) {
 	// Get trips directly by schedule IDs and date range
 	fmt.Printf("🔍 STEP 6: Querying scheduled_trips WHERE trip_schedule_id IN (%d IDs) AND date BETWEEN %s AND %s\n",
 		len(scheduleIDs), startDateStr, endDateStr)
-	ownerTrips, err := h.tripRepo.GetByScheduleIDsAndDateRange(scheduleIDs, startDate, endDate)
+	ownerTrips, err := h.tripRepo.GetByScheduleIDsAndDateRangeWithRouteInfo(scheduleIDs, startDate, endDate)
 	if err != nil {
 		fmt.Printf("❌ ERROR: Failed to fetch trips: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trips"})
 		return
 	}
 
-	fmt.Printf("✅ STEP 6 RESULT: Found %d trips in scheduled_trips table\n", len(ownerTrips))
+	fmt.Printf("✅ STEP 6 RESULT: Found %d trips in scheduled_trips table with route info\n", len(ownerTrips))
 	if len(ownerTrips) > 0 {
 		for i, trip := range ownerTrips {
-			fmt.Printf("   - Trip[%d]: id=%s, date=%s, time=%s, schedule_id=%v\n",
-				i+1, trip.ID, trip.TripDate.Format("2006-01-02"), trip.DepartureTime, trip.TripScheduleID)
+			routeInfo := "no route"
+			if trip.OriginCity != nil && trip.DestinationCity != nil {
+				routeInfo = fmt.Sprintf("%s - %s", *trip.OriginCity, *trip.DestinationCity)
+			}
+			fmt.Printf("   - Trip[%d]: id=%s, date=%s, time=%s, route=%s\n",
+				i+1, trip.ID, trip.TripDate.Format("2006-01-02"), trip.DepartureTime, routeInfo)
 		}
 	}
 
@@ -517,22 +521,22 @@ func (h *ScheduledTripHandler) CreateSpecialTrip(c *gin.Context) {
 					"requested_fare": req.BaseFare,
 					"approved_fare":  permit.ApprovedFare,
 				},
-		})
-		return
-	}
+			})
+			return
+		}
 
-	// Validate max bookable seats against permit approved seating capacity
-	if permit.ApprovedSeatingCapacity != nil && req.MaxBookableSeats > *permit.ApprovedSeatingCapacity {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Max bookable seats exceeds permit approved seating capacity",
-			"details": map[string]interface{}{
-				"requested_seats": req.MaxBookableSeats,
-				"approved_seats":  *permit.ApprovedSeatingCapacity,
-			},
-		})
-		return
-	}
-}	// Parse trip date
+		// Validate max bookable seats against permit approved seating capacity
+		if permit.ApprovedSeatingCapacity != nil && req.MaxBookableSeats > *permit.ApprovedSeatingCapacity {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Max bookable seats exceeds permit approved seating capacity",
+				"details": map[string]interface{}{
+					"requested_seats": req.MaxBookableSeats,
+					"approved_seats":  *permit.ApprovedSeatingCapacity,
+				},
+			})
+			return
+		}
+	} // Parse trip date
 	tripDate, _ := time.Parse("2006-01-02", req.TripDate) // Already validated in Validate()	// Parse departure time
 	var departureHour, departureMinute int
 	if t, err := time.Parse("15:04", req.DepartureTime); err == nil {
