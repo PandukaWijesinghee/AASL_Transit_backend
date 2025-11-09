@@ -157,7 +157,7 @@ func (r *ScheduledTripRepository) GetByScheduleIDsAndDateRangeWithRouteInfo(sche
 		LEFT JOIN trip_schedules ts ON st.trip_schedule_id = ts.id
 		LEFT JOIN route_permits rp ON st.permit_id = rp.id
 		LEFT JOIN master_routes mr ON rp.master_route_id = mr.id
-		LEFT JOIN bus_owner_routes bor ON COALESCE(st.custom_route_id, ts.bus_owner_route_id) = bor.id
+		LEFT JOIN bus_owner_routes bor ON ts.bus_owner_route_id = bor.id
 		WHERE st.trip_schedule_id IN (%s)
 		  AND st.trip_date BETWEEN $1 AND $2
 		ORDER BY st.trip_date, st.departure_time
