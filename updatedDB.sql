@@ -352,11 +352,13 @@ CREATE TABLE public.scheduled_trips (
   updated_at timestamp with time zone DEFAULT now(),
   assignment_deadline timestamp with time zone,
   is_published boolean NOT NULL DEFAULT false,
+  bus_owner_route_id uuid,
   CONSTRAINT scheduled_trips_pkey PRIMARY KEY (id),
   CONSTRAINT scheduled_trips_trip_schedule_id_fkey FOREIGN KEY (trip_schedule_id) REFERENCES public.trip_schedules(id),
   CONSTRAINT scheduled_trips_permit_id_fkey FOREIGN KEY (permit_id) REFERENCES public.route_permits(id),
   CONSTRAINT scheduled_trips_assigned_driver_id_fkey FOREIGN KEY (assigned_driver_id) REFERENCES public.bus_staff(id),
-  CONSTRAINT scheduled_trips_assigned_conductor_id_fkey FOREIGN KEY (assigned_conductor_id) REFERENCES public.bus_staff(id)
+  CONSTRAINT scheduled_trips_assigned_conductor_id_fkey FOREIGN KEY (assigned_conductor_id) REFERENCES public.bus_staff(id),
+  CONSTRAINT fk_scheduled_trips_bus_owner_route FOREIGN KEY (bus_owner_route_id) REFERENCES public.bus_owner_routes(id)
 );
 CREATE TABLE public.system_settings (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),

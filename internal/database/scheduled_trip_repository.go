@@ -152,7 +152,7 @@ func (r *ScheduledTripRepository) GetByScheduleIDsAndDateRangeWithRouteInfo(sche
 			st.is_bookable, st.base_fare, st.status, st.cancellation_reason, st.cancelled_at,
 			st.assignment_deadline, st.is_published, st.created_at, st.updated_at,
 			mr.route_number, mr.origin_city, mr.destination_city,
-			bor.is_up_direction
+			bor.direction
 		FROM scheduled_trips st
 		LEFT JOIN trip_schedules ts ON st.trip_schedule_id = ts.id
 		LEFT JOIN bus_owner_routes bor ON COALESCE(st.bus_owner_route_id, ts.bus_owner_route_id) = bor.id
@@ -492,14 +492,14 @@ func (r *ScheduledTripRepository) scanTripsWithRouteInfo(rows *sql.Rows) ([]mode
 		var routeNumber sql.NullString
 		var originCity sql.NullString
 		var destinationCity sql.NullString
-		var isUpDirection sql.NullBool
+		var direction sql.NullString // "UP" or "DOWN" from database
 
 		// Must match SELECT order (21 columns):
 		// st.id, st.trip_schedule_id, st.permit_id, st.trip_date, st.departure_time,
 		// st.estimated_arrival_time, st.assigned_driver_id, st.assigned_conductor_id,
 		// st.is_bookable, st.base_fare, st.status, st.cancellation_reason, st.cancelled_at,
 		// st.assignment_deadline, st.is_published, st.created_at, st.updated_at,
-		// mr.route_number, mr.origin_city, mr.destination_city, bor.is_up_direction
+		// mr.route_number, mr.origin_city, mr.destination_city, bor.direction
 		err := rows.Scan(
 			&tripWithRoute.ID,
 			&tripScheduleID,
@@ -521,7 +521,7 @@ func (r *ScheduledTripRepository) scanTripsWithRouteInfo(rows *sql.Rows) ([]mode
 			&routeNumber,
 			&originCity,
 			&destinationCity,
-			&isUpDirection,
+			&direction, // Scan string direction
 		)
 
 		if err != nil {
@@ -564,8 +564,10 @@ func (r *ScheduledTripRepository) scanTripsWithRouteInfo(rows *sql.Rows) ([]mode
 		if destinationCity.Valid {
 			tripWithRoute.DestinationCity = &destinationCity.String
 		}
-		if isUpDirection.Valid {
-			tripWithRoute.IsUpDirection = &isUpDirection.Bool
+		if direction.Valid {
+			// Convert string "UP"/"DOWN" to boolean for IsUpDirection
+			isUp := direction.String == "UP"
+			tripWithRoute.IsUpDirection = &isUp
 		}
 
 		trips = append(trips, tripWithRoute)
