@@ -4438,6 +4438,11 @@ components:
           type: number
           format: double
           example: 250.00
+        approved_seating_capacity:
+          type: integer
+          nullable: true
+          example: 52
+          description: Approved number of seats for this permit (optional)
         issue_date:
           type: string
           format: date
@@ -4491,6 +4496,10 @@ components:
           type: number
           format: double
           example: 250.00
+        approved_seating_capacity:
+          type: integer
+          example: 52
+          description: Approved number of seats (optional)
         validity_from:
           type: string
           format: date
@@ -4513,6 +4522,10 @@ components:
           type: number
           format: double
           example: 250.00
+        approved_seating_capacity:
+          type: integer
+          example: 52
+          description: Approved number of seats (optional)
         validity_to:
           type: string
           format: date
