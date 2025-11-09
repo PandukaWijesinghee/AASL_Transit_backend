@@ -51,13 +51,10 @@ func (r *ScheduledTripRepository) Create(trip *models.ScheduledTrip) error {
 // GetByID retrieves a scheduled trip by ID
 func (r *ScheduledTripRepository) GetByID(tripID string) (*models.ScheduledTrip, error) {
 	query := `
-		SELECT id, trip_schedule_id, custom_route_id, permit_id, bus_id,
-			   trip_date, departure_time, estimated_arrival_time,
-			   assigned_driver_id, assigned_conductor_id,
-			   is_bookable, is_published, total_seats, available_seats, booked_seats,
-			   base_fare, booking_advance_hours, assignment_deadline,
-			   status, cancellation_reason, cancelled_at,
-			   selected_stop_ids, created_at, updated_at
+		SELECT id, trip_schedule_id, permit_id, trip_date, departure_time,
+			   estimated_arrival_time, assigned_driver_id, assigned_conductor_id,
+			   is_bookable, base_fare, status, cancellation_reason, cancelled_at,
+			   assignment_deadline, is_published, created_at, updated_at
 		FROM scheduled_trips
 		WHERE id = $1
 	`
@@ -68,13 +65,10 @@ func (r *ScheduledTripRepository) GetByID(tripID string) (*models.ScheduledTrip,
 // GetByScheduleAndDate checks if a trip exists for a schedule on a specific date
 func (r *ScheduledTripRepository) GetByScheduleAndDate(scheduleID string, date time.Time) (*models.ScheduledTrip, error) {
 	query := `
-		SELECT id, trip_schedule_id, custom_route_id, permit_id, bus_id,
-			   trip_date, departure_time, estimated_arrival_time,
-			   assigned_driver_id, assigned_conductor_id,
-			   is_bookable, is_published, total_seats, available_seats, booked_seats,
-			   base_fare, booking_advance_hours, assignment_deadline,
-			   status, cancellation_reason, cancelled_at,
-			   selected_stop_ids, created_at, updated_at
+		SELECT id, trip_schedule_id, permit_id, trip_date, departure_time,
+			   estimated_arrival_time, assigned_driver_id, assigned_conductor_id,
+			   is_bookable, base_fare, status, cancellation_reason, cancelled_at,
+			   assignment_deadline, is_published, created_at, updated_at
 		FROM scheduled_trips
 		WHERE trip_schedule_id = $1 AND trip_date = $2
 	`
@@ -101,13 +95,10 @@ func (r *ScheduledTripRepository) GetByScheduleIDsAndDateRange(scheduleIDs []str
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, trip_schedule_id, custom_route_id, permit_id, bus_id,
-			   trip_date, departure_time, estimated_arrival_time,
-			   assigned_driver_id, assigned_conductor_id,
-			   is_bookable, is_published, total_seats, available_seats, booked_seats,
-			   base_fare, booking_advance_hours, assignment_deadline,
-			   status, cancellation_reason, cancelled_at,
-			   selected_stop_ids, created_at, updated_at
+		SELECT id, trip_schedule_id, permit_id, trip_date, departure_time,
+			   estimated_arrival_time, assigned_driver_id, assigned_conductor_id,
+			   is_bookable, base_fare, status, cancellation_reason, cancelled_at,
+			   assignment_deadline, is_published, created_at, updated_at
 		FROM scheduled_trips
 		WHERE trip_schedule_id IN (%s)
 		  AND trip_date BETWEEN $1 AND $2
@@ -139,13 +130,10 @@ func (r *ScheduledTripRepository) GetByScheduleIDsAndDateRange(scheduleIDs []str
 // GetByDateRange retrieves scheduled trips within a date range
 func (r *ScheduledTripRepository) GetByDateRange(startDate, endDate time.Time) ([]models.ScheduledTrip, error) {
 	query := `
-		SELECT id, trip_schedule_id, custom_route_id, permit_id, bus_id,
-			   trip_date, departure_time, estimated_arrival_time,
-			   assigned_driver_id, assigned_conductor_id,
-			   is_bookable, is_published, total_seats, available_seats, booked_seats,
-			   base_fare, booking_advance_hours, assignment_deadline,
-			   status, cancellation_reason, cancelled_at,
-			   selected_stop_ids, created_at, updated_at
+		SELECT id, trip_schedule_id, permit_id, trip_date, departure_time,
+			   estimated_arrival_time, assigned_driver_id, assigned_conductor_id,
+			   is_bookable, base_fare, status, cancellation_reason, cancelled_at,
+			   assignment_deadline, is_published, created_at, updated_at
 		FROM scheduled_trips
 		WHERE trip_date BETWEEN $1 AND $2
 		ORDER BY trip_date, departure_time
@@ -284,7 +272,7 @@ func (r *ScheduledTripRepository) Cancel(tripID string, reason string) error {
 // scanTrip scans a single trip
 func (r *ScheduledTripRepository) scanTrip(row scanner) (*models.ScheduledTrip, error) {
 	trip := &models.ScheduledTrip{}
-	var tripScheduleID, customRouteID, permitID, busID sql.NullString
+	var tripScheduleID, permitID sql.NullString
 	var estimatedArrivalTime sql.NullString
 	var assignedDriverID sql.NullString
 	var assignedConductorID sql.NullString
@@ -295,26 +283,19 @@ func (r *ScheduledTripRepository) scanTrip(row scanner) (*models.ScheduledTrip, 
 	err := row.Scan(
 		&trip.ID,
 		&tripScheduleID,
-		&customRouteID,
 		&permitID,
-		&busID,
 		&trip.TripDate,
 		&trip.DepartureTime,
 		&estimatedArrivalTime,
 		&assignedDriverID,
 		&assignedConductorID,
 		&trip.IsBookable,
-		&trip.IsPublished,
-		&trip.TotalSeats,
-		&trip.AvailableSeats,
-		&trip.BookedSeats,
 		&trip.BaseFare,
-		&trip.BookingAdvanceHours,
-		&assignmentDeadline,
 		&trip.Status,
 		&cancellationReason,
 		&cancelledAt,
-		&trip.SelectedStopIDs,
+		&assignmentDeadline,
+		&trip.IsPublished,
 		&trip.CreatedAt,
 		&trip.UpdatedAt,
 	)
@@ -327,14 +308,8 @@ func (r *ScheduledTripRepository) scanTrip(row scanner) (*models.ScheduledTrip, 
 	if tripScheduleID.Valid {
 		trip.TripScheduleID = &tripScheduleID.String
 	}
-	if customRouteID.Valid {
-		trip.CustomRouteID = &customRouteID.String
-	}
 	if permitID.Valid {
 		trip.PermitID = &permitID.String
-	}
-	if busID.Valid {
-		trip.BusID = &busID.String
 	}
 	if estimatedArrivalTime.Valid {
 		trip.EstimatedArrivalTime = &estimatedArrivalTime.String
@@ -365,33 +340,37 @@ func (r *ScheduledTripRepository) scanTrips(rows *sql.Rows) ([]models.ScheduledT
 	for rows.Next() {
 		var trip models.ScheduledTrip
 		var tripScheduleID sql.NullString
-		var customRouteID sql.NullString
 		var permitID sql.NullString
-		var busID sql.NullString
 		var estimatedArrivalTime sql.NullString
 		var assignedDriverID sql.NullString
 		var assignedConductorID sql.NullString
-		var isPublished sql.NullBool
 		var assignmentDeadline sql.NullTime
 		var cancellationReason sql.NullString
 		var cancelledAt sql.NullTime
 
-		// Must match SELECT order:
-		// id, trip_schedule_id, custom_route_id, permit_id, bus_id,
-		// trip_date, departure_time, estimated_arrival_time,
-		// assigned_driver_id, assigned_conductor_id,
-		// is_bookable, is_published, total_seats, available_seats, booked_seats,
-		// base_fare, booking_advance_hours, assignment_deadline,
-		// status, cancellation_reason, cancelled_at,
-		// selected_stop_ids, created_at, updated_at
+		// Must match SELECT order (17 columns):
+		// id, trip_schedule_id, permit_id, trip_date, departure_time,
+		// estimated_arrival_time, assigned_driver_id, assigned_conductor_id,
+		// is_bookable, base_fare, status, cancellation_reason, cancelled_at,
+		// assignment_deadline, is_published, created_at, updated_at
 		err := rows.Scan(
-			&trip.ID, &tripScheduleID, &customRouteID, &permitID, &busID,
-			&trip.TripDate, &trip.DepartureTime, &estimatedArrivalTime,
-			&assignedDriverID, &assignedConductorID,
-			&trip.IsBookable, &isPublished, &trip.TotalSeats, &trip.AvailableSeats, &trip.BookedSeats,
-			&trip.BaseFare, &trip.BookingAdvanceHours, &assignmentDeadline,
-			&trip.Status, &cancellationReason, &cancelledAt,
-			&trip.SelectedStopIDs, &trip.CreatedAt, &trip.UpdatedAt,
+			&trip.ID,
+			&tripScheduleID,
+			&permitID,
+			&trip.TripDate,
+			&trip.DepartureTime,
+			&estimatedArrivalTime,
+			&assignedDriverID,
+			&assignedConductorID,
+			&trip.IsBookable,
+			&trip.BaseFare,
+			&trip.Status,
+			&cancellationReason,
+			&cancelledAt,
+			&assignmentDeadline,
+			&trip.IsPublished,
+			&trip.CreatedAt,
+			&trip.UpdatedAt,
 		)
 
 		if err != nil {
@@ -402,14 +381,8 @@ func (r *ScheduledTripRepository) scanTrips(rows *sql.Rows) ([]models.ScheduledT
 		if tripScheduleID.Valid {
 			trip.TripScheduleID = &tripScheduleID.String
 		}
-		if customRouteID.Valid {
-			trip.CustomRouteID = &customRouteID.String
-		}
 		if permitID.Valid {
 			trip.PermitID = &permitID.String
-		}
-		if busID.Valid {
-			trip.BusID = &busID.String
 		}
 		if estimatedArrivalTime.Valid {
 			trip.EstimatedArrivalTime = &estimatedArrivalTime.String
@@ -419,11 +392,6 @@ func (r *ScheduledTripRepository) scanTrips(rows *sql.Rows) ([]models.ScheduledT
 		}
 		if assignedConductorID.Valid {
 			trip.AssignedConductorID = &assignedConductorID.String
-		}
-		if isPublished.Valid {
-			trip.IsPublished = isPublished.Bool
-		} else {
-			trip.IsPublished = false // Default to false (unpublished)
 		}
 		if assignmentDeadline.Valid {
 			trip.AssignmentDeadline = &assignmentDeadline.Time
