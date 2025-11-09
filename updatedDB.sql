@@ -372,7 +372,6 @@ CREATE TABLE public.trip_schedules (
   bus_owner_id uuid NOT NULL,
   schedule_name character varying,
   recurrence_type character varying NOT NULL CHECK (recurrence_type::text = ANY (ARRAY['daily'::character varying, 'weekly'::character varying, 'interval'::character varying]::text[])),
-  recurrence_days ARRAY,
   specific_dates ARRAY,
   departure_time time without time zone NOT NULL,
   base_fare numeric NOT NULL CHECK (base_fare > 0::numeric),
@@ -385,6 +384,7 @@ CREATE TABLE public.trip_schedules (
   estimated_arrival_time time without time zone,
   recurrence_interval integer CHECK (recurrence_interval IS NULL OR recurrence_interval > 0),
   bus_owner_route_id uuid,
+  recurrence_days text,
   CONSTRAINT trip_schedules_pkey PRIMARY KEY (id),
   CONSTRAINT trip_schedules_bus_owner_id_fkey FOREIGN KEY (bus_owner_id) REFERENCES public.bus_owners(id),
   CONSTRAINT fk_trip_schedules_bus_owner_route FOREIGN KEY (bus_owner_route_id) REFERENCES public.bus_owner_routes(id)

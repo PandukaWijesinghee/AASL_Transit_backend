@@ -47,7 +47,7 @@ type RoutePermit struct {
 	ExpiryDate              time.Time          `json:"expiry_date" db:"expiry_date"`
 	PermitType              string             `json:"permit_type" db:"permit_type"`
 	ApprovedFare            float64            `json:"approved_fare" db:"approved_fare"`
-	ApprovedSeatingCapacity int                `json:"approved_seating_capacity" db:"approved_seating_capacity"`
+	ApprovedSeatingCapacity *int               `json:"approved_seating_capacity,omitempty" db:"approved_seating_capacity"`
 	MaxTripsPerDay          *int               `json:"max_trips_per_day,omitempty" db:"max_trips_per_day"`
 	AllowedBusTypes       StringArray        `json:"allowed_bus_types,omitempty" db:"allowed_bus_types"`
 	Restrictions          *string            `json:"restrictions,omitempty" db:"restrictions"`

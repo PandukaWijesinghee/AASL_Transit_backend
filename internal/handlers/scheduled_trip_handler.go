@@ -517,24 +517,22 @@ func (h *ScheduledTripHandler) CreateSpecialTrip(c *gin.Context) {
 					"requested_fare": req.BaseFare,
 					"approved_fare":  permit.ApprovedFare,
 				},
-			})
-			return
-		}
-
-		// Validate max bookable seats against permit approved seating capacity
-		if req.MaxBookableSeats > permit.ApprovedSeatingCapacity {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "Max bookable seats exceeds permit approved seating capacity",
-				"details": map[string]interface{}{
-					"requested_seats": req.MaxBookableSeats,
-					"approved_seats":  permit.ApprovedSeatingCapacity,
-				},
-			})
-			return
-		}
+		})
+		return
 	}
 
-	// Parse trip date
+	// Validate max bookable seats against permit approved seating capacity
+	if permit.ApprovedSeatingCapacity != nil && req.MaxBookableSeats > *permit.ApprovedSeatingCapacity {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Max bookable seats exceeds permit approved seating capacity",
+			"details": map[string]interface{}{
+				"requested_seats": req.MaxBookableSeats,
+				"approved_seats":  *permit.ApprovedSeatingCapacity,
+			},
+		})
+		return
+	}
+}	// Parse trip date
 	tripDate, _ := time.Parse("2006-01-02", req.TripDate) // Already validated in Validate()	// Parse departure time
 	var departureHour, departureMinute int
 	if t, err := time.Parse("15:04", req.DepartureTime); err == nil {
