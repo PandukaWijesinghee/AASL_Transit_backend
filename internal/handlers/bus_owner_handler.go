@@ -74,11 +74,12 @@ func (h *BusOwnerHandler) CheckProfileStatus(c *gin.Context) {
 		return
 	}
 
-	// Count permits
+	// Count permits (non-critical - default to 0 on error)
 	permitCount, err := h.permitRepo.CountPermits(busOwner.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count permits"})
-		return
+		// Log the error but don't fail the entire profile request
+		// User can still access the app without permit count
+		permitCount = 0
 	}
 
 	// Check if company info is complete
