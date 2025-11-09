@@ -4809,6 +4809,12 @@ components:
           type: string
           format: uuid
           example: "d3eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        bus_owner_route_id:
+          type: string
+          format: uuid
+          nullable: true
+          example: "a1eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+          description: Optional route override - if NULL, inherits from trip_schedule.bus_owner_route_id
         permit_id:
           type: string
           format: uuid

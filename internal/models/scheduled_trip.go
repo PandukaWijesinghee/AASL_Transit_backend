@@ -19,9 +19,9 @@ const (
 // ScheduledTrip represents a specific trip instance generated from a schedule or created as a special trip
 type ScheduledTrip struct {
 	ID                   string              `json:"id" db:"id"`
-	TripScheduleID       *string             `json:"trip_schedule_id,omitempty" db:"trip_schedule_id"` // Nullable for special trips
-	CustomRouteID        *string             `json:"custom_route_id,omitempty" db:"custom_route_id"`   // NEW: Reference to custom route
-	PermitID             *string             `json:"permit_id,omitempty" db:"permit_id"`               // Nullable - assigned later
+	TripScheduleID       *string             `json:"trip_schedule_id,omitempty" db:"trip_schedule_id"`       // Nullable for special trips
+	BusOwnerRouteID      *string             `json:"bus_owner_route_id,omitempty" db:"bus_owner_route_id"` // Optional route override - inherits from schedule if NULL
+	PermitID             *string             `json:"permit_id,omitempty" db:"permit_id"`                     // Nullable - assigned later
 	BusID                *string             `json:"bus_id,omitempty" db:"bus_id"`
 	TripDate             time.Time           `json:"trip_date" db:"trip_date"`
 	DepartureTime        string              `json:"departure_time" db:"departure_time"`
