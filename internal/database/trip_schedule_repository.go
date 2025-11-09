@@ -39,7 +39,7 @@ func (r *TripScheduleRepository) CreateTimetable(schedule *models.TripSchedule) 
 
 	err := r.db.QueryRow(
 		query,
-		schedule.ID, schedule.BusOwnerID, schedule.CustomRouteID, schedule.ScheduleName,
+		schedule.ID, schedule.BusOwnerID, schedule.BusOwnerRouteID, schedule.ScheduleName,
 		schedule.RecurrenceType, schedule.RecurrenceDays, schedule.RecurrenceInterval, schedule.DepartureTime,
 		schedule.EstimatedArrivalTime, schedule.BaseFare, schedule.IsActive, schedule.Notes,
 	).Scan(&schedule.CreatedAt, &schedule.UpdatedAt)
@@ -117,7 +117,7 @@ func (r *TripScheduleRepository) GetByID(scheduleID string) (*models.TripSchedul
 
 	// Convert sql.Null* types
 	if customRouteID.Valid {
-		schedule.CustomRouteID = &customRouteID.String
+		schedule.BusOwnerRouteID = &customRouteID.String
 	}
 	if scheduleName.Valid {
 		schedule.ScheduleName = &scheduleName.String
@@ -358,7 +358,7 @@ func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSch
 
 		// Convert sql.Null* types
 		if busOwnerRouteID.Valid {
-			schedule.CustomRouteID = &busOwnerRouteID.String
+			schedule.BusOwnerRouteID = &busOwnerRouteID.String
 		}
 		if scheduleName.Valid {
 			schedule.ScheduleName = &scheduleName.String
@@ -415,7 +415,7 @@ func (r *TripScheduleRepository) scanTimetables(rows *sql.Rows) ([]models.TripSc
 
 		// Convert sql.Null* types
 		if customRouteID.Valid {
-			schedule.CustomRouteID = &customRouteID.String
+			schedule.BusOwnerRouteID = &customRouteID.String
 		}
 		if scheduleName.Valid {
 			schedule.ScheduleName = &scheduleName.String

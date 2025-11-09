@@ -3753,7 +3753,19 @@ paths:
 
     patch:
       summary: Update scheduled trip
-      description: Update scheduled trip details (assign staff, change status, etc.)
+      description: |
+        Update scheduled trip details including:
+        - Staff assignment (driver, conductor)
+        - Trip status
+        - Route override (with validation)
+        
+        **Route Override Rules:**
+        When updating `bus_owner_route_id`, the new route must:
+        - Use the same master_route_id as the schedule's route
+        - Have the same direction (UP/DOWN) as the schedule's route
+        - Be valid for the assigned permit (if permit is assigned)
+        
+        Route overrides allow trips to use different stop selections while maintaining the same master route and direction.
       operationId: updateScheduledTrip
       tags:
         - Scheduled Trips
@@ -3773,16 +3785,25 @@ paths:
             schema:
               type: object
               properties:
+                bus_owner_route_id:
+                  type: string
+                  format: uuid
+                  description: |
+                    Optional route override. Must match schedule's master route and direction.
+                    Validated against business rules before accepting.
                 assigned_driver_id:
                   type: string
                   format: uuid
+                  description: Assign or update the driver for this trip
                 assigned_conductor_id:
                   type: string
                   format: uuid
+                  description: Assign or update the conductor for this trip
                 status:
                   type: string
                   enum:
                     [scheduled, confirmed, in_progress, completed, cancelled]
+                  description: Update the trip status
       responses:
         "200":
           description: Trip updated successfully
@@ -3790,6 +3811,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ScheduledTrip"
+        "400":
+          description: Validation failed (e.g., route override rejected due to mismatched master route or direction)
         "404":
           description: Trip not found
         "401":

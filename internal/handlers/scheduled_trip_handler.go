@@ -316,7 +316,83 @@ func (h *ScheduledTripHandler) UpdateTrip(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "details": err.Error()})
 		return
-	} // Update fields if provided
+	}
+
+	// VALIDATION: If updating bus_owner_route_id, validate it matches master route and direction
+	if req.BusOwnerRouteID != nil {
+		if trip.TripScheduleID == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot update route for trips without a schedule"})
+			return
+		}
+
+		// Get schedule to find its default route
+		schedule, err := h.scheduleRepo.GetByID(*trip.TripScheduleID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get schedule"})
+			return
+		}
+
+		if schedule.BusOwnerRouteID == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Schedule has no route defined"})
+			return
+		}
+
+		// Get schedule's route (baseline)
+		scheduleRoute, err := h.routeRepo.GetByID(*schedule.BusOwnerRouteID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get schedule's route"})
+			return
+		}
+
+		// Get new route being proposed
+		newRoute, err := h.routeRepo.GetByID(*req.BusOwnerRouteID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "New route not found"})
+			return
+		}
+
+		// RULE 1: Must have same master_route_id
+		if scheduleRoute.MasterRouteID != newRoute.MasterRouteID {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Route override rejected: new route must use the same master route as the schedule",
+				"details": fmt.Sprintf("Schedule uses master route %s, new route uses %s",
+					scheduleRoute.MasterRouteID, newRoute.MasterRouteID),
+			})
+			return
+		}
+
+		// RULE 2: Must have same direction (UP/DOWN)
+		if scheduleRoute.Direction != newRoute.Direction {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Route override rejected: new route must have the same direction as the schedule",
+				"details": fmt.Sprintf("Schedule direction: %s, new route direction: %s",
+					scheduleRoute.Direction, newRoute.Direction),
+			})
+			return
+		}
+
+		// RULE 3: If permit is assigned, verify route is valid for permit
+		if trip.PermitID != nil {
+			permit, err := h.permitRepo.GetByID(*trip.PermitID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify permit"})
+				return
+			}
+
+			if permit.MasterRouteID != newRoute.MasterRouteID {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error":   "Route override rejected: permit is for a different master route",
+					"details": fmt.Sprintf("Permit is for route %s, new route uses %s", permit.MasterRouteID, newRoute.MasterRouteID),
+				})
+				return
+			}
+		}
+
+		// Validation passed - update the route
+		trip.BusOwnerRouteID = req.BusOwnerRouteID
+	}
+
+	// Update other fields if provided
 	if req.BusID != nil {
 		trip.BusID = req.BusID
 	}
@@ -603,7 +679,7 @@ func (h *ScheduledTripHandler) CreateSpecialTrip(c *gin.Context) {
 	// Create special trip
 	trip := &models.ScheduledTrip{
 		TripScheduleID:       nil, // Special trip - no timetable
-		CustomRouteID:        &req.CustomRouteID,
+		BusOwnerRouteID:      &req.CustomRouteID,
 		PermitID:             req.PermitID,
 		BusID:                req.BusID,
 		TripDate:             tripDate,

@@ -607,7 +607,7 @@ func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
 		ID:                   uuid.New().String(),
 		BusOwnerID:           busOwner.ID,
 		PermitID:             req.PermitID,
-		CustomRouteID:        &req.CustomRouteID,
+		BusOwnerRouteID:      &req.CustomRouteID,
 		ScheduleName:         req.ScheduleName,
 		RecurrenceType:       models.RecurrenceType(req.RecurrenceType),
 		RecurrenceDays:       models.IntSliceToString(req.RecurrenceDays),

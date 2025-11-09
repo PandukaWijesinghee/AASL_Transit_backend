@@ -23,8 +23,8 @@ const (
 type TripSchedule struct {
 	ID                   string         `json:"id" db:"id"`
 	BusOwnerID           string         `json:"bus_owner_id" db:"bus_owner_id"`
-	PermitID             *string        `json:"permit_id,omitempty" db:"permit_id"`             // Optional - assigned later to specific trips
-	CustomRouteID        *string        `json:"custom_route_id,omitempty" db:"custom_route_id"` // NEW: Reference to bus_owner_routes
+	PermitID             *string        `json:"permit_id,omitempty" db:"permit_id"`                     // Optional - assigned later to specific trips
+	BusOwnerRouteID      *string        `json:"bus_owner_route_id,omitempty" db:"bus_owner_route_id"` // Reference to bus_owner_routes (replaces old custom_route_id)
 	BusID                *string        `json:"bus_id,omitempty" db:"bus_id"`
 	ScheduleName         *string        `json:"schedule_name,omitempty" db:"schedule_name"`
 	RecurrenceType       RecurrenceType `json:"recurrence_type" db:"recurrence_type"`
