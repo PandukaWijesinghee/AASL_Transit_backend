@@ -4839,6 +4839,26 @@ components:
         conductor_name:
           type: string
           example: "Jane Smith"
+        route_number:
+          type: string
+          nullable: true
+          example: "99"
+          description: Route number from master_routes (via route_permits join)
+        origin_city:
+          type: string
+          nullable: true
+          example: "Badulla"
+          description: Origin city from master_routes
+        destination_city:
+          type: string
+          nullable: true
+          example: "Colombo"
+          description: Destination city from master_routes
+        is_up_direction:
+          type: boolean
+          nullable: true
+          example: true
+          description: Trip direction - true for up (origin→destination), false for down (destination→origin)
         is_bookable:
           type: boolean
           example: true
