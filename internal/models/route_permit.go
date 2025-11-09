@@ -158,13 +158,14 @@ func (r *CreateRoutePermitRequest) Validate() error {
 
 // UpdateRoutePermitRequest represents the request body for updating a permit
 type UpdateRoutePermitRequest struct {
-	BusRegistrationNumber *string  `json:"bus_registration_number,omitempty"`
-	Via                   *string  `json:"via,omitempty"`
-	ApprovedFare          *float64 `json:"approved_fare,omitempty"`
-	ValidityTo            *string  `json:"validity_to,omitempty"`
-	MaxTripsPerDay        *int     `json:"max_trips_per_day,omitempty"`
-	AllowedBusTypes       []string `json:"allowed_bus_types,omitempty"`
-	Restrictions          *string  `json:"restrictions,omitempty"`
+	BusRegistrationNumber   *string  `json:"bus_registration_number,omitempty"`
+	Via                     *string  `json:"via,omitempty"`
+	ApprovedFare            *float64 `json:"approved_fare,omitempty"`
+	ApprovedSeatingCapacity *int     `json:"approved_seating_capacity,omitempty"`
+	ValidityTo              *string  `json:"validity_to,omitempty"`
+	MaxTripsPerDay          *int     `json:"max_trips_per_day,omitempty"`
+	AllowedBusTypes         []string `json:"allowed_bus_types,omitempty"`
+	Restrictions            *string  `json:"restrictions,omitempty"`
 }
 
 // RoutePermitStop represents a stop on a route permit
