@@ -84,9 +84,9 @@ func (h *BusOwnerHandler) CheckProfileStatus(c *gin.Context) {
 
 	// Check if company info is complete
 	hasCompanyInfo := busOwner.CompanyName != nil &&
-	                  busOwner.IdentityOrIncorporationNo != nil &&
-	                  *busOwner.CompanyName != "" &&
-	                  *busOwner.IdentityOrIncorporationNo != ""
+		busOwner.IdentityOrIncorporationNo != nil &&
+		*busOwner.CompanyName != "" &&
+		*busOwner.IdentityOrIncorporationNo != ""
 
 	c.JSON(http.StatusOK, gin.H{
 		"user_id":           userCtx.UserID.String(),
@@ -99,10 +99,10 @@ func (h *BusOwnerHandler) CheckProfileStatus(c *gin.Context) {
 
 // CompleteOnboardingRequest represents the onboarding request payload
 type CompleteOnboardingRequest struct {
-	CompanyName              string                              `json:"company_name" binding:"required"`
-	IdentityOrIncorporationNo string                             `json:"identity_or_incorporation_no" binding:"required"`
-	BusinessEmail            *string                             `json:"business_email,omitempty"`
-	Permits                  []models.CreateRoutePermitRequest   `json:"permits" binding:"required,min=1,dive"`
+	CompanyName               string                            `json:"company_name" binding:"required"`
+	IdentityOrIncorporationNo string                            `json:"identity_or_incorporation_no" binding:"required"`
+	BusinessEmail             *string                           `json:"business_email,omitempty"`
+	Permits                   []models.CreateRoutePermitRequest `json:"permits" binding:"required,min=1,dive"`
 }
 
 // CompleteOnboarding handles the complete onboarding process
@@ -152,7 +152,7 @@ func (h *BusOwnerHandler) CompleteOnboarding(c *gin.Context) {
 		if busOwner.ProfileCompleted {
 			c.JSON(http.StatusConflict, gin.H{
 				"error": "Profile already completed. Onboarding can only be done once.",
-				"code": "PROFILE_ALREADY_COMPLETED",
+				"code":  "PROFILE_ALREADY_COMPLETED",
 			})
 			return
 		}
@@ -310,7 +310,7 @@ func (h *BusOwnerHandler) AddStaff(c *gin.Context) {
 		existingStaff, _ := h.staffRepo.GetByUserID(existingUser.ID.String())
 		if existingStaff != nil {
 			c.JSON(http.StatusConflict, gin.H{
-				"error": fmt.Sprintf("This phone number is already registered as %s", existingStaff.StaffType),
+				"error":      fmt.Sprintf("This phone number is already registered as %s", existingStaff.StaffType),
 				"staff_type": existingStaff.StaffType,
 			})
 			return
@@ -357,10 +357,10 @@ func (h *BusOwnerHandler) AddStaff(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message":    fmt.Sprintf("%s added successfully", req.StaffType),
-		"user_id":    userID.String(),
-		"staff_id":   staff.ID,
-		"staff_type": staff.StaffType,
+		"message":      fmt.Sprintf("%s added successfully", req.StaffType),
+		"user_id":      userID.String(),
+		"staff_id":     staff.ID,
+		"staff_type":   staff.StaffType,
 		"instructions": fmt.Sprintf("Staff member can now login using phone number %s", req.PhoneNumber),
 	})
 }
@@ -395,24 +395,24 @@ func (h *BusOwnerHandler) GetStaff(c *gin.Context) {
 
 	// Enrich staff data with user information (name, phone)
 	type StaffWithUserInfo struct {
-		ID                       string                       `json:"id"`
-		UserID                   string                       `json:"user_id"`
-		FirstName                string                       `json:"first_name"`
-		LastName                 string                       `json:"last_name"`
-		Phone                    string                       `json:"phone"`
-		StaffType                models.StaffType             `json:"staff_type"`
-		LicenseNumber            *string                      `json:"license_number,omitempty"`
-		LicenseExpiryDate        *time.Time                   `json:"license_expiry_date,omitempty"`
-		ExperienceYears          int                          `json:"experience_years"`
-		EmergencyContact         *string                      `json:"emergency_contact,omitempty"`
-		EmergencyContactName     *string                      `json:"emergency_contact_name,omitempty"`
-		EmploymentStatus         models.EmploymentStatus      `json:"employment_status"`
-		BackgroundCheckStatus    models.BackgroundCheckStatus `json:"background_check_status"`
-		HireDate                 *time.Time                   `json:"hire_date,omitempty"`
-		PerformanceRating        float64                      `json:"performance_rating"`
-		TotalTripsCompleted      int                          `json:"total_trips_completed"`
-		ProfileCompleted         bool                         `json:"profile_completed"`
-		CreatedAt                time.Time                    `json:"created_at"`
+		ID                    string                       `json:"id"`
+		UserID                string                       `json:"user_id"`
+		FirstName             string                       `json:"first_name"`
+		LastName              string                       `json:"last_name"`
+		Phone                 string                       `json:"phone"`
+		StaffType             models.StaffType             `json:"staff_type"`
+		LicenseNumber         *string                      `json:"license_number,omitempty"`
+		LicenseExpiryDate     *time.Time                   `json:"license_expiry_date,omitempty"`
+		ExperienceYears       int                          `json:"experience_years"`
+		EmergencyContact      *string                      `json:"emergency_contact,omitempty"`
+		EmergencyContactName  *string                      `json:"emergency_contact_name,omitempty"`
+		EmploymentStatus      models.EmploymentStatus      `json:"employment_status"`
+		BackgroundCheckStatus models.BackgroundCheckStatus `json:"background_check_status"`
+		HireDate              *time.Time                   `json:"hire_date,omitempty"`
+		PerformanceRating     float64                      `json:"performance_rating"`
+		TotalTripsCompleted   int                          `json:"total_trips_completed"`
+		ProfileCompleted      bool                         `json:"profile_completed"`
+		CreatedAt             time.Time                    `json:"created_at"`
 	}
 
 	enrichedStaff := []StaffWithUserInfo{}

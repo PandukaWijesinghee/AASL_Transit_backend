@@ -921,21 +921,41 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 		return
 	}
 
-	// Verify ownership through trip schedule
-	if trip.TripScheduleID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot assign to special trips without schedule"})
+	// Verify ownership through trip schedule OR bus owner route
+	var schedule *models.TripSchedule
+	
+	if trip.TripScheduleID == nil && trip.BusOwnerRouteID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot determine trip ownership - no schedule or route linked"})
 		return
 	}
 
-	schedule, err := h.scheduleRepo.GetByID(*trip.TripScheduleID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ownership"})
-		return
+	// Verify ownership via schedule if present
+	if trip.TripScheduleID != nil {
+		var err error
+		schedule, err = h.scheduleRepo.GetByID(*trip.TripScheduleID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ownership via schedule"})
+			return
+		}
+
+		if schedule.BusOwnerID != busOwner.ID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
 	}
 
-	if schedule.BusOwnerID != busOwner.ID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
-		return
+	// Verify ownership via bus owner route if present (and no schedule check done)
+	if trip.TripScheduleID == nil && trip.BusOwnerRouteID != nil {
+		route, err := h.routeRepo.GetByID(*trip.BusOwnerRouteID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ownership via route"})
+			return
+		}
+
+		if route.BusOwnerID != busOwner.ID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
 	}
 
 	// Parse request
@@ -1063,7 +1083,7 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 		var routeID string
 		if trip.BusOwnerRouteID != nil {
 			routeID = *trip.BusOwnerRouteID
-		} else if schedule.BusOwnerRouteID != nil {
+		} else if schedule != nil && schedule.BusOwnerRouteID != nil {
 			routeID = *schedule.BusOwnerRouteID
 		} else {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Trip has no route assigned"})
