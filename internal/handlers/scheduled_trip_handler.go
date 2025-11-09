@@ -19,6 +19,7 @@ type ScheduledTripHandler struct {
 	busOwnerRepo *database.BusOwnerRepository
 	routeRepo    *database.BusOwnerRouteRepository
 	busRepo      *database.BusRepository
+	staffRepo    *database.BusStaffRepository
 	settingRepo  *database.SystemSettingRepository
 }
 
@@ -29,6 +30,7 @@ func NewScheduledTripHandler(
 	busOwnerRepo *database.BusOwnerRepository,
 	routeRepo *database.BusOwnerRouteRepository,
 	busRepo *database.BusRepository,
+	staffRepo *database.BusStaffRepository,
 	settingRepo *database.SystemSettingRepository,
 ) *ScheduledTripHandler {
 	return &ScheduledTripHandler{
@@ -38,6 +40,7 @@ func NewScheduledTripHandler(
 		busOwnerRepo: busOwnerRepo,
 		routeRepo:    routeRepo,
 		busRepo:      busRepo,
+		staffRepo:    staffRepo,
 		settingRepo:  settingRepo,
 	}
 }
@@ -882,5 +885,220 @@ func (h *ScheduledTripHandler) BulkUnpublishTrips(c *gin.Context) {
 		"message":           "Trips unpublished successfully",
 		"unpublished_count": unpublishedCount,
 		"requested_count":   len(req.TripIDs),
+	})
+}
+
+// AssignStaffAndPermit assigns driver, conductor, and/or permit to a scheduled trip
+// PATCH /api/v1/scheduled-trips/:id/assign
+func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// Get bus owner
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Only bus owners can assign staff and permits"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bus owner"})
+		return
+	}
+
+	tripID := c.Param("id")
+
+	// Get the trip
+	trip, err := h.tripRepo.GetByID(tripID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Trip not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trip"})
+		return
+	}
+
+	// Verify ownership through trip schedule
+	if trip.TripScheduleID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot assign to special trips without schedule"})
+		return
+	}
+
+	schedule, err := h.scheduleRepo.GetByID(*trip.TripScheduleID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ownership"})
+		return
+	}
+
+	if schedule.BusOwnerID != busOwner.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	// Parse request
+	var req struct {
+		DriverID    *string `json:"driver_id"`
+		ConductorID *string `json:"conductor_id"`
+		PermitID    *string `json:"permit_id"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	// Validate at least one field is provided
+	if req.DriverID == nil && req.ConductorID == nil && req.PermitID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one of driver_id, conductor_id, or permit_id must be provided"})
+		return
+	}
+
+	// Validate driver if provided
+	if req.DriverID != nil && *req.DriverID != "" {
+		staff, err := h.staffRepo.GetByID(*req.DriverID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Driver not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate driver"})
+			return
+		}
+
+		// Verify driver belongs to this bus owner
+		if staff.BusOwnerID == nil || *staff.BusOwnerID != busOwner.ID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Driver does not belong to your organization"})
+			return
+		}
+
+		// Verify driver type
+		if staff.StaffType != "driver" && staff.StaffType != "both" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Selected staff is not a driver"})
+			return
+		}
+
+		// Verify employment status
+		if staff.EmploymentStatus != "active" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Driver is not actively employed"})
+			return
+		}
+
+		// Check if license is expired
+		if staff.LicenseExpiryDate != nil && staff.LicenseExpiryDate.Before(trip.TripDate) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Driver's license will be expired on trip date"})
+			return
+		}
+	}
+
+	// Validate conductor if provided
+	if req.ConductorID != nil && *req.ConductorID != "" {
+		staff, err := h.staffRepo.GetByID(*req.ConductorID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Conductor not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate conductor"})
+			return
+		}
+
+		// Verify conductor belongs to this bus owner
+		if staff.BusOwnerID == nil || *staff.BusOwnerID != busOwner.ID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Conductor does not belong to your organization"})
+			return
+		}
+
+		// Verify conductor type
+		if staff.StaffType != "conductor" && staff.StaffType != "both" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Selected staff is not a conductor"})
+			return
+		}
+
+		// Verify employment status
+		if staff.EmploymentStatus != "active" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Conductor is not actively employed"})
+			return
+		}
+	}
+
+	// Validate permit if provided
+	if req.PermitID != nil && *req.PermitID != "" {
+		permit, err := h.permitRepo.GetByID(*req.PermitID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Permit not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate permit"})
+			return
+		}
+
+		// Verify permit belongs to this bus owner
+		if permit.BusOwnerID != busOwner.ID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Permit does not belong to your organization"})
+			return
+		}
+
+		// Verify permit is approved
+		if permit.Status != "approved" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Permit must be approved before assignment"})
+			return
+		}
+
+		// Verify permit is valid on trip date
+		if permit.IssueDate.After(trip.TripDate) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Permit is not yet valid on trip date"})
+			return
+		}
+		if permit.ExpiryDate.Before(trip.TripDate) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Permit will be expired on trip date"})
+			return
+		}
+
+		// Verify permit matches the route
+		// Get the effective route for the trip (trip override or schedule's route)
+		var routeID string
+		if trip.BusOwnerRouteID != nil {
+			routeID = *trip.BusOwnerRouteID
+		} else if schedule.BusOwnerRouteID != nil {
+			routeID = *schedule.BusOwnerRouteID
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Trip has no route assigned"})
+			return
+		}
+
+		route, err := h.routeRepo.GetByID(routeID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch route"})
+			return
+		}
+
+		// Verify permit covers this route
+		if permit.MasterRouteID != route.MasterRouteID {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Permit does not cover this route"})
+			return
+		}
+	}
+
+	// Perform the assignment
+	err = h.tripRepo.AssignStaffAndPermit(tripID, req.DriverID, req.ConductorID, req.PermitID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign staff and permit", "details": err.Error()})
+		return
+	}
+
+	// Fetch updated trip
+	updatedTrip, err := h.tripRepo.GetByID(tripID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch updated trip"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Staff and permit assigned successfully",
+		"trip":    updatedTrip,
 	})
 }

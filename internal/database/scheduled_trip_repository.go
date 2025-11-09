@@ -688,6 +688,50 @@ func (r *ScheduledTripRepository) BulkUnpublishTrips(tripIDs []string, busOwnerI
 	return int(rowsAffected), nil
 }
 
+// AssignStaffAndPermit assigns driver, conductor, and/or permit to a scheduled trip
+func (r *ScheduledTripRepository) AssignStaffAndPermit(tripID string, driverID, conductorID, permitID *string) error {
+	// Build the query dynamically based on which fields are provided
+	query := `UPDATE scheduled_trips SET `
+	args := []interface{}{}
+	argPosition := 1
+	updates := []string{}
+
+	if driverID != nil {
+		updates = append(updates, fmt.Sprintf("assigned_driver_id = $%d", argPosition))
+		args = append(args, driverID)
+		argPosition++
+	}
+
+	if conductorID != nil {
+		updates = append(updates, fmt.Sprintf("assigned_conductor_id = $%d", argPosition))
+		args = append(args, conductorID)
+		argPosition++
+	}
+
+	if permitID != nil {
+		updates = append(updates, fmt.Sprintf("permit_id = $%d", argPosition))
+		args = append(args, permitID)
+		argPosition++
+	}
+
+	// Add updated_at
+	updates = append(updates, fmt.Sprintf("updated_at = $%d", argPosition))
+	args = append(args, time.Now())
+	argPosition++
+
+	// Complete the query
+	query += strings.Join(updates, ", ")
+	query += fmt.Sprintf(" WHERE id = $%d", argPosition)
+	args = append(args, tripID)
+
+	_, err := r.db.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to assign staff and permit: %w", err)
+	}
+
+	return nil
+}
+
 // scanner interface for QueryRow and Rows
 type scanner interface {
 	Scan(dest ...interface{}) error

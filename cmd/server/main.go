@@ -233,6 +233,7 @@ func main() {
 		ownerRepository,
 		busOwnerRouteRepo,
 		busRepository,
+		staffRepository,
 		systemSettingRepo,
 	)
 	systemSettingHandler := handlers.NewSystemSettingHandler(systemSettingRepo)
@@ -497,6 +498,9 @@ func main() {
 			scheduledTrips.PUT("/:id/unpublish", scheduledTripHandler.UnpublishTrip)
 			scheduledTrips.POST("/bulk-publish", scheduledTripHandler.BulkPublishTrips)
 			scheduledTrips.POST("/bulk-unpublish", scheduledTripHandler.BulkUnpublishTrips)
+
+			// NEW: Assign staff and permit
+			scheduledTrips.PATCH("/:id/assign", scheduledTripHandler.AssignStaffAndPermit)
 		}
 
 		// Permit-specific trip routes

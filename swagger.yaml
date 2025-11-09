@@ -3758,13 +3758,13 @@ paths:
         - Staff assignment (driver, conductor)
         - Trip status
         - Route override (with validation)
-        
+
         **Route Override Rules:**
         When updating `bus_owner_route_id`, the new route must:
         - Use the same master_route_id as the schedule's route
         - Have the same direction (UP/DOWN) as the schedule's route
         - Be valid for the assigned permit (if permit is assigned)
-        
+
         Route overrides allow trips to use different stop selections while maintaining the same master route and direction.
       operationId: updateScheduledTrip
       tags:
@@ -3903,6 +3903,109 @@ paths:
           description: Only bus owners can unpublish trips
         "404":
           description: Trip not found or access denied
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/scheduled-trips/{id}/assign:
+    patch:
+      summary: Assign staff and permit to a scheduled trip
+      description: |
+        Assign driver, conductor, and/or route permit to a scheduled trip.
+        This endpoint validates:
+        - Staff belongs to the bus owner's organization
+        - Staff has correct type (driver/conductor) and is actively employed
+        - Staff licenses are not expired on trip date
+        - Permit is approved and valid on trip date
+        - Permit covers the trip's route
+      operationId: assignStaffAndPermit
+      tags:
+        - Scheduled Trips
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the trip to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                driver_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: UUID of the driver to assign
+                  example: "123e4567-e89b-12d3-a456-426614174000"
+                conductor_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: UUID of the conductor to assign
+                  example: "123e4567-e89b-12d3-a456-426614174001"
+                permit_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: UUID of the route permit to assign
+                  example: "123e4567-e89b-12d3-a456-426614174002"
+              example:
+                driver_id: "123e4567-e89b-12d3-a456-426614174000"
+                conductor_id: "123e4567-e89b-12d3-a456-426614174001"
+                permit_id: "123e4567-e89b-12d3-a456-426614174002"
+      responses:
+        "200":
+          description: Staff and permit assigned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Staff and permit assigned successfully"
+                  trip:
+                    $ref: "#/components/schemas/ScheduledTrip"
+        "400":
+          description: |
+            Invalid request body, or validation failed:
+            - At least one field (driver_id, conductor_id, permit_id) must be provided
+            - Staff not found or wrong type
+            - Staff not actively employed
+            - License expired on trip date
+            - Permit not approved or expired
+            - Permit doesn't cover the route
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Driver's license will be expired on trip date"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: |
+            Access denied:
+            - Only bus owners can assign staff and permits
+            - Staff or permit does not belong to your organization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Driver does not belong to your organization"
+        "404":
+          description: Trip not found
         "500":
           $ref: "#/components/responses/InternalServerError"
 
