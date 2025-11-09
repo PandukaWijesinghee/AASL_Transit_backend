@@ -313,9 +313,9 @@ func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSch
 		var validUntil sql.NullTime
 		var notes sql.NullString
 		
-		// Temporary slices for scanning arrays - pq driver needs explicit types
-		var recurrenceDaysTemp []int
-		var specificDatesTemp []time.Time
+		// Scan array columns as TEXT (comma-separated strings)
+		var recurrenceDaysStr sql.NullString
+		var specificDatesStr sql.NullString
 
 		fmt.Printf("🔍 REPO: About to scan row #%d with columns: id, bus_owner_id, bus_owner_route_id, schedule_name, recurrence_type, recurrence_days...\n", rowNum)
 		
@@ -328,10 +328,10 @@ func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSch
 		// created_at, updated_at
 		err := rows.Scan(
 			&schedule.ID, &schedule.BusOwnerID, &busOwnerRouteID, &scheduleName,
-			&schedule.RecurrenceType, &recurrenceDaysTemp, &recurrenceInterval,
+			&schedule.RecurrenceType, &recurrenceDaysStr, &recurrenceInterval,
 			&schedule.DepartureTime, &estimatedArrivalTime,
 			&schedule.BaseFare, &schedule.IsActive, &notes,
-			&validFrom, &validUntil, &specificDatesTemp,
+			&validFrom, &validUntil, &specificDatesStr,
 			&schedule.CreatedAt, &schedule.UpdatedAt,
 		)
 
@@ -341,11 +341,19 @@ func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSch
 			return nil, err
 		}
 		
-		// Convert temp slices to custom types
-		schedule.RecurrenceDays = models.IntArray(recurrenceDaysTemp)
-		schedule.SpecificDates = models.DateArray(specificDatesTemp)
+		// Convert TEXT columns to string fields (empty if NULL)
+		if recurrenceDaysStr.Valid {
+			schedule.RecurrenceDays = recurrenceDaysStr.String
+		} else {
+			schedule.RecurrenceDays = ""
+		}
+		if specificDatesStr.Valid {
+			schedule.SpecificDates = specificDatesStr.String
+		} else {
+			schedule.SpecificDates = ""
+		}
 		
-		fmt.Printf("✅ REPO: Row #%d scanned successfully - ID=%s, RecurrenceDays=%v, SpecificDates=%v\n", 
+		fmt.Printf("✅ REPO: Row #%d scanned successfully - ID=%s, RecurrenceDays=%s, SpecificDates=%s\n", 
 			rowNum, schedule.ID, schedule.RecurrenceDays, schedule.SpecificDates)
 
 		// Convert sql.Null* types

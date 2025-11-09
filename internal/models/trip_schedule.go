@@ -2,6 +2,9 @@ package models
 
 import (
 	"errors"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -25,7 +28,7 @@ type TripSchedule struct {
 	BusID                *string        `json:"bus_id,omitempty" db:"bus_id"`
 	ScheduleName         *string        `json:"schedule_name,omitempty" db:"schedule_name"`
 	RecurrenceType       RecurrenceType `json:"recurrence_type" db:"recurrence_type"`
-	RecurrenceDays       IntArray       `json:"recurrence_days,omitempty" db:"recurrence_days"`               // For weekly: [0,1,2...6]
+	RecurrenceDays       string         `json:"recurrence_days,omitempty" db:"recurrence_days"`               // For weekly: "1,2,3" (comma-separated day numbers)
 	RecurrenceInterval   *int           `json:"recurrence_interval,omitempty" db:"recurrence_interval"`       // NEW: For interval: every N days
 	DepartureTime        string         `json:"departure_time" db:"departure_time"`                           // TIME type stored as string (HH:MM:SS)
 	EstimatedArrivalTime *string        `json:"estimated_arrival_time,omitempty" db:"estimated_arrival_time"` // TIME type stored as string (HH:MM:SS)
@@ -47,7 +50,103 @@ type TripSchedule struct {
 	SelectedStopIDs     UUIDArray  `json:"selected_stop_ids,omitempty" db:"selected_stop_ids"`
 	ValidFrom           time.Time  `json:"valid_from,omitempty" db:"valid_from_old"`
 	ValidUntil          *time.Time `json:"valid_until,omitempty" db:"valid_until_old"`
-	SpecificDates       DateArray  `json:"specific_dates,omitempty" db:"specific_dates_old"`
+	SpecificDates       string     `json:"specific_dates,omitempty" db:"specific_dates_old"` // Comma-separated dates: "2025-01-01,2025-01-15"
+}
+
+// Helper methods for converting between string and slices
+
+// GetRecurrenceDaysSlice parses the comma-separated recurrence_days string into []int
+func (s *TripSchedule) GetRecurrenceDaysSlice() ([]int, error) {
+	if s.RecurrenceDays == "" {
+		return []int{}, nil
+	}
+	return StringToIntSlice(s.RecurrenceDays)
+}
+
+// SetRecurrenceDaysFromSlice converts []int to comma-separated string
+func (s *TripSchedule) SetRecurrenceDaysFromSlice(days []int) {
+	s.RecurrenceDays = IntSliceToString(days)
+}
+
+// GetSpecificDatesSlice parses the comma-separated specific_dates string into []time.Time
+func (s *TripSchedule) GetSpecificDatesSlice() ([]time.Time, error) {
+	if s.SpecificDates == "" {
+		return []time.Time{}, nil
+	}
+	return StringToDateSlice(s.SpecificDates)
+}
+
+// SetSpecificDatesFromSlice converts []time.Time to comma-separated string
+func (s *TripSchedule) SetSpecificDatesFromSlice(dates []time.Time) {
+	s.SpecificDates = DateSliceToString(dates)
+}
+
+// Helper functions for string ↔ slice conversion
+
+// IntSliceToString converts []int to comma-separated string (e.g., "1,2,3")
+func IntSliceToString(slice []int) string {
+	if len(slice) == 0 {
+		return ""
+	}
+	strSlice := make([]string, len(slice))
+	for i, v := range slice {
+		strSlice[i] = fmt.Sprintf("%d", v)
+	}
+	return strings.Join(strSlice, ",")
+}
+
+// StringToIntSlice converts comma-separated string to []int
+func StringToIntSlice(str string) ([]int, error) {
+	if str == "" {
+		return []int{}, nil
+	}
+	parts := strings.Split(str, ",")
+	result := make([]int, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		num, err := strconv.Atoi(part)
+		if err != nil {
+			return nil, fmt.Errorf("invalid integer in string: %s", part)
+		}
+		result = append(result, num)
+	}
+	return result, nil
+}
+
+// DateSliceToString converts []time.Time to comma-separated string (e.g., "2025-01-01,2025-01-15")
+func DateSliceToString(dates []time.Time) string {
+	if len(dates) == 0 {
+		return ""
+	}
+	strSlice := make([]string, len(dates))
+	for i, d := range dates {
+		strSlice[i] = d.Format("2006-01-02")
+	}
+	return strings.Join(strSlice, ",")
+}
+
+// StringToDateSlice converts comma-separated string to []time.Time
+func StringToDateSlice(str string) ([]time.Time, error) {
+	if str == "" {
+		return []time.Time{}, nil
+	}
+	parts := strings.Split(str, ",")
+	result := make([]time.Time, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		date, err := time.Parse("2006-01-02", part)
+		if err != nil {
+			return nil, fmt.Errorf("invalid date in string: %s", part)
+		}
+		result = append(result, date)
+	}
+	return result, nil
 }
 
 // CreateTimetableRequest represents the request to create a new timetable (trip schedule)
@@ -227,7 +326,11 @@ func (s *TripSchedule) IsValidForDate(date time.Time) bool {
 		return true
 	case RecurrenceWeekly:
 		weekday := int(date.Weekday())
-		for _, day := range s.RecurrenceDays {
+		days, err := s.GetRecurrenceDaysSlice()
+		if err != nil {
+			return false
+		}
+		for _, day := range days {
 			if day == weekday {
 				return true
 			}
@@ -243,7 +346,11 @@ func (s *TripSchedule) IsValidForDate(date time.Time) bool {
 	case RecurrenceSpecificDates:
 		// Deprecated: for backward compatibility only
 		dateOnly := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
-		for _, specificDate := range s.SpecificDates {
+		specificDates, err := s.GetSpecificDatesSlice()
+		if err != nil {
+			return false
+		}
+		for _, specificDate := range specificDates {
 			specificDateOnly := time.Date(specificDate.Year(), specificDate.Month(), specificDate.Day(), 0, 0, 0, 0, time.UTC)
 			if dateOnly.Equal(specificDateOnly) {
 				return true

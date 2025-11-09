@@ -240,17 +240,19 @@ func (h *TripScheduleHandler) CreateSchedule(c *gin.Context) {
 		validUntil = &parsed
 	}
 
-	// Parse specific dates if provided
-	var specificDates models.DateArray
+	// Parse specific dates if provided and convert to comma-separated string
+	var specificDatesStr string
 	if len(req.SpecificDates) > 0 {
+		dates := make([]time.Time, 0, len(req.SpecificDates))
 		for _, dateStr := range req.SpecificDates {
 			date, err := time.Parse("2006-01-02", dateStr)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format in specific_dates"})
 				return
 			}
-			specificDates = append(specificDates, date)
+			dates = append(dates, date)
 		}
+		specificDatesStr = models.DateSliceToString(dates)
 	}
 
 	// Create schedule
@@ -262,8 +264,8 @@ func (h *TripScheduleHandler) CreateSchedule(c *gin.Context) {
 		BusID:                req.BusID,
 		ScheduleName:         req.ScheduleName,
 		RecurrenceType:       models.RecurrenceType(req.RecurrenceType),
-		RecurrenceDays:       models.IntArray(req.RecurrenceDays),
-		SpecificDates:        specificDates,
+		RecurrenceDays:       models.IntSliceToString(req.RecurrenceDays),
+		SpecificDates:        specificDatesStr,
 		DepartureTime:        req.DepartureTime,
 		EstimatedArrivalTime: req.EstimatedArrivalTime,
 		Direction:            req.Direction,
@@ -362,7 +364,7 @@ func (h *TripScheduleHandler) UpdateSchedule(c *gin.Context) {
 	schedule.BusID = req.BusID
 	schedule.ScheduleName = req.ScheduleName
 	schedule.RecurrenceType = models.RecurrenceType(req.RecurrenceType)
-	schedule.RecurrenceDays = models.IntArray(req.RecurrenceDays)
+	schedule.RecurrenceDays = models.IntSliceToString(req.RecurrenceDays)
 	schedule.DepartureTime = req.DepartureTime
 	schedule.BaseFare = req.BaseFare
 	schedule.IsBookable = req.IsBookable
@@ -383,18 +385,18 @@ func (h *TripScheduleHandler) UpdateSchedule(c *gin.Context) {
 		schedule.ValidUntil = nil
 	}
 
-	// Parse specific dates
+	// Parse specific dates and convert to comma-separated string
 	if len(req.SpecificDates) > 0 {
-		var specificDates models.DateArray
+		dates := make([]time.Time, 0, len(req.SpecificDates))
 		for _, dateStr := range req.SpecificDates {
 			date, err := time.Parse("2006-01-02", dateStr)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format in specific_dates"})
 				return
 			}
-			specificDates = append(specificDates, date)
+			dates = append(dates, date)
 		}
-		schedule.SpecificDates = specificDates
+		schedule.SpecificDates = models.DateSliceToString(dates)
 	}
 
 	if err := h.scheduleRepo.Update(schedule); err != nil {
@@ -608,7 +610,7 @@ func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
 		CustomRouteID:        &req.CustomRouteID,
 		ScheduleName:         req.ScheduleName,
 		RecurrenceType:       models.RecurrenceType(req.RecurrenceType),
-		RecurrenceDays:       req.RecurrenceDays,
+		RecurrenceDays:       models.IntSliceToString(req.RecurrenceDays),
 		RecurrenceInterval:   req.RecurrenceInterval,
 		DepartureTime:        req.DepartureTime,
 		EstimatedArrivalTime: req.EstimatedArrivalTime,
