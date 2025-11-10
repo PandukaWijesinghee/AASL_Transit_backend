@@ -52,7 +52,7 @@ func (r *TripScheduleRepository) Create(schedule *models.TripSchedule) error {
 	query := `
 		INSERT INTO trip_schedules (
 			id, bus_owner_id, permit_id, bus_id, schedule_name,
-			recurrence_type, recurrence_days, specific_dates_old, departure_time,
+			recurrence_type, recurrence_days, specific_dates, departure_time,
 			base_fare, is_bookable, max_bookable_seats, advance_booking_hours,
 			default_driver_id, default_conductor_id, selected_stop_ids,
 			is_active, valid_from_old, valid_until_old, notes

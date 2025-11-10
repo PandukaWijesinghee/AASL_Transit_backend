@@ -374,7 +374,7 @@ CREATE TABLE public.trip_schedules (
   bus_owner_id uuid NOT NULL,
   schedule_name character varying,
   recurrence_type character varying NOT NULL CHECK (recurrence_type::text = ANY (ARRAY['daily'::character varying, 'weekly'::character varying, 'interval'::character varying]::text[])),
-  specific_dates ARRAY,
+  specific_dates text,
   departure_time time without time zone NOT NULL,
   base_fare numeric NOT NULL CHECK (base_fare > 0::numeric),
   is_active boolean DEFAULT true,

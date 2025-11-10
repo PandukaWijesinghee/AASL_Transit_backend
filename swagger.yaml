@@ -4917,6 +4917,11 @@ components:
           type: string
           format: date
           example: "2025-12-31"
+        specific_dates:
+          type: string
+          nullable: true
+          example: "2025-11-15,2025-11-20,2025-12-25"
+          description: "Comma-separated list of dates in YYYY-MM-DD format (deprecated field, can be NULL). Stored as TEXT in database."
         notes:
           type: string
           example: "Regular weekday service"

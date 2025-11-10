@@ -50,7 +50,7 @@ type TripSchedule struct {
 	SelectedStopIDs     UUIDArray  `json:"selected_stop_ids,omitempty" db:"selected_stop_ids"`
 	ValidFrom           time.Time  `json:"valid_from,omitempty" db:"valid_from_old"`
 	ValidUntil          *time.Time `json:"valid_until,omitempty" db:"valid_until_old"`
-	SpecificDates       *string    `json:"specific_dates,omitempty" db:"specific_dates_old"` // Comma-separated dates: "2025-01-01,2025-01-15" - can be NULL
+	SpecificDates       *string    `json:"specific_dates,omitempty" db:"specific_dates"` // Comma-separated dates: "2025-01-01,2025-01-15" - can be NULL
 }
 
 // Helper methods for converting between string and slices
