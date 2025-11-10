@@ -72,25 +72,35 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 			// Calculate assignment deadline (e.g., 2 hours before departure)
 			// TODO: Get assignment_deadline_hours from system settings
 			assignmentDeadlineHours := 2
-			departureDateTime := time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), 0, 0, 0, 0, currentDate.Location())
-			// Parse departure time and add to date
+			
+			// Parse departure time from schedule and combine with current date to create departure_datetime
+			var departureDatetime time.Time
 			if t, err := time.Parse("15:04", schedule.DepartureTime); err == nil {
-				departureDateTime = time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), t.Hour(), t.Minute(), 0, 0, currentDate.Location())
+				departureDatetime = time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), t.Hour(), t.Minute(), 0, 0, currentDate.Location())
+			} else if t, err := time.Parse("15:04:05", schedule.DepartureTime); err == nil {
+				departureDatetime = time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), t.Hour(), t.Minute(), t.Second(), 0, currentDate.Location())
 			}
-			assignmentDeadline := departureDateTime.Add(-time.Duration(assignmentDeadlineHours) * time.Hour)
+			
+			assignmentDeadline := departureDatetime.Add(-time.Duration(assignmentDeadlineHours) * time.Hour)
+
+			// Calculate actual arrival datetime from departure_datetime + duration
+			var actualArrivalDatetime *time.Time
+			if schedule.EstimatedDurationMinutes != nil {
+				arrivalDt := departureDatetime.Add(time.Duration(*schedule.EstimatedDurationMinutes) * time.Minute)
+				actualArrivalDatetime = &arrivalDt
+			}
 
 			// Create scheduled trip
 			scheduleID := schedule.ID
 			trip := &models.ScheduledTrip{
-				ID:                   uuid.New().String(),
-				TripScheduleID:       &scheduleID,
-				BusOwnerRouteID:      schedule.BusOwnerRouteID, // Inherit route from schedule (can be updated later)
-				PermitID:             schedule.PermitID,        // Pass pointer directly (nil if not set)
-				BusID:                schedule.BusID,
-				TripDate:             currentDate,
-				DepartureTime:        schedule.DepartureTime,
-				EstimatedArrivalTime: schedule.EstimatedArrivalTime,
-				AssignedDriverID:     schedule.DefaultDriverID,
+				ID:                    uuid.New().String(),
+				TripScheduleID:        &scheduleID,
+				BusOwnerRouteID:       schedule.BusOwnerRouteID, // Inherit route from schedule (can be updated later)
+				PermitID:              schedule.PermitID,        // Pass pointer directly (nil if not set)
+				BusID:                 schedule.BusID,
+				DepartureDatetime:     departureDatetime,        // Specific departure date and time
+				ActualArrivalDatetime: actualArrivalDatetime,    // Calculated arrival datetime (handles overnight)
+				AssignedDriverID:      schedule.DefaultDriverID,
 				AssignedConductorID:  schedule.DefaultConductorID,
 				IsBookable:           schedule.IsBookable,
 				TotalSeats:           totalSeats,
@@ -180,25 +190,35 @@ func (s *TripGeneratorService) GenerateFutureTrips() (int, error) {
 
 			// Calculate assignment deadline (2 hours before departure)
 			assignmentDeadlineHours := 2
-			departureDateTime := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
-			// Parse departure time
+			
+			// Parse departure time from timetable and combine with date to create departure_datetime
+			var departureDatetime time.Time
 			if t, err := time.Parse("15:04", timetable.DepartureTime); err == nil {
-				departureDateTime = time.Date(date.Year(), date.Month(), date.Day(), t.Hour(), t.Minute(), 0, 0, date.Location())
+				departureDatetime = time.Date(date.Year(), date.Month(), date.Day(), t.Hour(), t.Minute(), 0, 0, date.Location())
+			} else if t, err := time.Parse("15:04:05", timetable.DepartureTime); err == nil {
+				departureDatetime = time.Date(date.Year(), date.Month(), date.Day(), t.Hour(), t.Minute(), t.Second(), 0, date.Location())
 			}
-			assignmentDeadline := departureDateTime.Add(-time.Duration(assignmentDeadlineHours) * time.Hour)
+			
+			assignmentDeadline := departureDatetime.Add(-time.Duration(assignmentDeadlineHours) * time.Hour)
+
+			// Calculate actual arrival datetime from departure_datetime + duration
+			var actualArrivalDatetime *time.Time
+			if timetable.EstimatedDurationMinutes != nil {
+				arrivalDt := departureDatetime.Add(time.Duration(*timetable.EstimatedDurationMinutes) * time.Minute)
+				actualArrivalDatetime = &arrivalDt
+			}
 
 			// Create scheduled trip
 			scheduleID := timetable.ID
 			trip := &models.ScheduledTrip{
-				ID:                   uuid.New().String(),
-				TripScheduleID:       &scheduleID,
-				BusOwnerRouteID:      timetable.BusOwnerRouteID,
-				PermitID:             timetable.PermitID, // Pass pointer directly (nil if not set)
-				BusID:                timetable.BusID,
-				TripDate:             date,
-				DepartureTime:        timetable.DepartureTime,
-				EstimatedArrivalTime: timetable.EstimatedArrivalTime,
-				AssignedDriverID:     timetable.DefaultDriverID,
+				ID:                    uuid.New().String(),
+				TripScheduleID:        &scheduleID,
+				BusOwnerRouteID:       timetable.BusOwnerRouteID,
+				PermitID:              timetable.PermitID, // Pass pointer directly (nil if not set)
+				BusID:                 timetable.BusID,
+				DepartureDatetime:     departureDatetime,     // Specific departure date and time
+				ActualArrivalDatetime: actualArrivalDatetime, // Calculated arrival datetime (handles overnight)
+				AssignedDriverID:      timetable.DefaultDriverID,
 				AssignedConductorID:  timetable.DefaultConductorID,
 				IsBookable:           timetable.IsBookable,
 				TotalSeats:           totalSeats,

@@ -1652,8 +1652,7 @@ paths:
               type: object
               required:
                 - custom_route_id
-                - trip_date
-                - departure_time
+                - departure_datetime
                 - base_fare
                 - max_bookable_seats
               properties:
@@ -1666,19 +1665,16 @@ paths:
                   format: uuid
                   nullable: true
                   description: Optional route permit ID (can be NULL if not assigned yet)
-                trip_date:
+                departure_datetime:
                   type: string
-                  format: date
-                  example: "2024-12-25"
-                  description: Trip date (YYYY-MM-DD, cannot be in past)
-                departure_time:
-                  type: string
-                  pattern: "^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
-                  example: "10:00"
-                estimated_arrival_time:
-                  type: string
-                  pattern: "^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
-                  example: "16:30"
+                  format: date-time
+                  example: "2024-12-25T10:00:00Z"
+                  description: "Trip departure date and time in ISO 8601 format (YYYY-MM-DDTHH:MM:SS). Cannot be in past."
+                estimated_duration_minutes:
+                  type: integer
+                  minimum: 1
+                  example: 390
+                  description: "Estimated trip duration in minutes. Arrival datetime will be calculated as departure_datetime + duration."
                 base_fare:
                   type: number
                   format: double
@@ -1723,9 +1719,15 @@ paths:
                   custom_route_id:
                     type: string
                     format: uuid
-                  trip_date:
+                  departure_datetime:
                     type: string
-                    format: date
+                    format: date-time
+                    example: "2024-12-25T10:00:00Z"
+                  actual_arrival_datetime:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    example: "2024-12-25T16:30:00Z"
                   status:
                     type: string
                     enum:
@@ -3498,6 +3500,10 @@ paths:
                   type: string
                   example: "10:30:00"
                   description: "User-entered estimated arrival time"
+                is_overnight_trip:
+                  type: boolean
+                  default: false
+                  description: "Indicates if the bus arrives the next day (e.g., departs 10 PM, arrives 5 AM). Used to calculate duration accurately."
                 direction:
                   type: string
                   enum: [UP, DOWN, ROUND_TRIP]
@@ -3681,7 +3687,7 @@ paths:
         1. Gets bus_owner_id from authenticated user
         2. Queries trip_schedules table: WHERE bus_owner_id = X
         3. Extracts schedule IDs
-        4. Queries scheduled_trips: WHERE trip_schedule_id IN (...) AND trip_date BETWEEN start AND end
+        4. Queries scheduled_trips: WHERE trip_schedule_id IN (...) AND DATE(departure_datetime) BETWEEN start AND end
 
         This ensures only trips from the bus owner's timetables are returned,
         using a single optimized SQL query with IN clause.
@@ -4904,6 +4910,11 @@ components:
         estimated_arrival_time:
           type: string
           example: "10:30:00"
+        estimated_duration_minutes:
+          type: integer
+          nullable: true
+          example: 420
+          description: "Calculated trip duration in minutes. For overnight trips, includes time past midnight (e.g., 10 PM to 5 AM = 420 minutes)."
         base_fare:
           type: number
           format: double
@@ -4941,8 +4952,7 @@ components:
       required:
         - id
         - trip_schedule_id
-        - trip_date
-        - departure_time
+        - departure_datetime
         - base_fare
         - status
       properties:
@@ -4966,16 +4976,17 @@ components:
           nullable: true
           example: "c2eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
           description: Optional permit ID (NULL if trip has no permit assigned)
-        trip_date:
+        departure_datetime:
           type: string
-          format: date
-          example: "2025-11-05"
-        departure_time:
+          format: date-time
+          example: "2025-11-05T08:00:00Z"
+          description: "Combined departure date and time for the trip. Use ISO 8601 format (YYYY-MM-DDTHH:MM:SS)."
+        actual_arrival_datetime:
           type: string
-          example: "08:00:00"
-        estimated_arrival_time:
-          type: string
-          example: "10:30:00"
+          format: date-time
+          nullable: true
+          example: "2025-11-05T10:30:00Z"
+          description: "Calculated actual arrival date and time for the trip. For overnight trips, this will be the next day's date (e.g., depart 2025-11-05T22:00:00, arrive 2025-11-06T05:00:00)."
         assigned_driver_id:
           type: string
           format: uuid

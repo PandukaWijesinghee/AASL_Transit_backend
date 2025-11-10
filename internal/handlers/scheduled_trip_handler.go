@@ -143,8 +143,8 @@ func (h *ScheduledTripHandler) GetTripsByDateRange(c *gin.Context) {
 			if trip.OriginCity != nil && trip.DestinationCity != nil {
 				routeInfo = fmt.Sprintf("%s - %s", *trip.OriginCity, *trip.DestinationCity)
 			}
-			fmt.Printf("   - Trip[%d]: id=%s, date=%s, time=%s, route=%s\n",
-				i+1, trip.ID, trip.TripDate.Format("2006-01-02"), trip.DepartureTime, routeInfo)
+			fmt.Printf("   - Trip[%d]: id=%s, datetime=%s, route=%s\n",
+				i+1, trip.ID, trip.DepartureDatetime.Format("2006-01-02 15:04:05"), routeInfo)
 		}
 	}
 
@@ -616,22 +616,19 @@ func (h *ScheduledTripHandler) CreateSpecialTrip(c *gin.Context) {
 			})
 			return
 		}
-	} // Parse trip date
-	tripDate, _ := time.Parse("2006-01-02", req.TripDate) // Already validated in Validate()	// Parse departure time
-	var departureHour, departureMinute int
-	if t, err := time.Parse("15:04", req.DepartureTime); err == nil {
-		departureHour = t.Hour()
-		departureMinute = t.Minute()
-	} else if t, err := time.Parse("15:04:05", req.DepartureTime); err == nil {
-		departureHour = t.Hour()
-		departureMinute = t.Minute()
+	} // Parse departure datetime
+	departureDatetime, _ := time.Parse(time.RFC3339, req.DepartureDatetime) // Already validated in Validate()
+	
+	// If parsing as RFC3339 fails, try ISO 8601 formats
+	if departureDatetime.IsZero() {
+		formats := []string{"2006-01-02 15:04:05", "2006-01-02T15:04:05"}
+		for _, format := range formats {
+			if dt, err := time.Parse(format, req.DepartureDatetime); err == nil {
+				departureDatetime = dt
+				break
+			}
+		}
 	}
-
-	// Calculate departure datetime
-	departureDateTime := time.Date(
-		tripDate.Year(), tripDate.Month(), tripDate.Day(),
-		departureHour, departureMinute, 0, 0, time.Local,
-	)
 
 	// Get system settings
 	assignmentDeadlineHours := h.settingRepo.GetIntValue("assignment_deadline_hours", 2)
@@ -644,7 +641,7 @@ func (h *ScheduledTripHandler) CreateSpecialTrip(c *gin.Context) {
 	}
 
 	// Calculate assignment deadline
-	assignmentDeadline := departureDateTime.Add(-time.Duration(assignmentDeadlineHours) * time.Hour)
+	assignmentDeadline := departureDatetime.Add(-time.Duration(assignmentDeadlineHours) * time.Hour)
 
 	// Check if trip is too soon (assignment deadline has passed or will pass soon)
 	now := time.Now()
@@ -680,15 +677,21 @@ func (h *ScheduledTripHandler) CreateSpecialTrip(c *gin.Context) {
 		}
 	}
 
+	// Calculate actual arrival datetime
+	var actualArrivalDatetime *time.Time
+	if req.EstimatedDurationMinutes != nil {
+		arrivalTime := departureDatetime.Add(time.Duration(*req.EstimatedDurationMinutes) * time.Minute)
+		actualArrivalDatetime = &arrivalTime
+	}
+
 	// Create special trip
 	trip := &models.ScheduledTrip{
 		TripScheduleID:       nil, // Special trip - no timetable
 		BusOwnerRouteID:      &req.CustomRouteID,
 		PermitID:             req.PermitID,
 		BusID:                req.BusID,
-		TripDate:             tripDate,
-		DepartureTime:        req.DepartureTime,
-		EstimatedArrivalTime: req.EstimatedArrivalTime,
+		DepartureDatetime:    departureDatetime,
+		ActualArrivalDatetime: actualArrivalDatetime,
 		AssignedDriverID:     req.AssignedDriverID,
 		AssignedConductorID:  req.AssignedConductorID,
 		IsBookable:           req.IsBookable,
@@ -1025,8 +1028,9 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 			return
 		}
 
-		// Check if license is expired
-		if staff.LicenseExpiryDate != nil && staff.LicenseExpiryDate.Before(trip.TripDate) {
+		// Check if license is expired (compare with trip departure date)
+		tripDate := time.Date(trip.DepartureDatetime.Year(), trip.DepartureDatetime.Month(), trip.DepartureDatetime.Day(), 0, 0, 0, 0, time.UTC)
+		if staff.LicenseExpiryDate != nil && staff.LicenseExpiryDate.Before(tripDate) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Driver's license will be expired on trip date"})
 			return
 		}
@@ -1094,11 +1098,13 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 		log.Printf("[AssignStaffToTrip] ✓ Permit is verified")
 
 		// Verify permit is valid on trip date
-		if permit.IssueDate.After(trip.TripDate) {
+		// Extract date from DepartureDatetime for comparison with permit dates
+		tripDate := time.Date(trip.DepartureDatetime.Year(), trip.DepartureDatetime.Month(), trip.DepartureDatetime.Day(), 0, 0, 0, 0, time.UTC)
+		if permit.IssueDate.After(tripDate) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Permit is not yet valid on trip date"})
 			return
 		}
-		if permit.ExpiryDate.Before(trip.TripDate) {
+		if permit.ExpiryDate.Before(tripDate) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Permit will be expired on trip date"})
 			return
 		}

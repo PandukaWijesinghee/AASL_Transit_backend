@@ -256,20 +256,32 @@ func (h *TripScheduleHandler) CreateSchedule(c *gin.Context) {
 		specificDatesPtr = &specificDatesStr
 	}
 
+	// Calculate duration if arrival time is provided
+	var durationMinutes *int
+	if req.EstimatedArrivalTime != nil && *req.EstimatedArrivalTime != "" {
+		duration, err := models.CalculateDurationMinutes(req.DepartureTime, *req.EstimatedArrivalTime, req.IsOvernightTrip)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid trip duration", "details": err.Error()})
+			return
+		}
+		durationMinutes = &duration
+	}
+
 	// Create schedule
 	permitID := req.PermitID
 	schedule := &models.TripSchedule{
-		ID:                   uuid.New().String(),
-		BusOwnerID:           busOwner.ID,
-		PermitID:             &permitID,
-		BusID:                req.BusID,
-		ScheduleName:         req.ScheduleName,
-		RecurrenceType:       models.RecurrenceType(req.RecurrenceType),
-		RecurrenceDays:       models.IntSliceToString(req.RecurrenceDays),
-		SpecificDates:        specificDatesPtr,
-		DepartureTime:        req.DepartureTime,
-		EstimatedArrivalTime: req.EstimatedArrivalTime,
-		Direction:            req.Direction,
+		ID:                       uuid.New().String(),
+		BusOwnerID:               busOwner.ID,
+		PermitID:                 &permitID,
+		BusID:                    req.BusID,
+		ScheduleName:             req.ScheduleName,
+		RecurrenceType:           models.RecurrenceType(req.RecurrenceType),
+		RecurrenceDays:           models.IntSliceToString(req.RecurrenceDays),
+		SpecificDates:            specificDatesPtr,
+		DepartureTime:            req.DepartureTime,
+		EstimatedArrivalTime:     req.EstimatedArrivalTime,
+		EstimatedDurationMinutes: durationMinutes,
+		Direction:                req.Direction,
 		TripsPerDay:          req.TripsPerDay,
 		BaseFare:             req.BaseFare,
 		IsBookable:           req.IsBookable,

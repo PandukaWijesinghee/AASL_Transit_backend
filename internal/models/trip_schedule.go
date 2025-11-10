@@ -29,10 +29,11 @@ type TripSchedule struct {
 	ScheduleName         *string        `json:"schedule_name,omitempty" db:"schedule_name"`
 	RecurrenceType       RecurrenceType `json:"recurrence_type" db:"recurrence_type"`
 	RecurrenceDays       string         `json:"recurrence_days,omitempty" db:"recurrence_days"`               // For weekly: "1,2,3" (comma-separated day numbers)
-	RecurrenceInterval   *int           `json:"recurrence_interval,omitempty" db:"recurrence_interval"`       // NEW: For interval: every N days
-	DepartureTime        string         `json:"departure_time" db:"departure_time"`                           // TIME type stored as string (HH:MM:SS)
-	EstimatedArrivalTime *string        `json:"estimated_arrival_time,omitempty" db:"estimated_arrival_time"` // TIME type stored as string (HH:MM:SS)
-	BaseFare             float64        `json:"base_fare" db:"base_fare"`
+	RecurrenceInterval       *int    `json:"recurrence_interval,omitempty" db:"recurrence_interval"`             // NEW: For interval: every N days
+	DepartureTime            string  `json:"departure_time" db:"departure_time"`                                 // TIME type stored as string (HH:MM:SS)
+	EstimatedArrivalTime     *string `json:"estimated_arrival_time,omitempty" db:"estimated_arrival_time"`       // TIME type stored as string (HH:MM:SS)
+	EstimatedDurationMinutes *int    `json:"estimated_duration_minutes,omitempty" db:"estimated_duration_minutes"` // NEW: Duration in minutes (handles overnight trips)
+	BaseFare                 float64 `json:"base_fare" db:"base_fare"`
 	IsBookable           bool           `json:"is_bookable" db:"is_bookable"`
 	MaxBookableSeats     *int           `json:"max_bookable_seats,omitempty" db:"max_bookable_seats"`
 	BookingAdvanceHours  *int           `json:"booking_advance_hours,omitempty" db:"booking_advance_hours"` // NEW: NULL = use system default
@@ -241,6 +242,7 @@ type CreateTripScheduleRequest struct {
 	SpecificDates        []string `json:"specific_dates,omitempty"` // Date strings in YYYY-MM-DD format
 	DepartureTime        string   `json:"departure_time" binding:"required"`
 	EstimatedArrivalTime *string  `json:"estimated_arrival_time,omitempty"` // HH:MM or HH:MM:SS format
+	IsOvernightTrip      bool     `json:"is_overnight_trip"`                // NEW: True if arrival is next day
 	Direction            string   `json:"direction" binding:"required,oneof=UP DOWN ROUND_TRIP"`
 	TripsPerDay          int      `json:"trips_per_day" binding:"required,min=1,max=10"`
 	BaseFare             float64  `json:"base_fare" binding:"required,gt=0"`
@@ -404,4 +406,54 @@ func (s *TripSchedule) GetNextOccurrences(n int) []time.Time {
 	}
 
 	return dates
+}
+
+// CalculateDurationMinutes calculates trip duration from departure and arrival times
+// Returns duration in minutes. Handles overnight trips (e.g., 22:00 to 05:00 = 420 minutes)
+func CalculateDurationMinutes(departureTimeStr string, arrivalTimeStr string, isOvernight bool) (int, error) {
+	// Parse departure time
+	depTime, err := time.Parse("15:04:05", departureTimeStr)
+	if err != nil {
+		// Try without seconds
+		depTime, err = time.Parse("15:04", departureTimeStr)
+		if err != nil {
+			return 0, errors.New("invalid departure time format")
+		}
+	}
+
+	// Parse arrival time
+	arrTime, err := time.Parse("15:04:05", arrivalTimeStr)
+	if err != nil {
+		// Try without seconds
+		arrTime, err = time.Parse("15:04", arrivalTimeStr)
+		if err != nil {
+			return 0, errors.New("invalid arrival time format")
+		}
+	}
+
+	// Convert to minutes from midnight
+	depMinutes := depTime.Hour()*60 + depTime.Minute()
+	arrMinutes := arrTime.Hour()*60 + arrTime.Minute()
+
+	var duration int
+	if isOvernight {
+		// Overnight: add 24 hours (1440 minutes) to arrival time
+		duration = (1440 - depMinutes) + arrMinutes
+	} else {
+		// Same day
+		duration = arrMinutes - depMinutes
+		if duration < 0 {
+			return 0, errors.New("arrival time must be after departure time for same-day trips")
+		}
+	}
+
+	// Validate duration (must be positive and reasonable)
+	if duration <= 0 {
+		return 0, errors.New("trip duration must be positive")
+	}
+	if duration > 2880 { // 48 hours max
+		return 0, errors.New("trip duration cannot exceed 48 hours")
+	}
+
+	return duration, nil
 }
