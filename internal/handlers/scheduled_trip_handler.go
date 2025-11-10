@@ -924,10 +924,10 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 
 	// Verify ownership through trip schedule OR bus owner route
 	var schedule *models.TripSchedule
-	
-	log.Printf("[AssignStaffToTrip] Trip ID: %s, TripScheduleID: %v, BusOwnerRouteID: %v, BusOwnerID: %s", 
+
+	log.Printf("[AssignStaffToTrip] Trip ID: %s, TripScheduleID: %v, BusOwnerRouteID: %v, BusOwnerID: %s",
 		tripID, trip.TripScheduleID, trip.BusOwnerRouteID, busOwner.ID)
-	
+
 	if trip.TripScheduleID == nil && trip.BusOwnerRouteID == nil {
 		log.Printf("[AssignStaffToTrip] ERROR: Trip has neither schedule nor route")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot determine trip ownership - no schedule or route linked"})
@@ -945,9 +945,9 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 			return
 		}
 
-		log.Printf("[AssignStaffToTrip] Schedule found. Schedule BusOwnerID: %s, Current BusOwnerID: %s", 
+		log.Printf("[AssignStaffToTrip] Schedule found. Schedule BusOwnerID: %s, Current BusOwnerID: %s",
 			schedule.BusOwnerID, busOwner.ID)
-		
+
 		if schedule.BusOwnerID != busOwner.ID {
 			log.Printf("[AssignStaffToTrip] ERROR: Ownership mismatch - access denied")
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
@@ -966,9 +966,9 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 			return
 		}
 
-		log.Printf("[AssignStaffToTrip] Route found. Route BusOwnerID: %s, Current BusOwnerID: %s", 
+		log.Printf("[AssignStaffToTrip] Route found. Route BusOwnerID: %s, Current BusOwnerID: %s",
 			route.BusOwnerID, busOwner.ID)
-		
+
 		if route.BusOwnerID != busOwner.ID {
 			log.Printf("[AssignStaffToTrip] ERROR: Ownership mismatch - access denied")
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})

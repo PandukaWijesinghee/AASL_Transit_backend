@@ -348,13 +348,18 @@ func (r *TripScheduleRepository) scanSchedules(rows *sql.Rows) ([]models.TripSch
 			schedule.RecurrenceDays = ""
 		}
 		if specificDatesStr.Valid {
-			schedule.SpecificDates = specificDatesStr.String
+			dateStr := specificDatesStr.String
+			schedule.SpecificDates = &dateStr
 		} else {
-			schedule.SpecificDates = ""
+			schedule.SpecificDates = nil
 		}
 
+		specificDatesDisplay := ""
+		if schedule.SpecificDates != nil {
+			specificDatesDisplay = *schedule.SpecificDates
+		}
 		fmt.Printf("✅ REPO: Row #%d scanned successfully - ID=%s, RecurrenceDays=%s, SpecificDates=%s\n",
-			rowNum, schedule.ID, schedule.RecurrenceDays, schedule.SpecificDates)
+			rowNum, schedule.ID, schedule.RecurrenceDays, specificDatesDisplay)
 
 		// Convert sql.Null* types
 		if busOwnerRouteID.Valid {

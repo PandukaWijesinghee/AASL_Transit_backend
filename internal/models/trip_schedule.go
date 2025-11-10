@@ -50,7 +50,7 @@ type TripSchedule struct {
 	SelectedStopIDs     UUIDArray  `json:"selected_stop_ids,omitempty" db:"selected_stop_ids"`
 	ValidFrom           time.Time  `json:"valid_from,omitempty" db:"valid_from_old"`
 	ValidUntil          *time.Time `json:"valid_until,omitempty" db:"valid_until_old"`
-	SpecificDates       string     `json:"specific_dates,omitempty" db:"specific_dates_old"` // Comma-separated dates: "2025-01-01,2025-01-15"
+	SpecificDates       *string    `json:"specific_dates,omitempty" db:"specific_dates_old"` // Comma-separated dates: "2025-01-01,2025-01-15" - can be NULL
 }
 
 // Helper methods for converting between string and slices
@@ -70,15 +70,16 @@ func (s *TripSchedule) SetRecurrenceDaysFromSlice(days []int) {
 
 // GetSpecificDatesSlice parses the comma-separated specific_dates string into []time.Time
 func (s *TripSchedule) GetSpecificDatesSlice() ([]time.Time, error) {
-	if s.SpecificDates == "" {
+	if s.SpecificDates == nil || *s.SpecificDates == "" {
 		return []time.Time{}, nil
 	}
-	return StringToDateSlice(s.SpecificDates)
+	return StringToDateSlice(*s.SpecificDates)
 }
 
 // SetSpecificDatesFromSlice converts []time.Time to comma-separated string
 func (s *TripSchedule) SetSpecificDatesFromSlice(dates []time.Time) {
-	s.SpecificDates = DateSliceToString(dates)
+	dateStr := DateSliceToString(dates)
+	s.SpecificDates = &dateStr
 }
 
 // Helper functions for string ↔ slice conversion

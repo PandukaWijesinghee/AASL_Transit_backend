@@ -3911,19 +3911,19 @@ paths:
       summary: Assign staff and permit to a scheduled trip
       description: |
         Assign driver, conductor, and/or route permit to a scheduled trip.
-        
+
         Ownership Verification:
         - Trip must have either trip_schedule_id OR bus_owner_route_id to verify ownership
         - Only the bus owner who created the trip can assign staff/permits
         - Detailed logs are generated for debugging ownership verification failures
-        
+
         This endpoint validates:
         - Staff belongs to the bus owner's organization
         - Staff has correct type (driver/conductor) and is actively employed
         - Staff licenses are not expired on trip date
         - Permit is approved and valid on trip date
         - Permit covers the trip's route
-        
+
         Error Logging:
         - Logs trip ownership details (trip_schedule_id, bus_owner_route_id)
         - Logs schedule and route ownership verification steps

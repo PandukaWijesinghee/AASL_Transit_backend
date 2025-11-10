@@ -241,7 +241,7 @@ func (h *TripScheduleHandler) CreateSchedule(c *gin.Context) {
 	}
 
 	// Parse specific dates if provided and convert to comma-separated string
-	var specificDatesStr string
+	var specificDatesPtr *string
 	if len(req.SpecificDates) > 0 {
 		dates := make([]time.Time, 0, len(req.SpecificDates))
 		for _, dateStr := range req.SpecificDates {
@@ -252,7 +252,8 @@ func (h *TripScheduleHandler) CreateSchedule(c *gin.Context) {
 			}
 			dates = append(dates, date)
 		}
-		specificDatesStr = models.DateSliceToString(dates)
+		specificDatesStr := models.DateSliceToString(dates)
+		specificDatesPtr = &specificDatesStr
 	}
 
 	// Create schedule
@@ -265,7 +266,7 @@ func (h *TripScheduleHandler) CreateSchedule(c *gin.Context) {
 		ScheduleName:         req.ScheduleName,
 		RecurrenceType:       models.RecurrenceType(req.RecurrenceType),
 		RecurrenceDays:       models.IntSliceToString(req.RecurrenceDays),
-		SpecificDates:        specificDatesStr,
+		SpecificDates:        specificDatesPtr,
 		DepartureTime:        req.DepartureTime,
 		EstimatedArrivalTime: req.EstimatedArrivalTime,
 		Direction:            req.Direction,
@@ -396,7 +397,8 @@ func (h *TripScheduleHandler) UpdateSchedule(c *gin.Context) {
 			}
 			dates = append(dates, date)
 		}
-		schedule.SpecificDates = models.DateSliceToString(dates)
+		specificDatesStr := models.DateSliceToString(dates)
+		schedule.SpecificDates = &specificDatesStr
 	}
 
 	if err := h.scheduleRepo.Update(schedule); err != nil {
