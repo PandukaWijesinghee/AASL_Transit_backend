@@ -618,7 +618,7 @@ func (h *ScheduledTripHandler) CreateSpecialTrip(c *gin.Context) {
 		}
 	} // Parse departure datetime
 	departureDatetime, _ := time.Parse(time.RFC3339, req.DepartureDatetime) // Already validated in Validate()
-	
+
 	// If parsing as RFC3339 fails, try ISO 8601 formats
 	if departureDatetime.IsZero() {
 		formats := []string{"2006-01-02 15:04:05", "2006-01-02T15:04:05"}
@@ -686,22 +686,22 @@ func (h *ScheduledTripHandler) CreateSpecialTrip(c *gin.Context) {
 
 	// Create special trip
 	trip := &models.ScheduledTrip{
-		TripScheduleID:       nil, // Special trip - no timetable
-		BusOwnerRouteID:      &req.CustomRouteID,
-		PermitID:             req.PermitID,
-		BusID:                req.BusID,
-		DepartureDatetime:    departureDatetime,
+		TripScheduleID:        nil, // Special trip - no timetable
+		BusOwnerRouteID:       &req.CustomRouteID,
+		PermitID:              req.PermitID,
+		BusID:                 req.BusID,
+		DepartureDatetime:     departureDatetime,
 		ActualArrivalDatetime: actualArrivalDatetime,
-		AssignedDriverID:     req.AssignedDriverID,
-		AssignedConductorID:  req.AssignedConductorID,
-		IsBookable:           req.IsBookable,
-		TotalSeats:           req.MaxBookableSeats,
-		AvailableSeats:       req.MaxBookableSeats,
-		BookedSeats:          0,
-		BaseFare:             req.BaseFare,
-		BookingAdvanceHours:  bookingAdvanceHours,
-		AssignmentDeadline:   &assignmentDeadline,
-		Status:               models.ScheduledTripStatusScheduled,
+		AssignedDriverID:      req.AssignedDriverID,
+		AssignedConductorID:   req.AssignedConductorID,
+		IsBookable:            req.IsBookable,
+		TotalSeats:            req.MaxBookableSeats,
+		AvailableSeats:        req.MaxBookableSeats,
+		BookedSeats:           0,
+		BaseFare:              req.BaseFare,
+		BookingAdvanceHours:   bookingAdvanceHours,
+		AssignmentDeadline:    &assignmentDeadline,
+		Status:                models.ScheduledTripStatusScheduled,
 	}
 
 	if err := h.tripRepo.Create(trip); err != nil {

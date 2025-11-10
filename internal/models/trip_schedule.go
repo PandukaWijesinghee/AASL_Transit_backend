@@ -21,26 +21,26 @@ const (
 
 // TripSchedule represents a recurring trip template (timetable)
 type TripSchedule struct {
-	ID                   string         `json:"id" db:"id"`
-	BusOwnerID           string         `json:"bus_owner_id" db:"bus_owner_id"`
-	PermitID             *string        `json:"permit_id,omitempty" db:"permit_id"`                   // Optional - assigned later to specific trips
-	BusOwnerRouteID      *string        `json:"bus_owner_route_id,omitempty" db:"bus_owner_route_id"` // Reference to bus_owner_routes (replaces old custom_route_id)
-	BusID                *string        `json:"bus_id,omitempty" db:"bus_id"`
-	ScheduleName         *string        `json:"schedule_name,omitempty" db:"schedule_name"`
-	RecurrenceType       RecurrenceType `json:"recurrence_type" db:"recurrence_type"`
-	RecurrenceDays       string         `json:"recurrence_days,omitempty" db:"recurrence_days"`               // For weekly: "1,2,3" (comma-separated day numbers)
-	RecurrenceInterval       *int    `json:"recurrence_interval,omitempty" db:"recurrence_interval"`             // NEW: For interval: every N days
-	DepartureTime            string  `json:"departure_time" db:"departure_time"`                                 // TIME type stored as string (HH:MM:SS)
-	EstimatedArrivalTime     *string `json:"estimated_arrival_time,omitempty" db:"estimated_arrival_time"`       // TIME type stored as string (HH:MM:SS)
-	EstimatedDurationMinutes *int    `json:"estimated_duration_minutes,omitempty" db:"estimated_duration_minutes"` // NEW: Duration in minutes (handles overnight trips)
-	BaseFare                 float64 `json:"base_fare" db:"base_fare"`
-	IsBookable           bool           `json:"is_bookable" db:"is_bookable"`
-	MaxBookableSeats     *int           `json:"max_bookable_seats,omitempty" db:"max_bookable_seats"`
-	BookingAdvanceHours  *int           `json:"booking_advance_hours,omitempty" db:"booking_advance_hours"` // NEW: NULL = use system default
-	IsActive             bool           `json:"is_active" db:"is_active"`
-	Notes                *string        `json:"notes,omitempty" db:"notes"`
-	CreatedAt            time.Time      `json:"created_at" db:"created_at"`
-	UpdatedAt            time.Time      `json:"updated_at" db:"updated_at"`
+	ID                       string         `json:"id" db:"id"`
+	BusOwnerID               string         `json:"bus_owner_id" db:"bus_owner_id"`
+	PermitID                 *string        `json:"permit_id,omitempty" db:"permit_id"`                   // Optional - assigned later to specific trips
+	BusOwnerRouteID          *string        `json:"bus_owner_route_id,omitempty" db:"bus_owner_route_id"` // Reference to bus_owner_routes (replaces old custom_route_id)
+	BusID                    *string        `json:"bus_id,omitempty" db:"bus_id"`
+	ScheduleName             *string        `json:"schedule_name,omitempty" db:"schedule_name"`
+	RecurrenceType           RecurrenceType `json:"recurrence_type" db:"recurrence_type"`
+	RecurrenceDays           string         `json:"recurrence_days,omitempty" db:"recurrence_days"`                       // For weekly: "1,2,3" (comma-separated day numbers)
+	RecurrenceInterval       *int           `json:"recurrence_interval,omitempty" db:"recurrence_interval"`               // NEW: For interval: every N days
+	DepartureTime            string         `json:"departure_time" db:"departure_time"`                                   // TIME type stored as string (HH:MM:SS)
+	EstimatedArrivalTime     *string        `json:"estimated_arrival_time,omitempty" db:"estimated_arrival_time"`         // TIME type stored as string (HH:MM:SS)
+	EstimatedDurationMinutes *int           `json:"estimated_duration_minutes,omitempty" db:"estimated_duration_minutes"` // NEW: Duration in minutes (handles overnight trips)
+	BaseFare                 float64        `json:"base_fare" db:"base_fare"`
+	IsBookable               bool           `json:"is_bookable" db:"is_bookable"`
+	MaxBookableSeats         *int           `json:"max_bookable_seats,omitempty" db:"max_bookable_seats"`
+	BookingAdvanceHours      *int           `json:"booking_advance_hours,omitempty" db:"booking_advance_hours"` // NEW: NULL = use system default
+	IsActive                 bool           `json:"is_active" db:"is_active"`
+	Notes                    *string        `json:"notes,omitempty" db:"notes"`
+	CreatedAt                time.Time      `json:"created_at" db:"created_at"`
+	UpdatedAt                time.Time      `json:"updated_at" db:"updated_at"`
 
 	// Deprecated fields (kept for backward compatibility, renamed in DB to *_old)
 	Direction           string     `json:"direction,omitempty" db:"direction_old"`

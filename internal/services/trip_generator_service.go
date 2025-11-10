@@ -72,7 +72,7 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 			// Calculate assignment deadline (e.g., 2 hours before departure)
 			// TODO: Get assignment_deadline_hours from system settings
 			assignmentDeadlineHours := 2
-			
+
 			// Parse departure time from schedule and combine with current date to create departure_datetime
 			var departureDatetime time.Time
 			if t, err := time.Parse("15:04", schedule.DepartureTime); err == nil {
@@ -80,7 +80,7 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 			} else if t, err := time.Parse("15:04:05", schedule.DepartureTime); err == nil {
 				departureDatetime = time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), t.Hour(), t.Minute(), t.Second(), 0, currentDate.Location())
 			}
-			
+
 			assignmentDeadline := departureDatetime.Add(-time.Duration(assignmentDeadlineHours) * time.Hour)
 
 			// Calculate actual arrival datetime from departure_datetime + duration
@@ -98,19 +98,19 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 				BusOwnerRouteID:       schedule.BusOwnerRouteID, // Inherit route from schedule (can be updated later)
 				PermitID:              schedule.PermitID,        // Pass pointer directly (nil if not set)
 				BusID:                 schedule.BusID,
-				DepartureDatetime:     departureDatetime,        // Specific departure date and time
-				ActualArrivalDatetime: actualArrivalDatetime,    // Calculated arrival datetime (handles overnight)
+				DepartureDatetime:     departureDatetime,     // Specific departure date and time
+				ActualArrivalDatetime: actualArrivalDatetime, // Calculated arrival datetime (handles overnight)
 				AssignedDriverID:      schedule.DefaultDriverID,
-				AssignedConductorID:  schedule.DefaultConductorID,
-				IsBookable:           schedule.IsBookable,
-				TotalSeats:           totalSeats,
-				AvailableSeats:       maxBookableSeats,
-				BookedSeats:          0,
-				BaseFare:             schedule.BaseFare,
-				BookingAdvanceHours:  bookingAdvanceHours,
-				AssignmentDeadline:   &assignmentDeadline,
-				Status:               models.ScheduledTripStatusScheduled,
-				SelectedStopIDs:      schedule.SelectedStopIDs,
+				AssignedConductorID:   schedule.DefaultConductorID,
+				IsBookable:            schedule.IsBookable,
+				TotalSeats:            totalSeats,
+				AvailableSeats:        maxBookableSeats,
+				BookedSeats:           0,
+				BaseFare:              schedule.BaseFare,
+				BookingAdvanceHours:   bookingAdvanceHours,
+				AssignmentDeadline:    &assignmentDeadline,
+				Status:                models.ScheduledTripStatusScheduled,
+				SelectedStopIDs:       schedule.SelectedStopIDs,
 			}
 
 			if err := s.scheduledTripRepo.Create(trip); err != nil {
@@ -190,7 +190,7 @@ func (s *TripGeneratorService) GenerateFutureTrips() (int, error) {
 
 			// Calculate assignment deadline (2 hours before departure)
 			assignmentDeadlineHours := 2
-			
+
 			// Parse departure time from timetable and combine with date to create departure_datetime
 			var departureDatetime time.Time
 			if t, err := time.Parse("15:04", timetable.DepartureTime); err == nil {
@@ -198,7 +198,7 @@ func (s *TripGeneratorService) GenerateFutureTrips() (int, error) {
 			} else if t, err := time.Parse("15:04:05", timetable.DepartureTime); err == nil {
 				departureDatetime = time.Date(date.Year(), date.Month(), date.Day(), t.Hour(), t.Minute(), t.Second(), 0, date.Location())
 			}
-			
+
 			assignmentDeadline := departureDatetime.Add(-time.Duration(assignmentDeadlineHours) * time.Hour)
 
 			// Calculate actual arrival datetime from departure_datetime + duration
@@ -219,16 +219,16 @@ func (s *TripGeneratorService) GenerateFutureTrips() (int, error) {
 				DepartureDatetime:     departureDatetime,     // Specific departure date and time
 				ActualArrivalDatetime: actualArrivalDatetime, // Calculated arrival datetime (handles overnight)
 				AssignedDriverID:      timetable.DefaultDriverID,
-				AssignedConductorID:  timetable.DefaultConductorID,
-				IsBookable:           timetable.IsBookable,
-				TotalSeats:           totalSeats,
-				AvailableSeats:       maxBookableSeats,
-				BookedSeats:          0,
-				BaseFare:             timetable.BaseFare,
-				BookingAdvanceHours:  bookingAdvanceHours,
-				AssignmentDeadline:   &assignmentDeadline,
-				Status:               models.ScheduledTripStatusScheduled,
-				SelectedStopIDs:      timetable.SelectedStopIDs,
+				AssignedConductorID:   timetable.DefaultConductorID,
+				IsBookable:            timetable.IsBookable,
+				TotalSeats:            totalSeats,
+				AvailableSeats:        maxBookableSeats,
+				BookedSeats:           0,
+				BaseFare:              timetable.BaseFare,
+				BookingAdvanceHours:   bookingAdvanceHours,
+				AssignmentDeadline:    &assignmentDeadline,
+				Status:                models.ScheduledTripStatusScheduled,
+				SelectedStopIDs:       timetable.SelectedStopIDs,
 			}
 
 			if err := s.scheduledTripRepo.Create(trip); err != nil {
