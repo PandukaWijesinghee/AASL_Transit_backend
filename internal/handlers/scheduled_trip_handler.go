@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -924,38 +925,56 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 	// Verify ownership through trip schedule OR bus owner route
 	var schedule *models.TripSchedule
 	
+	log.Printf("[AssignStaffToTrip] Trip ID: %s, TripScheduleID: %v, BusOwnerRouteID: %v, BusOwnerID: %s", 
+		tripID, trip.TripScheduleID, trip.BusOwnerRouteID, busOwner.ID)
+	
 	if trip.TripScheduleID == nil && trip.BusOwnerRouteID == nil {
+		log.Printf("[AssignStaffToTrip] ERROR: Trip has neither schedule nor route")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot determine trip ownership - no schedule or route linked"})
 		return
 	}
 
 	// Verify ownership via schedule if present
 	if trip.TripScheduleID != nil {
+		log.Printf("[AssignStaffToTrip] Verifying ownership via schedule ID: %s", *trip.TripScheduleID)
 		var err error
 		schedule, err = h.scheduleRepo.GetByID(*trip.TripScheduleID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ownership via schedule"})
+			log.Printf("[AssignStaffToTrip] ERROR: Failed to get schedule: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ownership via schedule", "details": err.Error()})
 			return
 		}
 
+		log.Printf("[AssignStaffToTrip] Schedule found. Schedule BusOwnerID: %s, Current BusOwnerID: %s", 
+			schedule.BusOwnerID, busOwner.ID)
+		
 		if schedule.BusOwnerID != busOwner.ID {
+			log.Printf("[AssignStaffToTrip] ERROR: Ownership mismatch - access denied")
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 			return
 		}
+		log.Printf("[AssignStaffToTrip] Ownership verified via schedule ✓")
 	}
 
 	// Verify ownership via bus owner route if present (and no schedule check done)
 	if trip.TripScheduleID == nil && trip.BusOwnerRouteID != nil {
+		log.Printf("[AssignStaffToTrip] Verifying ownership via route ID: %s", *trip.BusOwnerRouteID)
 		route, err := h.routeRepo.GetByID(*trip.BusOwnerRouteID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ownership via route"})
+			log.Printf("[AssignStaffToTrip] ERROR: Failed to get route: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ownership via route", "details": err.Error()})
 			return
 		}
 
+		log.Printf("[AssignStaffToTrip] Route found. Route BusOwnerID: %s, Current BusOwnerID: %s", 
+			route.BusOwnerID, busOwner.ID)
+		
 		if route.BusOwnerID != busOwner.ID {
+			log.Printf("[AssignStaffToTrip] ERROR: Ownership mismatch - access denied")
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 			return
 		}
+		log.Printf("[AssignStaffToTrip] Ownership verified via route ✓")
 	}
 
 	// Parse request
