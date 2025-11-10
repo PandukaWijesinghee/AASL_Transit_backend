@@ -219,3 +219,30 @@ type ScheduledTripWithRouteInfo struct {
 	DestinationCity *string `json:"destination_city,omitempty"`
 	IsUpDirection   *bool   `json:"is_up_direction,omitempty"`
 }
+
+// StaffDetails contains basic staff information for trip display
+type StaffDetails struct {
+	ID            string  `json:"id"`
+	FirstName     string  `json:"first_name"`
+	LastName      string  `json:"last_name"`
+	Phone         string  `json:"phone"`
+	LicenseNumber *string `json:"license_number,omitempty"`
+}
+
+// PermitDetails contains basic permit information for trip display
+type PermitDetails struct {
+	ID                    string `json:"id"`
+	PermitNumber          string `json:"permit_number"`
+	BusRegistrationNumber string `json:"bus_registration_number"`
+	RouteNumber           string `json:"route_number"`
+	OriginCity            string `json:"origin_city"`
+	DestinationCity       string `json:"destination_city"`
+}
+
+// ScheduledTripWithDetails extends ScheduledTrip with full assignment details
+type ScheduledTripWithDetails struct {
+	ScheduledTrip
+	Driver    *StaffDetails  `json:"driver,omitempty"`
+	Conductor *StaffDetails  `json:"conductor,omitempty"`
+	Permit    *PermitDetails `json:"permit,omitempty"`
+}
