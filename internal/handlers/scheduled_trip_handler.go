@@ -1082,10 +1082,16 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 		}
 
 		// Verify permit is approved
+		log.Printf("[AssignStaffToTrip] Permit status check - Permit ID: %s, Status: %s", req.PermitID, permit.Status)
 		if permit.Status != "approved" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Permit must be approved before assignment"})
+			log.Printf("[AssignStaffToTrip] ❌ Permit status is '%s', expected 'approved'", permit.Status)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Permit must be approved before assignment",
+				"details": fmt.Sprintf("Current permit status: %s", permit.Status),
+			})
 			return
 		}
+		log.Printf("[AssignStaffToTrip] ✓ Permit is approved")
 
 		// Verify permit is valid on trip date
 		if permit.IssueDate.After(trip.TripDate) {

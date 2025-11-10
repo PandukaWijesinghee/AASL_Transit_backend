@@ -3921,7 +3921,8 @@ paths:
         - Staff belongs to the bus owner's organization
         - Staff has correct type (driver/conductor) and is actively employed
         - Staff licenses are not expired on trip date
-        - Permit is approved and valid on trip date
+        - Permit status must be "approved" (not "pending", "verified", or "rejected")
+        - Permit is valid on trip date (not expired)
         - Permit covers the trip's route
 
         Error Logging:
@@ -3991,7 +3992,8 @@ paths:
             - Staff not found or wrong type
             - Staff not actively employed
             - License expired on trip date
-            - Permit not approved or expired
+            - Permit status is not "approved" (must be approved, not pending/verified/rejected)
+            - Permit is expired on trip date
             - Permit doesn't cover the route
           content:
             application/json:
