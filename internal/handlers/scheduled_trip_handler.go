@@ -737,12 +737,12 @@ func (h *ScheduledTripHandler) PublishTrip(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Trip not found or access denied"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish trip"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish trip for booking"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Trip published successfully",
+		"message": "Trip published for booking successfully",
 		"trip_id": tripID,
 	})
 }
@@ -779,12 +779,12 @@ func (h *ScheduledTripHandler) UnpublishTrip(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Trip not found or access denied"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unpublish trip"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove trip from booking"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Trip unpublished successfully",
+		"message": "Trip removed from booking successfully",
 		"trip_id": tripID,
 	})
 }
@@ -809,7 +809,7 @@ func (h *ScheduledTripHandler) BulkPublishTrips(c *gin.Context) {
 		return
 	}
 
-	log.Printf("Bulk publish request from user %s: %d trips - %v", 
+	log.Printf("Bulk publish request from user %s: %d trips - %v",
 		userCtx.UserID.String(), len(req.TripIDs), req.TripIDs)
 
 	if len(req.TripIDs) == 0 {
@@ -831,23 +831,23 @@ func (h *ScheduledTripHandler) BulkPublishTrips(c *gin.Context) {
 		return
 	}
 
-	log.Printf("Bulk publish: Bus owner found - ID: %s, User ID: %s", 
+	log.Printf("Bulk publish: Bus owner found - ID: %s, User ID: %s",
 		busOwner.ID, userCtx.UserID.String())
 
 	// Bulk publish trips
 	publishedCount, err := h.tripRepo.BulkPublishTrips(req.TripIDs, busOwner.ID)
 	if err != nil {
-		log.Printf("Bulk publish: Failed to publish trips for bus owner %s: %v (Trip IDs: %v)", 
+		log.Printf("Bulk publish: Failed to publish trips for bus owner %s: %v (Trip IDs: %v)",
 			busOwner.ID, err, req.TripIDs)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish trips", "details": err.Error()})
 		return
 	}
 
-	log.Printf("Bulk publish: Success - Published %d/%d trips", 
+	log.Printf("Bulk publish: Success - Published %d/%d trips for booking",
 		publishedCount, len(req.TripIDs))
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":         "Trips published successfully",
+		"message":         "Trips published for booking successfully",
 		"published_count": publishedCount,
 		"requested_count": len(req.TripIDs),
 	})
@@ -873,7 +873,7 @@ func (h *ScheduledTripHandler) BulkUnpublishTrips(c *gin.Context) {
 		return
 	}
 
-	log.Printf("Bulk unpublish request from user %s: %d trips - %v", 
+	log.Printf("Bulk unpublish request from user %s: %d trips - %v",
 		userCtx.UserID.String(), len(req.TripIDs), req.TripIDs)
 
 	if len(req.TripIDs) == 0 {
@@ -895,23 +895,23 @@ func (h *ScheduledTripHandler) BulkUnpublishTrips(c *gin.Context) {
 		return
 	}
 
-	log.Printf("Bulk unpublish: Bus owner found - ID: %s, User ID: %s", 
+	log.Printf("Bulk unpublish: Bus owner found - ID: %s, User ID: %s",
 		busOwner.ID, userCtx.UserID.String())
 
 	// Bulk unpublish trips
 	unpublishedCount, err := h.tripRepo.BulkUnpublishTrips(req.TripIDs, busOwner.ID)
 	if err != nil {
-		log.Printf("Bulk unpublish: Failed to unpublish trips for bus owner %s: %v (Trip IDs: %v)", 
+		log.Printf("Bulk unpublish: Failed to unpublish trips for bus owner %s: %v (Trip IDs: %v)",
 			busOwner.ID, err, req.TripIDs)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unpublish trips", "details": err.Error()})
 		return
 	}
 
-	log.Printf("Bulk unpublish: Success - Unpublished %d/%d trips", 
+	log.Printf("Bulk unpublish: Success - Unpublished %d/%d trips from booking",
 		unpublishedCount, len(req.TripIDs))
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":           "Trips unpublished successfully",
+		"message":           "Trips removed from booking successfully",
 		"unpublished_count": unpublishedCount,
 		"requested_count":   len(req.TripIDs),
 	})

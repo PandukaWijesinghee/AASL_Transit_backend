@@ -36,6 +36,8 @@ tags:
     description: Health check endpoints
   - name: Authentication
     description: SMS OTP authentication endpoints
+  - name: Admin Authentication
+    description: Admin dashboard authentication endpoints (email/password based)
   - name: User
     description: User profile management
   - name: Staff
@@ -665,6 +667,257 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================================
+  # Admin Authentication Endpoints
+  # ============================================================================
+  /api/v1/admin/auth/login:
+    post:
+      summary: Admin login
+      description: Authenticate admin user with email and password
+      operationId: adminLogin
+      tags:
+        - Admin Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@smarttransit.com
+                password:
+                  type: string
+                  format: password
+                  example: Admin@123
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  refresh_token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  expires_in:
+                    type: integer
+                    format: int64
+                    example: 3600
+                  admin_user:
+                    $ref: "#/components/schemas/AdminUser"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Invalid credentials or account inactive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/admin/auth/refresh:
+    post:
+      summary: Refresh admin access token
+      description: Generate a new access token using a refresh token
+      operationId: adminRefreshToken
+      tags:
+        - Admin Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        "200":
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  refresh_token:
+                    type: string
+                  expires_in:
+                    type: integer
+                    format: int64
+                  admin_user:
+                    $ref: "#/components/schemas/AdminUser"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/admin/auth/logout:
+    post:
+      summary: Admin logout
+      description: Revoke the refresh token
+      operationId: adminLogout
+      tags:
+        - Admin Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        "200":
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logged out successfully
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/admin/auth/profile:
+    get:
+      summary: Get admin profile
+      description: Get the authenticated admin user's profile
+      operationId: getAdminProfile
+      tags:
+        - Admin Authentication
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Admin profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/admin/auth/change-password:
+    post:
+      summary: Change admin password
+      description: Change the authenticated admin user's password
+      operationId: changeAdminPassword
+      tags:
+        - Admin Authentication
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - old_password
+                - new_password
+              properties:
+                old_password:
+                  type: string
+                  format: password
+                new_password:
+                  type: string
+                  format: password
+                  minLength: 8
+      responses:
+        "200":
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password changed successfully
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/admin/auth/create:
+    post:
+      summary: Create new admin user
+      description: Create a new admin user (requires admin authentication)
+      operationId: createAdminUser
+      tags:
+        - Admin Authentication
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - full_name
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                full_name:
+                  type: string
+      responses:
+        "201":
+          description: Admin user created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/admin/auth/list:
+    get:
+      summary: List all admin users
+      description: Get a list of all admin users (requires admin authentication)
+      operationId: listAdminUsers
+      tags:
+        - Admin Authentication
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Admin users retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminUser"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   # ============================================================================
   # Staff Endpoints
@@ -1509,7 +1762,7 @@ paths:
 
         A daily cron job (runs at 2 AM) maintains a rolling 7-day window by generating new trips for upcoming dates.
 
-        After creation, use the publish/unpublish endpoints to control which trips are visible to passengers.
+        After creation, use the publish endpoints to make trips available for passenger booking (is_bookable=true).
       operationId: createTimetable
       tags:
         - Timetables
@@ -3829,8 +4082,8 @@ paths:
 
   /api/v1/scheduled-trips/{id}/publish:
     put:
-      summary: Publish a scheduled trip
-      description: Make a scheduled trip visible to passengers for booking. Only the trip owner can publish their trips.
+      summary: Publish a scheduled trip for booking
+      description: Make a scheduled trip available for passenger booking by setting is_bookable=true. Only the trip owner can publish their trips.
       operationId: publishScheduledTrip
       tags:
         - Scheduled Trips
@@ -3872,8 +4125,8 @@ paths:
 
   /api/v1/scheduled-trips/{id}/unpublish:
     put:
-      summary: Unpublish a scheduled trip
-      description: Hide a scheduled trip from passengers (not bookable). Only the trip owner can unpublish their trips.
+      summary: Remove a scheduled trip from booking
+      description: Remove a scheduled trip from passenger booking by setting is_bookable=false. Only the trip owner can unpublish their trips.
       operationId: unpublishScheduledTrip
       tags:
         - Scheduled Trips
@@ -4032,8 +4285,8 @@ paths:
 
   /api/v1/scheduled-trips/bulk-publish:
     post:
-      summary: Bulk publish scheduled trips
-      description: Publish multiple scheduled trips at once. Only the trip owner can publish their trips.
+      summary: Bulk publish scheduled trips for booking
+      description: Publish multiple scheduled trips at once by setting is_bookable=true. Only the trip owner can publish their trips.
       operationId: bulkPublishScheduledTrips
       tags:
         - Scheduled Trips
@@ -4089,8 +4342,8 @@ paths:
 
   /api/v1/scheduled-trips/bulk-unpublish:
     post:
-      summary: Bulk unpublish scheduled trips
-      description: Unpublish multiple scheduled trips at once. Only the trip owner can unpublish their trips.
+      summary: Bulk remove scheduled trips from booking
+      description: Remove multiple scheduled trips from booking by setting is_bookable=false. Only the trip owner can unpublish their trips.
       operationId: bulkUnpublishScheduledTrips
       tags:
         - Scheduled Trips
@@ -4238,6 +4491,40 @@ components:
           type: string
           format: date-time
           example: "2025-10-19T07:00:00Z"
+
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        email:
+          type: string
+          format: email
+          example: "admin@smarttransit.com"
+        full_name:
+          type: string
+          example: "System Administrator"
+        is_active:
+          type: boolean
+          example: true
+        last_login_at:
+          type: string
+          format: date-time
+          example: "2025-10-19T07:00:00Z"
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-10-19T07:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2025-10-19T07:00:00Z"
+        created_by:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
 
     BusStaff:
       type: object
@@ -5021,12 +5308,8 @@ components:
           description: Trip direction - true for up (origin→destination), false for down (destination→origin)
         is_bookable:
           type: boolean
-          example: true
-          description: Whether this trip accepts passenger bookings
-        is_published:
-          type: boolean
-          example: true
-          description: Whether this trip is visible to passengers (published trips can be viewed and booked)
+          example: false
+          description: Whether this trip is available for passenger booking. Must be explicitly published to make bookable.
         base_fare:
           type: number
           format: double

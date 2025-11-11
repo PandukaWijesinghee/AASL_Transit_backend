@@ -216,6 +216,19 @@ func main() {
 	logger.Info("🔍 DEBUG: Lounge handlers initialized successfully")
 	adminHandler := handlers.NewAdminHandler(loungeOwnerRepository, loungeRepository, userRepository)
 
+	// Initialize admin authentication repository, service, and handler
+	logger.Info("Initializing admin authentication system...")
+	adminUserRepository := database.NewAdminUserRepository(db)
+	adminAuthService := services.NewAdminAuthService(
+		adminUserRepository,
+		refreshTokenRepository,
+		jwtService,
+		cfg.JWT.AccessTokenExpiry,
+		cfg.JWT.RefreshTokenExpiry,
+	)
+	adminAuthHandler := handlers.NewAdminAuthHandler(adminAuthService, logger)
+	logger.Info("✓ Admin authentication system initialized")
+
 	// Initialize trip scheduling handlers
 	tripScheduleHandler := handlers.NewTripScheduleHandler(
 		tripScheduleRepo,
@@ -309,6 +322,34 @@ func main() {
 				protected.POST("/logout", authHandler.Logout)
 			}
 		}
+
+		// Admin Authentication routes (separate from regular user auth)
+		logger.Info("🔐 Registering Admin Authentication routes...")
+		adminAuth := v1.Group("/admin/auth")
+		{
+			// Public routes
+			logger.Info("  ✅ POST /api/v1/admin/auth/login")
+			adminAuth.POST("/login", adminAuthHandler.Login)
+			logger.Info("  ✅ POST /api/v1/admin/auth/refresh")
+			adminAuth.POST("/refresh", adminAuthHandler.RefreshToken)
+			logger.Info("  ✅ POST /api/v1/admin/auth/logout")
+			adminAuth.POST("/logout", adminAuthHandler.Logout)
+
+			// Protected routes (require admin JWT authentication)
+			adminProtected := adminAuth.Group("")
+			adminProtected.Use(middleware.AuthMiddleware(jwtService))
+			{
+				logger.Info("  ✅ GET /api/v1/admin/auth/profile")
+				adminProtected.GET("/profile", adminAuthHandler.GetProfile)
+				logger.Info("  ✅ POST /api/v1/admin/auth/change-password")
+				adminProtected.POST("/change-password", adminAuthHandler.ChangePassword)
+				logger.Info("  ✅ POST /api/v1/admin/auth/create")
+				adminProtected.POST("/create", adminAuthHandler.CreateAdmin)
+				logger.Info("  ✅ GET /api/v1/admin/auth/list")
+				adminProtected.GET("/list", adminAuthHandler.ListAdmins)
+			}
+		}
+		logger.Info("🔐 Admin Authentication routes registered successfully")
 
 		// User routes (protected)
 		user := v1.Group("/user")

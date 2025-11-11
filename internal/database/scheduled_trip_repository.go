@@ -28,9 +28,9 @@ func (r *ScheduledTripRepository) Create(trip *models.ScheduledTrip) error {
 		INSERT INTO scheduled_trips (
 			id, trip_schedule_id, bus_owner_route_id, permit_id, departure_datetime,
 			estimated_duration_minutes, assigned_driver_id, assigned_conductor_id,
-			is_bookable, base_fare, assignment_deadline, status, is_published
+			is_bookable, base_fare, assignment_deadline, status
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
 		)
 		RETURNING created_at, updated_at
 	`
@@ -44,7 +44,7 @@ func (r *ScheduledTripRepository) Create(trip *models.ScheduledTrip) error {
 		query,
 		trip.ID, trip.TripScheduleID, trip.BusOwnerRouteID, trip.PermitID, trip.DepartureDatetime,
 		trip.EstimatedDurationMinutes, trip.AssignedDriverID, trip.AssignedConductorID,
-		trip.IsBookable, trip.BaseFare, trip.AssignmentDeadline, trip.Status, trip.IsPublished,
+		trip.IsBookable, trip.BaseFare, trip.AssignmentDeadline, trip.Status,
 	).Scan(&trip.CreatedAt, &trip.UpdatedAt)
 
 	return err
@@ -56,7 +56,7 @@ func (r *ScheduledTripRepository) GetByID(tripID string) (*models.ScheduledTrip,
 		SELECT id, trip_schedule_id, bus_owner_route_id, permit_id, departure_datetime,
 			   estimated_duration_minutes, assigned_driver_id, assigned_conductor_id,
 			   is_bookable, base_fare, status, cancellation_reason, cancelled_at,
-			   assignment_deadline, is_published, created_at, updated_at
+			   assignment_deadline, created_at, updated_at
 		FROM scheduled_trips
 		WHERE id = $1
 	`
@@ -70,7 +70,7 @@ func (r *ScheduledTripRepository) GetByScheduleAndDate(scheduleID string, date t
 		SELECT id, trip_schedule_id, bus_owner_route_id, permit_id, departure_datetime,
 			   estimated_duration_minutes, assigned_driver_id, assigned_conductor_id,
 			   is_bookable, base_fare, status, cancellation_reason, cancelled_at,
-			   assignment_deadline, is_published, created_at, updated_at
+			   assignment_deadline, created_at, updated_at
 		FROM scheduled_trips
 		WHERE trip_schedule_id = $1 AND DATE(departure_datetime) = $2
 	`
@@ -100,7 +100,7 @@ func (r *ScheduledTripRepository) GetByScheduleIDsAndDateRange(scheduleIDs []str
 		SELECT id, trip_schedule_id, bus_owner_route_id, permit_id, departure_datetime,
 			   estimated_duration_minutes, assigned_driver_id, assigned_conductor_id,
 			   is_bookable, base_fare, status, cancellation_reason, cancelled_at,
-			   assignment_deadline, is_published, created_at, updated_at
+			   assignment_deadline, created_at, updated_at
 		FROM scheduled_trips
 		WHERE trip_schedule_id IN (%s)
 		  AND DATE(departure_datetime) BETWEEN $1 AND $2
@@ -152,7 +152,7 @@ func (r *ScheduledTripRepository) GetByScheduleIDsAndDateRangeWithRouteInfo(sche
 			st.id, st.trip_schedule_id, st.permit_id, st.departure_datetime,
 			st.estimated_duration_minutes, st.assigned_driver_id, st.assigned_conductor_id,
 			st.is_bookable, st.base_fare, st.status, st.cancellation_reason, st.cancelled_at,
-			st.assignment_deadline, st.is_published, st.created_at, st.updated_at,
+			st.assignment_deadline, st.created_at, st.updated_at,
 			mr.route_number, mr.origin_city, mr.destination_city,
 			bor.direction
 		FROM scheduled_trips st
@@ -192,7 +192,7 @@ func (r *ScheduledTripRepository) GetByDateRange(startDate, endDate time.Time) (
 		SELECT id, trip_schedule_id, permit_id, departure_datetime,
 			   estimated_duration_minutes, assigned_driver_id, assigned_conductor_id,
 			   is_bookable, base_fare, status, cancellation_reason, cancelled_at,
-			   assignment_deadline, is_published, created_at, updated_at
+			   assignment_deadline, created_at, updated_at
 		FROM scheduled_trips
 		WHERE DATE(departure_datetime) BETWEEN $1 AND $2
 		ORDER BY departure_datetime
@@ -213,7 +213,7 @@ func (r *ScheduledTripRepository) GetByPermitAndDateRange(permitID string, start
 		SELECT id, trip_schedule_id, permit_id, departure_datetime,
 			   estimated_duration_minutes, assigned_driver_id, assigned_conductor_id,
 			   is_bookable, base_fare, status, cancellation_reason, cancelled_at,
-			   assignment_deadline, is_published, created_at, updated_at
+			   assignment_deadline, created_at, updated_at
 		FROM scheduled_trips
 		WHERE permit_id = $1 AND DATE(departure_datetime) BETWEEN $2 AND $3
 		ORDER BY departure_datetime
@@ -234,12 +234,11 @@ func (r *ScheduledTripRepository) GetBookableTrips(startDate, endDate time.Time)
 		SELECT id, trip_schedule_id, permit_id, departure_datetime,
 			   estimated_duration_minutes, assigned_driver_id, assigned_conductor_id,
 			   is_bookable, base_fare, status, cancellation_reason, cancelled_at,
-			   assignment_deadline, is_published, created_at, updated_at
+			   assignment_deadline, created_at, updated_at
 		FROM scheduled_trips
 		WHERE is_bookable = true
 		  AND DATE(departure_datetime) BETWEEN $1 AND $2
 		  AND status IN ('scheduled', 'confirmed')
-		  AND is_published = true
 		ORDER BY departure_datetime
 	`
 
@@ -258,7 +257,7 @@ func (r *ScheduledTripRepository) Update(trip *models.ScheduledTrip) error {
 		UPDATE scheduled_trips
 		SET assigned_driver_id = $2, assigned_conductor_id = $3,
 			status = $4, cancellation_reason = $5, cancelled_at = $6,
-			is_published = $7, updated_at = NOW()
+			updated_at = NOW()
 		WHERE id = $1
 		RETURNING updated_at
 	`
@@ -266,7 +265,7 @@ func (r *ScheduledTripRepository) Update(trip *models.ScheduledTrip) error {
 	err := r.db.QueryRow(
 		query,
 		trip.ID, trip.AssignedDriverID, trip.AssignedConductorID,
-		trip.Status, trip.CancellationReason, trip.CancelledAt, trip.IsPublished,
+		trip.Status, trip.CancellationReason, trip.CancelledAt,
 	).Scan(&trip.UpdatedAt)
 
 	return err
@@ -354,7 +353,6 @@ func (r *ScheduledTripRepository) scanTrip(row scanner) (*models.ScheduledTrip, 
 		&cancellationReason,
 		&cancelledAt,
 		&assignmentDeadline,
-		&trip.IsPublished,
 		&trip.CreatedAt,
 		&trip.UpdatedAt,
 	)
@@ -412,11 +410,11 @@ func (r *ScheduledTripRepository) scanTrips(rows *sql.Rows) ([]models.ScheduledT
 		var cancellationReason sql.NullString
 		var cancelledAt sql.NullTime
 
-		// Must match SELECT order (17 columns):
+		// Must match SELECT order (16 columns):
 		// id, trip_schedule_id, bus_owner_route_id, permit_id, departure_datetime,
 		// estimated_duration_minutes, assigned_driver_id, assigned_conductor_id,
 		// is_bookable, base_fare, status, cancellation_reason, cancelled_at,
-		// assignment_deadline, is_published, created_at, updated_at
+		// assignment_deadline, created_at, updated_at
 		err := rows.Scan(
 			&trip.ID,
 			&tripScheduleID,
@@ -432,7 +430,6 @@ func (r *ScheduledTripRepository) scanTrips(rows *sql.Rows) ([]models.ScheduledT
 			&cancellationReason,
 			&cancelledAt,
 			&assignmentDeadline,
-			&trip.IsPublished,
 			&trip.CreatedAt,
 			&trip.UpdatedAt,
 		)
@@ -496,11 +493,11 @@ func (r *ScheduledTripRepository) scanTripsWithRouteInfo(rows *sql.Rows) ([]mode
 		var destinationCity sql.NullString
 		var direction sql.NullString // "UP" or "DOWN" from database
 
-		// Must match SELECT order (20 columns):
+		// Must match SELECT order (19 columns):
 		// st.id, st.trip_schedule_id, st.permit_id, st.departure_datetime,
 		// st.estimated_duration_minutes, st.assigned_driver_id, st.assigned_conductor_id,
 		// st.is_bookable, st.base_fare, st.status, st.cancellation_reason, st.cancelled_at,
-		// st.assignment_deadline, st.is_published, st.created_at, st.updated_at,
+		// st.assignment_deadline, st.created_at, st.updated_at,
 		// mr.route_number, mr.origin_city, mr.destination_city, bor.direction
 		err := rows.Scan(
 			&tripWithRoute.ID,
@@ -516,7 +513,6 @@ func (r *ScheduledTripRepository) scanTripsWithRouteInfo(rows *sql.Rows) ([]mode
 			&cancellationReason,
 			&cancelledAt,
 			&assignmentDeadline,
-			&tripWithRoute.IsPublished,
 			&tripWithRoute.CreatedAt,
 			&tripWithRoute.UpdatedAt,
 			&routeNumber,
@@ -578,11 +574,13 @@ func (r *ScheduledTripRepository) scanTripsWithRouteInfo(rows *sql.Rows) ([]mode
 	return trips, rows.Err()
 }
 
-// PublishTrip sets is_published to true for a specific trip
+// PublishTrip sets is_bookable to true for a specific trip (Publish for Booking)
 func (r *ScheduledTripRepository) PublishTrip(tripID string, busOwnerID string) error {
+	log.Printf("PublishTrip: Setting is_bookable=true for trip %s, bus owner %s", tripID, busOwnerID)
+
 	query := `
 		UPDATE scheduled_trips st
-		SET is_published = true, updated_at = NOW()
+		SET is_bookable = true, updated_at = NOW()
 		FROM trip_schedules ts
 		WHERE st.id = $1
 		  AND st.trip_schedule_id = ts.id
@@ -591,7 +589,8 @@ func (r *ScheduledTripRepository) PublishTrip(tripID string, busOwnerID string) 
 
 	result, err := r.db.Exec(query, tripID, busOwnerID)
 	if err != nil {
-		return fmt.Errorf("failed to publish trip: %w", err)
+		log.Printf("PublishTrip: Database error: %v", err)
+		return fmt.Errorf("failed to publish trip for booking: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
@@ -603,14 +602,17 @@ func (r *ScheduledTripRepository) PublishTrip(tripID string, busOwnerID string) 
 		return fmt.Errorf("trip not found or unauthorized")
 	}
 
+	log.Printf("PublishTrip: Successfully published trip %s for booking", tripID)
 	return nil
 }
 
-// UnpublishTrip sets is_published to false for a specific trip
+// UnpublishTrip sets is_bookable to false for a specific trip (Remove from Booking)
 func (r *ScheduledTripRepository) UnpublishTrip(tripID string, busOwnerID string) error {
+	log.Printf("UnpublishTrip: Setting is_bookable=false for trip %s, bus owner %s", tripID, busOwnerID)
+
 	query := `
 		UPDATE scheduled_trips st
-		SET is_published = false, updated_at = NOW()
+		SET is_bookable = false, updated_at = NOW()
 		FROM trip_schedules ts
 		WHERE st.id = $1
 		  AND st.trip_schedule_id = ts.id
@@ -619,7 +621,8 @@ func (r *ScheduledTripRepository) UnpublishTrip(tripID string, busOwnerID string
 
 	result, err := r.db.Exec(query, tripID, busOwnerID)
 	if err != nil {
-		return fmt.Errorf("failed to unpublish trip: %w", err)
+		log.Printf("UnpublishTrip: Database error: %v", err)
+		return fmt.Errorf("failed to unpublish trip from booking: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
@@ -634,19 +637,19 @@ func (r *ScheduledTripRepository) UnpublishTrip(tripID string, busOwnerID string
 	return nil
 }
 
-// BulkPublishTrips publishes multiple trips at once
+// BulkPublishTrips publishes multiple trips for booking at once
 func (r *ScheduledTripRepository) BulkPublishTrips(tripIDs []string, busOwnerID string) (int, error) {
 	if len(tripIDs) == 0 {
 		return 0, fmt.Errorf("no trip IDs provided")
 	}
 
-	log.Printf("BulkPublishTrips: Attempting to publish %d trips for bus owner %s", len(tripIDs), busOwnerID)
+	log.Printf("BulkPublishTrips: Attempting to publish %d trips for booking (bus owner %s)", len(tripIDs), busOwnerID)
 	log.Printf("BulkPublishTrips: Trip IDs: %v", tripIDs)
 
 	// Convert string slice to PostgreSQL text array format
 	query := `
 		UPDATE scheduled_trips st
-		SET is_published = true, updated_at = NOW()
+		SET is_bookable = true, updated_at = NOW()
 		FROM trip_schedules ts
 		WHERE st.id = ANY($1::text[])
 		  AND st.trip_schedule_id = ts.id
@@ -656,7 +659,7 @@ func (r *ScheduledTripRepository) BulkPublishTrips(tripIDs []string, busOwnerID 
 	result, err := r.db.Exec(query, pq.Array(tripIDs), busOwnerID)
 	if err != nil {
 		log.Printf("BulkPublishTrips: Database error: %v", err)
-		return 0, fmt.Errorf("failed to bulk publish trips: %w", err)
+		return 0, fmt.Errorf("failed to bulk publish trips for booking: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
@@ -665,23 +668,23 @@ func (r *ScheduledTripRepository) BulkPublishTrips(tripIDs []string, busOwnerID 
 		return 0, fmt.Errorf("failed to get rows affected: %w", err)
 	}
 
-	log.Printf("BulkPublishTrips: Successfully published %d trips", int(rowsAffected))
+	log.Printf("BulkPublishTrips: Successfully published %d trips for booking", int(rowsAffected))
 	return int(rowsAffected), nil
 }
 
-// BulkUnpublishTrips unpublishes multiple trips at once
+// BulkUnpublishTrips removes multiple trips from booking at once
 func (r *ScheduledTripRepository) BulkUnpublishTrips(tripIDs []string, busOwnerID string) (int, error) {
 	if len(tripIDs) == 0 {
 		return 0, fmt.Errorf("no trip IDs provided")
 	}
 
-	log.Printf("BulkUnpublishTrips: Attempting to unpublish %d trips for bus owner %s", len(tripIDs), busOwnerID)
+	log.Printf("BulkUnpublishTrips: Attempting to unpublish %d trips from booking (bus owner %s)", len(tripIDs), busOwnerID)
 	log.Printf("BulkUnpublishTrips: Trip IDs: %v", tripIDs)
 
 	// Convert string slice to PostgreSQL text array format
 	query := `
 		UPDATE scheduled_trips st
-		SET is_published = false, updated_at = NOW()
+		SET is_bookable = false, updated_at = NOW()
 		FROM trip_schedules ts
 		WHERE st.id = ANY($1::text[])
 		  AND st.trip_schedule_id = ts.id
@@ -691,7 +694,7 @@ func (r *ScheduledTripRepository) BulkUnpublishTrips(tripIDs []string, busOwnerI
 	result, err := r.db.Exec(query, pq.Array(tripIDs), busOwnerID)
 	if err != nil {
 		log.Printf("BulkUnpublishTrips: Database error: %v", err)
-		return 0, fmt.Errorf("failed to bulk unpublish trips: %w", err)
+		return 0, fmt.Errorf("failed to bulk unpublish trips from booking: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
