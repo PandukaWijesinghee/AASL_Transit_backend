@@ -677,31 +677,24 @@ func (h *ScheduledTripHandler) CreateSpecialTrip(c *gin.Context) {
 		}
 	}
 
-	// Calculate actual arrival datetime
-	var actualArrivalDatetime *time.Time
-	if req.EstimatedDurationMinutes != nil {
-		arrivalTime := departureDatetime.Add(time.Duration(*req.EstimatedDurationMinutes) * time.Minute)
-		actualArrivalDatetime = &arrivalTime
-	}
-
 	// Create special trip
 	trip := &models.ScheduledTrip{
-		TripScheduleID:        nil, // Special trip - no timetable
-		BusOwnerRouteID:       &req.CustomRouteID,
-		PermitID:              req.PermitID,
-		BusID:                 req.BusID,
-		DepartureDatetime:     departureDatetime,
-		ActualArrivalDatetime: actualArrivalDatetime,
-		AssignedDriverID:      req.AssignedDriverID,
-		AssignedConductorID:   req.AssignedConductorID,
-		IsBookable:            req.IsBookable,
-		TotalSeats:            req.MaxBookableSeats,
-		AvailableSeats:        req.MaxBookableSeats,
-		BookedSeats:           0,
-		BaseFare:              req.BaseFare,
-		BookingAdvanceHours:   bookingAdvanceHours,
-		AssignmentDeadline:    &assignmentDeadline,
-		Status:                models.ScheduledTripStatusScheduled,
+		TripScheduleID:           nil, // Special trip - no timetable
+		BusOwnerRouteID:          &req.CustomRouteID,
+		PermitID:                 req.PermitID,
+		BusID:                    req.BusID,
+		DepartureDatetime:        departureDatetime,
+		EstimatedDurationMinutes: req.EstimatedDurationMinutes,
+		AssignedDriverID:         req.AssignedDriverID,
+		AssignedConductorID:      req.AssignedConductorID,
+		IsBookable:               req.IsBookable,
+		TotalSeats:               req.MaxBookableSeats,
+		AvailableSeats:           req.MaxBookableSeats,
+		BookedSeats:              0,
+		BaseFare:                 req.BaseFare,
+		BookingAdvanceHours:      bookingAdvanceHours,
+		AssignmentDeadline:       &assignmentDeadline,
+		Status:                   models.ScheduledTripStatusScheduled,
 	}
 
 	if err := h.tripRepo.Create(trip); err != nil {

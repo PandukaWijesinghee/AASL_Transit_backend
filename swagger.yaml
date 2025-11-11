@@ -1558,11 +1558,11 @@ paths:
                   pattern: "^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
                   example: "09:30"
                   description: Departure time in HH:MM or HH:MM:SS format
-                estimated_arrival_time:
-                  type: string
-                  pattern: "^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"
-                  example: "15:45"
-                  description: Estimated arrival time (optional)
+                estimated_duration_minutes:
+                  type: integer
+                  minimum: 1
+                  example: 420
+                  description: Estimated trip duration in minutes (optional - will be calculated from route if not provided)
                 base_fare:
                   type: number
                   format: double
@@ -3496,10 +3496,11 @@ paths:
                 departure_time:
                   type: string
                   example: "08:00:00"
-                estimated_arrival_time:
-                  type: string
-                  example: "10:30:00"
-                  description: "User-entered estimated arrival time"
+                estimated_duration_minutes:
+                  type: integer
+                  minimum: 1
+                  example: 420
+                  description: "Estimated trip duration in minutes (optional - will be calculated from route if not provided)"
                 is_overnight_trip:
                   type: boolean
                   default: false
@@ -4907,9 +4908,6 @@ components:
         departure_time:
           type: string
           example: "08:00:00"
-        estimated_arrival_time:
-          type: string
-          example: "10:30:00"
         estimated_duration_minutes:
           type: integer
           nullable: true
