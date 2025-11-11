@@ -219,9 +219,10 @@ func main() {
 	// Initialize admin authentication repository, service, and handler
 	logger.Info("Initializing admin authentication system...")
 	adminUserRepository := database.NewAdminUserRepository(db)
+	adminRefreshTokenRepository := database.NewAdminRefreshTokenRepository(db)
 	adminAuthService := services.NewAdminAuthService(
 		adminUserRepository,
-		refreshTokenRepository,
+		adminRefreshTokenRepository,
 		jwtService,
 		cfg.JWT.AccessTokenExpiry,
 		cfg.JWT.RefreshTokenExpiry,

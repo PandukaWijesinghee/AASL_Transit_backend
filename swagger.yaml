@@ -4526,6 +4526,61 @@ components:
           format: uuid
           example: "550e8400-e29b-41d4-a716-446655440000"
 
+    AdminRefreshToken:
+      type: object
+      description: Refresh token for admin dashboard authentication (stored in admin_refresh_tokens table)
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        admin_user_id:
+          type: string
+          format: uuid
+          description: Foreign key to admin_users table
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        token_hash:
+          type: string
+          description: SHA-256 hash of the refresh token
+          example: "a3f5c8e9b2d4f1a6c8e7b9d2f4a1c6e8b5d7f9a2c4e6b8d1f3a5c7e9b2d4f6a8"
+        device_id:
+          type: string
+          nullable: true
+          example: "device-12345"
+        device_type:
+          type: string
+          nullable: true
+          example: "web"
+        ip_address:
+          type: string
+          nullable: true
+          example: "192.168.1.100"
+        user_agent:
+          type: string
+          nullable: true
+          example: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-11-12T00:00:00Z"
+        expires_at:
+          type: string
+          format: date-time
+          example: "2025-11-19T00:00:00Z"
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2025-11-12T12:30:00Z"
+        revoked:
+          type: boolean
+          example: false
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: null
+
     BusStaff:
       type: object
       properties:

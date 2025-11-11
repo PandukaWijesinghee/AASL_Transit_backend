@@ -15,7 +15,7 @@ import (
 // AdminAuthService handles admin authentication business logic
 type AdminAuthService struct {
 	adminRepo            *database.AdminUserRepository
-	refreshTokenRepo     *database.RefreshTokenRepository
+	adminRefreshTokenRepo *database.AdminRefreshTokenRepository
 	jwtService           *jwt.Service
 	accessTokenDuration  time.Duration
 	refreshTokenDuration time.Duration
@@ -24,14 +24,14 @@ type AdminAuthService struct {
 // NewAdminAuthService creates a new admin auth service
 func NewAdminAuthService(
 	adminRepo *database.AdminUserRepository,
-	refreshTokenRepo *database.RefreshTokenRepository,
+	adminRefreshTokenRepo *database.AdminRefreshTokenRepository,
 	jwtService *jwt.Service,
 	accessTokenDuration time.Duration,
 	refreshTokenDuration time.Duration,
 ) *AdminAuthService {
 	return &AdminAuthService{
 		adminRepo:            adminRepo,
-		refreshTokenRepo:     refreshTokenRepo,
+		adminRefreshTokenRepo: adminRefreshTokenRepo,
 		jwtService:           jwtService,
 		accessTokenDuration:  accessTokenDuration,
 		refreshTokenDuration: refreshTokenDuration,
@@ -71,7 +71,7 @@ func (s *AdminAuthService) Login(ctx context.Context, email, password string) (*
 
 	// Store refresh token in database
 	expiresAt := time.Now().Add(s.refreshTokenDuration)
-	if err := s.refreshTokenRepo.StoreRefreshToken(
+	if err := s.adminRefreshTokenRepo.StoreRefreshToken(
 		admin.ID,
 		refreshToken,
 		"", // deviceID
@@ -106,7 +106,7 @@ func (s *AdminAuthService) RefreshToken(ctx context.Context, refreshToken string
 	}
 
 	// Check if refresh token is revoked or expired
-	storedToken, err := s.refreshTokenRepo.GetRefreshToken(refreshToken)
+	storedToken, err := s.adminRefreshTokenRepo.GetRefreshToken(refreshToken)
 	if err != nil {
 		return nil, fmt.Errorf("refresh token not found")
 	}
@@ -137,7 +137,7 @@ func (s *AdminAuthService) RefreshToken(ctx context.Context, refreshToken string
 	}
 
 	// Update last used timestamp
-	if err := s.refreshTokenRepo.UpdateLastUsed(refreshToken); err != nil {
+	if err := s.adminRefreshTokenRepo.UpdateLastUsed(refreshToken); err != nil {
 		fmt.Printf("Warning: failed to update last used for token: %v\n", err)
 	}
 
@@ -151,7 +151,7 @@ func (s *AdminAuthService) RefreshToken(ctx context.Context, refreshToken string
 
 // Logout revokes the refresh token
 func (s *AdminAuthService) Logout(ctx context.Context, refreshToken string) error {
-	return s.refreshTokenRepo.RevokeToken(refreshToken)
+	return s.adminRefreshTokenRepo.RevokeToken(refreshToken)
 }
 
 // ChangePassword changes an admin user's password
