@@ -3,10 +3,12 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/smarttransit/sms-auth-backend/internal/models"
 )
 
@@ -638,25 +640,32 @@ func (r *ScheduledTripRepository) BulkPublishTrips(tripIDs []string, busOwnerID 
 		return 0, fmt.Errorf("no trip IDs provided")
 	}
 
+	log.Printf("BulkPublishTrips: Attempting to publish %d trips for bus owner %s", len(tripIDs), busOwnerID)
+	log.Printf("BulkPublishTrips: Trip IDs: %v", tripIDs)
+
+	// Convert string slice to PostgreSQL text array format
 	query := `
 		UPDATE scheduled_trips st
 		SET is_published = true, updated_at = NOW()
 		FROM trip_schedules ts
-		WHERE st.id = ANY($1)
+		WHERE st.id = ANY($1::text[])
 		  AND st.trip_schedule_id = ts.id
 		  AND ts.bus_owner_id = $2
 	`
 
-	result, err := r.db.Exec(query, tripIDs, busOwnerID)
+	result, err := r.db.Exec(query, pq.Array(tripIDs), busOwnerID)
 	if err != nil {
+		log.Printf("BulkPublishTrips: Database error: %v", err)
 		return 0, fmt.Errorf("failed to bulk publish trips: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
+		log.Printf("BulkPublishTrips: Failed to get rows affected: %v", err)
 		return 0, fmt.Errorf("failed to get rows affected: %w", err)
 	}
 
+	log.Printf("BulkPublishTrips: Successfully published %d trips", int(rowsAffected))
 	return int(rowsAffected), nil
 }
 
@@ -666,25 +675,32 @@ func (r *ScheduledTripRepository) BulkUnpublishTrips(tripIDs []string, busOwnerI
 		return 0, fmt.Errorf("no trip IDs provided")
 	}
 
+	log.Printf("BulkUnpublishTrips: Attempting to unpublish %d trips for bus owner %s", len(tripIDs), busOwnerID)
+	log.Printf("BulkUnpublishTrips: Trip IDs: %v", tripIDs)
+
+	// Convert string slice to PostgreSQL text array format
 	query := `
 		UPDATE scheduled_trips st
 		SET is_published = false, updated_at = NOW()
 		FROM trip_schedules ts
-		WHERE st.id = ANY($1)
+		WHERE st.id = ANY($1::text[])
 		  AND st.trip_schedule_id = ts.id
 		  AND ts.bus_owner_id = $2
 	`
 
-	result, err := r.db.Exec(query, tripIDs, busOwnerID)
+	result, err := r.db.Exec(query, pq.Array(tripIDs), busOwnerID)
 	if err != nil {
+		log.Printf("BulkUnpublishTrips: Database error: %v", err)
 		return 0, fmt.Errorf("failed to bulk unpublish trips: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
+		log.Printf("BulkUnpublishTrips: Failed to get rows affected: %v", err)
 		return 0, fmt.Errorf("failed to get rows affected: %w", err)
 	}
 
+	log.Printf("BulkUnpublishTrips: Successfully unpublished %d trips", int(rowsAffected))
 	return int(rowsAffected), nil
 }
 

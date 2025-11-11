@@ -794,6 +794,7 @@ func (h *ScheduledTripHandler) UnpublishTrip(c *gin.Context) {
 func (h *ScheduledTripHandler) BulkPublishTrips(c *gin.Context) {
 	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
+		log.Println("Bulk publish: Unauthorized - no user context")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
@@ -803,11 +804,16 @@ func (h *ScheduledTripHandler) BulkPublishTrips(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		log.Printf("Bulk publish: Invalid request body: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
 		return
 	}
 
+	log.Printf("Bulk publish request from user %s: %d trips - %v", 
+		userCtx.UserID.String(), len(req.TripIDs), req.TripIDs)
+
 	if len(req.TripIDs) == 0 {
+		log.Println("Bulk publish: Empty trip IDs array")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one trip ID is required"})
 		return
 	}
@@ -816,19 +822,29 @@ func (h *ScheduledTripHandler) BulkPublishTrips(c *gin.Context) {
 	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
 	if err != nil {
 		if err == sql.ErrNoRows {
+			log.Printf("Bulk publish: User %s is not a bus owner", userCtx.UserID.String())
 			c.JSON(http.StatusForbidden, gin.H{"error": "Only bus owners can publish trips"})
 			return
 		}
+		log.Printf("Bulk publish: Failed to fetch bus owner: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bus owner"})
 		return
 	}
 
+	log.Printf("Bulk publish: Bus owner found - ID: %s, User ID: %s", 
+		busOwner.ID, userCtx.UserID.String())
+
 	// Bulk publish trips
 	publishedCount, err := h.tripRepo.BulkPublishTrips(req.TripIDs, busOwner.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish trips"})
+		log.Printf("Bulk publish: Failed to publish trips for bus owner %s: %v (Trip IDs: %v)", 
+			busOwner.ID, err, req.TripIDs)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish trips", "details": err.Error()})
 		return
 	}
+
+	log.Printf("Bulk publish: Success - Published %d/%d trips", 
+		publishedCount, len(req.TripIDs))
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":         "Trips published successfully",
@@ -842,6 +858,7 @@ func (h *ScheduledTripHandler) BulkPublishTrips(c *gin.Context) {
 func (h *ScheduledTripHandler) BulkUnpublishTrips(c *gin.Context) {
 	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
+		log.Println("Bulk unpublish: Unauthorized - no user context")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
@@ -851,11 +868,16 @@ func (h *ScheduledTripHandler) BulkUnpublishTrips(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		log.Printf("Bulk unpublish: Invalid request body: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
 		return
 	}
 
+	log.Printf("Bulk unpublish request from user %s: %d trips - %v", 
+		userCtx.UserID.String(), len(req.TripIDs), req.TripIDs)
+
 	if len(req.TripIDs) == 0 {
+		log.Println("Bulk unpublish: Empty trip IDs array")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one trip ID is required"})
 		return
 	}
@@ -864,19 +886,29 @@ func (h *ScheduledTripHandler) BulkUnpublishTrips(c *gin.Context) {
 	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
 	if err != nil {
 		if err == sql.ErrNoRows {
+			log.Printf("Bulk unpublish: User %s is not a bus owner", userCtx.UserID.String())
 			c.JSON(http.StatusForbidden, gin.H{"error": "Only bus owners can unpublish trips"})
 			return
 		}
+		log.Printf("Bulk unpublish: Failed to fetch bus owner: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bus owner"})
 		return
 	}
 
+	log.Printf("Bulk unpublish: Bus owner found - ID: %s, User ID: %s", 
+		busOwner.ID, userCtx.UserID.String())
+
 	// Bulk unpublish trips
 	unpublishedCount, err := h.tripRepo.BulkUnpublishTrips(req.TripIDs, busOwner.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unpublish trips"})
+		log.Printf("Bulk unpublish: Failed to unpublish trips for bus owner %s: %v (Trip IDs: %v)", 
+			busOwner.ID, err, req.TripIDs)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unpublish trips", "details": err.Error()})
 		return
 	}
+
+	log.Printf("Bulk unpublish: Success - Unpublished %d/%d trips", 
+		unpublishedCount, len(req.TripIDs))
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":           "Trips unpublished successfully",
