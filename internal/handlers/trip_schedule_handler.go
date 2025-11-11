@@ -240,35 +240,30 @@ func (h *TripScheduleHandler) CreateSchedule(c *gin.Context) {
 		validUntil = &parsed
 	}
 
-	// Parse specific dates if provided and convert to comma-separated string
-	var specificDatesPtr *string
+	// Parse specific dates if provided
+	var specificDates models.DateArray
 	if len(req.SpecificDates) > 0 {
-		dates := make([]time.Time, 0, len(req.SpecificDates))
 		for _, dateStr := range req.SpecificDates {
 			date, err := time.Parse("2006-01-02", dateStr)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format in specific_dates"})
 				return
 			}
-			dates = append(dates, date)
+			specificDates = append(specificDates, date)
 		}
-		specificDatesStr := models.DateSliceToString(dates)
-		specificDatesPtr = &specificDatesStr
-	}
-
-	// Calculate duration if arrival time is provided
-	var durationMinutes *int
-	if req.EstimatedArrivalTime != nil && *req.EstimatedArrivalTime != "" {
-		duration, err := models.CalculateDurationMinutes(req.DepartureTime, *req.EstimatedArrivalTime, req.IsOvernightTrip)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid trip duration", "details": err.Error()})
-			return
-		}
-		durationMinutes = &duration
 	}
 
 	// Create schedule
 	permitID := req.PermitID
+
+	// Convert arrays to strings for database storage
+	recurrenceDaysStr := models.IntSliceToString(req.RecurrenceDays)
+	var specificDatesStr *string
+	if len(specificDates) > 0 {
+		dateStr := models.DateSliceToString(specificDates)
+		specificDatesStr = &dateStr
+	}
+
 	schedule := &models.TripSchedule{
 		ID:                       uuid.New().String(),
 		BusOwnerID:               busOwner.ID,
@@ -276,11 +271,10 @@ func (h *TripScheduleHandler) CreateSchedule(c *gin.Context) {
 		BusID:                    req.BusID,
 		ScheduleName:             req.ScheduleName,
 		RecurrenceType:           models.RecurrenceType(req.RecurrenceType),
-		RecurrenceDays:           models.IntSliceToString(req.RecurrenceDays),
-		SpecificDates:            specificDatesPtr,
+		RecurrenceDays:           recurrenceDaysStr,
+		SpecificDates:            specificDatesStr,
 		DepartureTime:            req.DepartureTime,
-		EstimatedArrivalTime:     req.EstimatedArrivalTime,
-		EstimatedDurationMinutes: durationMinutes,
+		EstimatedDurationMinutes: req.EstimatedDurationMinutes,
 		Direction:                req.Direction,
 		TripsPerDay:              req.TripsPerDay,
 		BaseFare:                 req.BaseFare,
@@ -398,19 +392,21 @@ func (h *TripScheduleHandler) UpdateSchedule(c *gin.Context) {
 		schedule.ValidUntil = nil
 	}
 
-	// Parse specific dates and convert to comma-separated string
+	// Parse specific dates
 	if len(req.SpecificDates) > 0 {
-		dates := make([]time.Time, 0, len(req.SpecificDates))
+		var specificDates models.DateArray
 		for _, dateStr := range req.SpecificDates {
 			date, err := time.Parse("2006-01-02", dateStr)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format in specific_dates"})
 				return
 			}
-			dates = append(dates, date)
+			specificDates = append(specificDates, date)
 		}
-		specificDatesStr := models.DateSliceToString(dates)
-		schedule.SpecificDates = &specificDatesStr
+		dateStr := models.DateSliceToString(specificDates)
+		schedule.SpecificDates = &dateStr
+	} else {
+		schedule.SpecificDates = nil
 	}
 
 	if err := h.scheduleRepo.Update(schedule); err != nil {
@@ -598,44 +594,25 @@ func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
 		// but not enforced here. User decides what fare and seats to set for the timetable.
 	}
 
-	// Parse valid_from date
-	validFrom, err := time.Parse("2006-01-02", req.ValidFrom)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid valid_from date format"})
-		return
-	}
-
-	// Parse valid_until date if provided
-	var validUntil *time.Time
-	if req.ValidUntil != nil {
-		parsedUntil, err := time.Parse("2006-01-02", *req.ValidUntil)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid valid_until date format"})
-			return
-		}
-		validUntil = &parsedUntil
-	}
-
 	// Create timetable
+	recurrenceDaysStr := models.IntSliceToString(req.RecurrenceDays)
+
 	schedule := &models.TripSchedule{
-		ID:                   uuid.New().String(),
-		BusOwnerID:           busOwner.ID,
-		PermitID:             req.PermitID,
-		BusOwnerRouteID:      &req.CustomRouteID,
-		ScheduleName:         req.ScheduleName,
-		RecurrenceType:       models.RecurrenceType(req.RecurrenceType),
-		RecurrenceDays:       models.IntSliceToString(req.RecurrenceDays),
-		RecurrenceInterval:   req.RecurrenceInterval,
-		DepartureTime:        req.DepartureTime,
-		EstimatedArrivalTime: req.EstimatedArrivalTime,
-		BaseFare:             req.BaseFare,
-		IsBookable:           req.IsBookable,
-		MaxBookableSeats:     &req.MaxBookableSeats,
-		BookingAdvanceHours:  req.BookingAdvanceHours,
-		ValidFrom:            validFrom,  // NEW: Set validity start date
-		ValidUntil:           validUntil, // NEW: Set validity end date
-		IsActive:             true,
-		Notes:                req.Notes,
+		ID:                       uuid.New().String(),
+		BusOwnerID:               busOwner.ID,
+		PermitID:                 req.PermitID,
+		ScheduleName:             req.ScheduleName,
+		RecurrenceType:           models.RecurrenceType(req.RecurrenceType),
+		RecurrenceDays:           recurrenceDaysStr,
+		RecurrenceInterval:       req.RecurrenceInterval,
+		DepartureTime:            req.DepartureTime,
+		EstimatedDurationMinutes: req.EstimatedDurationMinutes,
+		BaseFare:                 req.BaseFare,
+		IsBookable:               req.IsBookable,
+		MaxBookableSeats:         &req.MaxBookableSeats,
+		BookingAdvanceHours:      req.BookingAdvanceHours,
+		IsActive:                 true,
+		Notes:                    req.Notes,
 	}
 
 	if err := h.scheduleRepo.CreateTimetable(schedule); err != nil {
@@ -643,19 +620,5 @@ func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
 		return
 	}
 
-	// IMMEDIATE GENERATION: Generate trips for next 7 days (configurable via system_settings)
-	tripsGenerated, err := h.tripGeneratorSvc.GenerateTripsForNewSchedule(schedule)
-	if err != nil {
-		// Log error but don't fail the request - timetable was created successfully
-		println("WARNING: Failed to generate trips for timetable:", schedule.ID, "Error:", err.Error())
-	}
-
-	// Return timetable with trip count
-	response := gin.H{
-		"schedule":        schedule,
-		"trips_generated": tripsGenerated,
-		"message":         "Timetable created successfully. Trips generated for next 7 days.",
-	}
-
-	c.JSON(http.StatusCreated, response)
+	c.JSON(http.StatusCreated, schedule)
 }

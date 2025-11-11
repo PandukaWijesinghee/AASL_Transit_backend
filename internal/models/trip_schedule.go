@@ -153,9 +153,9 @@ func StringToDateSlice(str string) ([]time.Time, error) {
 // CreateTimetableRequest represents the request to create a new timetable (trip schedule)
 type CreateTimetableRequest struct {
 	CustomRouteID            string  `json:"custom_route_id" binding:"required"`
-	PermitID                 *string `json:"permit_id,omitempty"`                   // Optional - assigned later to specific trips
+	PermitID                 *string `json:"permit_id,omitempty"` // Optional - assigned later to specific trips
 	ScheduleName             *string `json:"schedule_name,omitempty"`
-	DepartureTime            string  `json:"departure_time" binding:"required"`     // HH:MM or HH:MM:SS format
+	DepartureTime            string  `json:"departure_time" binding:"required"`    // HH:MM or HH:MM:SS format
 	EstimatedDurationMinutes *int    `json:"estimated_duration_minutes,omitempty"` // Duration in minutes (optional - will be calculated from route if not provided)
 	BaseFare                 float64 `json:"base_fare" binding:"required,gt=0"`
 	MaxBookableSeats         int     `json:"max_bookable_seats" binding:"required,gt=0"`
