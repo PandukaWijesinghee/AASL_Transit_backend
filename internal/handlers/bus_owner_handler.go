@@ -70,7 +70,14 @@ func (h *BusOwnerHandler) CheckProfileStatus(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch profile"})
+		h.logger.WithFields(logrus.Fields{
+			"user_id": userCtx.UserID.String(),
+			"error":   err.Error(),
+		}).Error("Failed to fetch bus owner profile from database")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to fetch profile",
+			"details": "Database error occurred. Please contact support.",
+		})
 		return
 	}
 
