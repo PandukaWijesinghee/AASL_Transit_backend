@@ -1213,6 +1213,8 @@ func (h *ScheduledTripHandler) AssignSeatLayout(c *gin.Context) {
 	}
 
 	tripID := c.Param("id")
+	fmt.Printf("📊 AssignSeatLayout called - Trip ID: %s, User ID: %s, Bus Owner ID: %s\n", 
+		tripID, userCtx.UserID.String(), busOwner.ID)
 
 	// Parse request body
 	var req struct {
@@ -1224,18 +1226,22 @@ func (h *ScheduledTripHandler) AssignSeatLayout(c *gin.Context) {
 		return
 	}
 
+	fmt.Printf("📊 Seat Layout ID to assign: %s\n", *req.SeatLayoutID)
+
 	// Get the trip
 	trip, err := h.tripRepo.GetByID(tripID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Trip not found"})
+			fmt.Printf("❌ Trip not found in database: %s\n", tripID)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Trip not found", "trip_id": tripID})
 			return
 		}
+		fmt.Printf("❌ Database error fetching trip: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trip"})
 		return
 	}
 
-	// Verify ownership through trip schedule
+	fmt.Printf("✅ Trip found: %s, Schedule ID: %v\n", trip.ID, trip.TripScheduleID)	// Verify ownership through trip schedule
 	if trip.TripScheduleID == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot determine trip ownership - no schedule linked"})
 		return
