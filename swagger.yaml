@@ -5343,7 +5343,6 @@ components:
         - bus_number
         - license_plate
         - bus_type
-        - total_seats
         - status
         - created_at
         - updated_at
@@ -5370,9 +5369,6 @@ components:
           type: string
           enum: [normal, luxury, semi_luxury, super_luxury]
           example: "luxury"
-        total_seats:
-          type: integer
-          example: 45
         manufacturing_year:
           type: integer
           example: 2020
@@ -5423,7 +5419,6 @@ components:
         - permit_id
         - bus_number
         - bus_type
-        - total_seats
       properties:
         permit_id:
           type: string
@@ -5436,10 +5431,6 @@ components:
           type: string
           enum: [normal, luxury, semi_luxury, super_luxury]
           example: "luxury"
-        total_seats:
-          type: integer
-          minimum: 1
-          example: 45
         manufacturing_year:
           type: integer
           minimum: 1900
@@ -5493,10 +5484,6 @@ components:
           type: string
           enum: [normal, luxury, semi_luxury, super_luxury]
           example: "luxury"
-        total_seats:
-          type: integer
-          minimum: 1
-          example: 45
         manufacturing_year:
           type: integer
           minimum: 1900

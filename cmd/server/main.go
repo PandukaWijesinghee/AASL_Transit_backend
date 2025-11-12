@@ -104,6 +104,7 @@ func main() {
 	loungeOwnerRepository := database.NewLoungeOwnerRepository(sqlxDB.DB)
 	loungeRepository := database.NewLoungeRepository(sqlxDB.DB)
 	loungeStaffRepository := database.NewLoungeStaffRepository(sqlxDB.DB)
+	seatLayoutRepository := database.NewBusSeatLayoutRepository(sqlxDB.DB)
 
 	// Initialize staff service
 	staffService := services.NewStaffService(staffRepository, ownerRepository, userRepository)
@@ -119,6 +120,7 @@ func main() {
 		tripScheduleRepo,
 		scheduledTripRepo,
 		busRepository,
+		seatLayoutRepository,
 		systemSettingRepo,
 	)
 

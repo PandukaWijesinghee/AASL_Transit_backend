@@ -26,17 +26,16 @@ const (
 
 // Bus represents a bus owned by a bus owner
 type Bus struct {
-	ID                   string     `json:"id" db:"id"`
-	BusOwnerID           string     `json:"bus_owner_id" db:"bus_owner_id"`
-	PermitID             string     `json:"permit_id" db:"permit_id"`
-	BusNumber            string     `json:"bus_number" db:"bus_number"`
-	LicensePlate         string     `json:"license_plate" db:"license_plate"`
-	BusType              BusType    `json:"bus_type" db:"bus_type"`
-	TotalSeats           int        `json:"total_seats" db:"total_seats"`
-	ManufacturingYear    *int       `json:"manufacturing_year,omitempty" db:"manufacturing_year"`
-	LastMaintenanceDate  *time.Time `json:"last_maintenance_date,omitempty" db:"last_maintenance_date"`
-	InsuranceExpiry      *time.Time `json:"insurance_expiry,omitempty" db:"insurance_expiry"`
-	Status               BusStatus  `json:"status" db:"status"`
+	ID                  string     `json:"id" db:"id"`
+	BusOwnerID          string     `json:"bus_owner_id" db:"bus_owner_id"`
+	PermitID            string     `json:"permit_id" db:"permit_id"`
+	BusNumber           string     `json:"bus_number" db:"bus_number"`
+	LicensePlate        string     `json:"license_plate" db:"license_plate"`
+	BusType             BusType    `json:"bus_type" db:"bus_type"`
+	ManufacturingYear   *int       `json:"manufacturing_year,omitempty" db:"manufacturing_year"`
+	LastMaintenanceDate *time.Time `json:"last_maintenance_date,omitempty" db:"last_maintenance_date"`
+	InsuranceExpiry     *time.Time `json:"insurance_expiry,omitempty" db:"insurance_expiry"`
+	Status              BusStatus  `json:"status" db:"status"`
 
 	// Seat Layout
 	SeatLayoutID *string `json:"seat_layout_id,omitempty" db:"seat_layout_id"`
@@ -57,7 +56,6 @@ type CreateBusRequest struct {
 	PermitID            string  `json:"permit_id" binding:"required"`
 	BusNumber           string  `json:"bus_number" binding:"required"`
 	BusType             string  `json:"bus_type" binding:"required"`
-	TotalSeats          int     `json:"total_seats" binding:"required,gt=0"`
 	ManufacturingYear   *int    `json:"manufacturing_year,omitempty"`
 	LastMaintenanceDate *string `json:"last_maintenance_date,omitempty"` // Format: YYYY-MM-DD
 	InsuranceExpiry     *string `json:"insurance_expiry,omitempty"`      // Format: YYYY-MM-DD
@@ -76,7 +74,6 @@ type CreateBusRequest struct {
 type UpdateBusRequest struct {
 	BusNumber           *string `json:"bus_number,omitempty"`
 	BusType             *string `json:"bus_type,omitempty"`
-	TotalSeats          *int    `json:"total_seats,omitempty"`
 	ManufacturingYear   *int    `json:"manufacturing_year,omitempty"`
 	LastMaintenanceDate *string `json:"last_maintenance_date,omitempty"` // Format: YYYY-MM-DD
 	InsuranceExpiry     *string `json:"insurance_expiry,omitempty"`      // Format: YYYY-MM-DD
@@ -96,13 +93,8 @@ func (req *CreateBusRequest) Validate() error {
 	// Validate bus type
 	busType := BusType(req.BusType)
 	if busType != BusTypeNormal && busType != BusTypeLuxury &&
-	   busType != BusTypeSemiLuxury && busType != BusTypeSuperLuxury {
+		busType != BusTypeSemiLuxury && busType != BusTypeSuperLuxury {
 		return errors.New("invalid bus_type: must be normal, luxury, semi_luxury, or super_luxury")
-	}
-
-	// Validate total seats
-	if req.TotalSeats <= 0 {
-		return errors.New("total_seats must be greater than 0")
 	}
 
 	// Validate manufacturing year if provided
@@ -130,14 +122,9 @@ func (req *UpdateBusRequest) Validate() error {
 	if req.BusType != nil {
 		busType := BusType(*req.BusType)
 		if busType != BusTypeNormal && busType != BusTypeLuxury &&
-		   busType != BusTypeSemiLuxury && busType != BusTypeSuperLuxury {
+			busType != BusTypeSemiLuxury && busType != BusTypeSuperLuxury {
 			return errors.New("invalid bus_type: must be normal, luxury, semi_luxury, or super_luxury")
 		}
-	}
-
-	// Validate total seats if provided
-	if req.TotalSeats != nil && *req.TotalSeats <= 0 {
-		return errors.New("total_seats must be greater than 0")
 	}
 
 	// Validate manufacturing year if provided

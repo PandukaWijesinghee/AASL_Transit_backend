@@ -24,11 +24,11 @@ func (r *BusRepository) Create(bus *models.Bus) error {
 	query := `
 		INSERT INTO buses (
 			id, bus_owner_id, permit_id, bus_number, license_plate,
-			bus_type, total_seats, manufacturing_year, last_maintenance_date,
+			bus_type, manufacturing_year, last_maintenance_date,
 			insurance_expiry, status, seat_layout_id, has_wifi, has_ac, has_charging_ports,
 			has_entertainment, has_refreshments
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
 		)
 		RETURNING created_at, updated_at
 	`
@@ -36,7 +36,7 @@ func (r *BusRepository) Create(bus *models.Bus) error {
 	err := r.db.QueryRow(
 		query,
 		bus.ID, bus.BusOwnerID, bus.PermitID, bus.BusNumber, bus.LicensePlate,
-		bus.BusType, bus.TotalSeats, bus.ManufacturingYear, bus.LastMaintenanceDate,
+		bus.BusType, bus.ManufacturingYear, bus.LastMaintenanceDate,
 		bus.InsuranceExpiry, bus.Status, bus.SeatLayoutID, bus.HasWifi, bus.HasAC, bus.HasChargingPorts,
 		bus.HasEntertainment, bus.HasRefreshments,
 	).Scan(&bus.CreatedAt, &bus.UpdatedAt)
@@ -49,7 +49,7 @@ func (r *BusRepository) GetByID(busID string) (*models.Bus, error) {
 	query := `
 		SELECT
 			id, bus_owner_id, permit_id, bus_number, license_plate,
-			bus_type, total_seats, manufacturing_year, last_maintenance_date,
+			bus_type, manufacturing_year, last_maintenance_date,
 			insurance_expiry, status, seat_layout_id, has_wifi, has_ac, has_charging_ports,
 			has_entertainment, has_refreshments, created_at, updated_at
 		FROM buses
@@ -64,7 +64,7 @@ func (r *BusRepository) GetByID(busID string) (*models.Bus, error) {
 
 	err := r.db.QueryRow(query, busID).Scan(
 		&bus.ID, &bus.BusOwnerID, &bus.PermitID, &bus.BusNumber, &bus.LicensePlate,
-		&bus.BusType, &bus.TotalSeats, &manufacturingYear, &lastMaintenanceDate,
+		&bus.BusType, &manufacturingYear, &lastMaintenanceDate,
 		&insuranceExpiry, &bus.Status, &seatLayoutID, &bus.HasWifi, &bus.HasAC, &bus.HasChargingPorts,
 		&bus.HasEntertainment, &bus.HasRefreshments, &bus.CreatedAt, &bus.UpdatedAt,
 	)
@@ -96,7 +96,7 @@ func (r *BusRepository) GetByOwnerID(busOwnerID string) ([]models.Bus, error) {
 	query := `
 		SELECT
 			id, bus_owner_id, permit_id, bus_number, license_plate,
-			bus_type, total_seats, manufacturing_year, last_maintenance_date,
+			bus_type, manufacturing_year, last_maintenance_date,
 			insurance_expiry, status, seat_layout_id, has_wifi, has_ac, has_charging_ports,
 			has_entertainment, has_refreshments, created_at, updated_at
 		FROM buses
@@ -120,7 +120,7 @@ func (r *BusRepository) GetByOwnerID(busOwnerID string) ([]models.Bus, error) {
 
 		err := rows.Scan(
 			&bus.ID, &bus.BusOwnerID, &bus.PermitID, &bus.BusNumber, &bus.LicensePlate,
-			&bus.BusType, &bus.TotalSeats, &manufacturingYear, &lastMaintenanceDate,
+			&bus.BusType, &manufacturingYear, &lastMaintenanceDate,
 			&insuranceExpiry, &bus.Status, &seatLayoutID, &bus.HasWifi, &bus.HasAC, &bus.HasChargingPorts,
 			&bus.HasEntertainment, &bus.HasRefreshments, &bus.CreatedAt, &bus.UpdatedAt,
 		)
@@ -154,7 +154,7 @@ func (r *BusRepository) GetByLicensePlate(licensePlate string) (*models.Bus, err
 	query := `
 		SELECT
 			id, bus_owner_id, permit_id, bus_number, license_plate,
-			bus_type, total_seats, manufacturing_year, last_maintenance_date,
+			bus_type, manufacturing_year, last_maintenance_date,
 			insurance_expiry, status, seat_layout_id, has_wifi, has_ac, has_charging_ports,
 			has_entertainment, has_refreshments, created_at, updated_at
 		FROM buses
@@ -169,7 +169,7 @@ func (r *BusRepository) GetByLicensePlate(licensePlate string) (*models.Bus, err
 
 	err := r.db.QueryRow(query, licensePlate).Scan(
 		&bus.ID, &bus.BusOwnerID, &bus.PermitID, &bus.BusNumber, &bus.LicensePlate,
-		&bus.BusType, &bus.TotalSeats, &manufacturingYear, &lastMaintenanceDate,
+		&bus.BusType, &manufacturingYear, &lastMaintenanceDate,
 		&insuranceExpiry, &bus.Status, &seatLayoutID, &bus.HasWifi, &bus.HasAC, &bus.HasChargingPorts,
 		&bus.HasEntertainment, &bus.HasRefreshments, &bus.CreatedAt, &bus.UpdatedAt,
 	)
@@ -214,12 +214,6 @@ func (r *BusRepository) Update(busID string, req *models.UpdateBusRequest) error
 	if req.BusType != nil {
 		updates = append(updates, fmt.Sprintf("bus_type = $%d", argCount))
 		args = append(args, *req.BusType)
-		argCount++
-	}
-
-	if req.TotalSeats != nil {
-		updates = append(updates, fmt.Sprintf("total_seats = $%d", argCount))
-		args = append(args, *req.TotalSeats)
 		argCount++
 	}
 
@@ -336,7 +330,7 @@ func (r *BusRepository) GetByPermitID(permitID string) (*models.Bus, error) {
 	query := `
 		SELECT
 			id, bus_owner_id, permit_id, bus_number, license_plate,
-			bus_type, total_seats, manufacturing_year, last_maintenance_date,
+			bus_type, manufacturing_year, last_maintenance_date,
 			insurance_expiry, status, seat_layout_id, has_wifi, has_ac, has_charging_ports,
 			has_entertainment, has_refreshments, created_at, updated_at
 		FROM buses
@@ -351,7 +345,7 @@ func (r *BusRepository) GetByPermitID(permitID string) (*models.Bus, error) {
 
 	err := r.db.QueryRow(query, permitID).Scan(
 		&bus.ID, &bus.BusOwnerID, &bus.PermitID, &bus.BusNumber, &bus.LicensePlate,
-		&bus.BusType, &bus.TotalSeats, &manufacturingYear, &lastMaintenanceDate,
+		&bus.BusType, &manufacturingYear, &lastMaintenanceDate,
 		&insuranceExpiry, &bus.Status, &seatLayoutID, &bus.HasWifi, &bus.HasAC, &bus.HasChargingPorts,
 		&bus.HasEntertainment, &bus.HasRefreshments, &bus.CreatedAt, &bus.UpdatedAt,
 	)
@@ -386,7 +380,7 @@ func (r *BusRepository) GetByStatus(busOwnerID string, status string) ([]models.
 	query := `
 		SELECT
 			id, bus_owner_id, permit_id, bus_number, license_plate,
-			bus_type, total_seats, manufacturing_year, last_maintenance_date,
+			bus_type, manufacturing_year, last_maintenance_date,
 			insurance_expiry, status, seat_layout_id, has_wifi, has_ac, has_charging_ports,
 			has_entertainment, has_refreshments, created_at, updated_at
 		FROM buses
@@ -410,7 +404,7 @@ func (r *BusRepository) GetByStatus(busOwnerID string, status string) ([]models.
 
 		err := rows.Scan(
 			&bus.ID, &bus.BusOwnerID, &bus.PermitID, &bus.BusNumber, &bus.LicensePlate,
-			&bus.BusType, &bus.TotalSeats, &manufacturingYear, &lastMaintenanceDate,
+			&bus.BusType, &manufacturingYear, &lastMaintenanceDate,
 			&insuranceExpiry, &bus.Status, &seatLayoutID, &bus.HasWifi, &bus.HasAC, &bus.HasChargingPorts,
 			&bus.HasEntertainment, &bus.HasRefreshments, &bus.CreatedAt, &bus.UpdatedAt,
 		)

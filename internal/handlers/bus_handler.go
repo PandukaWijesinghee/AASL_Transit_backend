@@ -200,11 +200,11 @@ func (h *BusHandler) CreateBus(c *gin.Context) {
 		BusNumber:           req.BusNumber,
 		LicensePlate:        permit.BusRegistrationNumber, // Get from permit
 		BusType:             models.BusType(req.BusType),
-		TotalSeats:          req.TotalSeats,
 		ManufacturingYear:   req.ManufacturingYear,
 		LastMaintenanceDate: lastMaintenanceDate,
 		InsuranceExpiry:     insuranceExpiry,
 		Status:              status,
+		SeatLayoutID:        req.SeatLayoutID,
 		HasWifi:             req.HasWifi,
 		HasAC:               req.HasAC,
 		HasChargingPorts:    req.HasChargingPorts,
