@@ -69,17 +69,6 @@ func NewConnection(cfg config.DatabaseConfig) (DB, error) {
 		fmt.Printf("INFO: Added binary_parameters=no (fixes connection pooler issues)\n")
 	}
 
-	// Disable prepared statements completely for Supavisor/PgBouncer compatibility
-	// This prevents "unnamed prepared statement does not exist" errors
-	if !strings.Contains(connectionURL, "prefer_simple_protocol") {
-		separator := "?"
-		if strings.Contains(connectionURL, "?") {
-			separator = "&"
-		}
-		connectionURL = connectionURL + separator + "prefer_simple_protocol=yes"
-		fmt.Printf("INFO: Added prefer_simple_protocol=yes (disables prepared statements)\n")
-	}
-
 	fmt.Printf("INFO: Final connection URL: %s\n", maskPassword(connectionURL))
 
 	// Connect to database
