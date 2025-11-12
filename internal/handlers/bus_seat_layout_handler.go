@@ -26,6 +26,18 @@ func NewBusSeatLayoutHandler(service *services.BusSeatLayoutService, logger *log
 }
 
 // CreateTemplate creates a new bus seat layout template
+// @Summary Create a new seat layout template
+// @Description Create a new bus seat layout template with seat configuration
+// @Tags Seat Layouts
+// @Accept json
+// @Produce json
+// @Param request body models.CreateBusSeatLayoutTemplateRequest true "Seat layout template details"
+// @Success 201 {object} models.BusSeatLayoutTemplateResponse
+// @Failure 400 {object} map[string]interface{} "Invalid request"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Security BearerAuth
+// @Router /api/v1/admin/seat-layouts [post]
 func (h *BusSeatLayoutHandler) CreateTemplate(c *gin.Context) {
 	var req models.CreateBusSeatLayoutTemplateRequest
 
@@ -63,6 +75,16 @@ func (h *BusSeatLayoutHandler) CreateTemplate(c *gin.Context) {
 }
 
 // GetTemplate retrieves a specific template by ID
+// @Summary Get a seat layout template
+// @Description Get details of a specific seat layout template by ID
+// @Tags Seat Layouts
+// @Produce json
+// @Param id path string true "Template ID"
+// @Success 200 {object} models.BusSeatLayoutTemplateResponse
+// @Failure 400 {object} map[string]interface{} "Invalid template ID"
+// @Failure 404 {object} map[string]interface{} "Template not found"
+// @Security BearerAuth
+// @Router /api/v1/admin/seat-layouts/{id} [get]
 func (h *BusSeatLayoutHandler) GetTemplate(c *gin.Context) {
 	templateIDStr := c.Param("id")
 	templateID, err := uuid.Parse(templateIDStr)
@@ -83,6 +105,15 @@ func (h *BusSeatLayoutHandler) GetTemplate(c *gin.Context) {
 }
 
 // ListTemplates retrieves all templates
+// @Summary List all seat layout templates
+// @Description Get a list of all seat layout templates, optionally filtered by active status
+// @Tags Seat Layouts
+// @Produce json
+// @Param active_only query boolean false "Filter for active templates only"
+// @Success 200 {object} map[string]interface{} "List of templates with count"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Security BearerAuth
+// @Router /api/v1/admin/seat-layouts [get]
 func (h *BusSeatLayoutHandler) ListTemplates(c *gin.Context) {
 	activeOnlyStr := c.Query("active_only")
 	activeOnly := activeOnlyStr == "true"
@@ -101,6 +132,19 @@ func (h *BusSeatLayoutHandler) ListTemplates(c *gin.Context) {
 }
 
 // UpdateTemplate updates a template's basic information
+// @Summary Update a seat layout template
+// @Description Update basic information of a seat layout template
+// @Tags Seat Layouts
+// @Accept json
+// @Produce json
+// @Param id path string true "Template ID"
+// @Param request body models.UpdateBusSeatLayoutTemplateRequest true "Update details"
+// @Success 200 {object} models.BusSeatLayoutTemplateResponse
+// @Failure 400 {object} map[string]interface{} "Invalid request"
+// @Failure 404 {object} map[string]interface{} "Template not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Security BearerAuth
+// @Router /api/v1/admin/seat-layouts/{id} [put]
 func (h *BusSeatLayoutHandler) UpdateTemplate(c *gin.Context) {
 	templateIDStr := c.Param("id")
 	templateID, err := uuid.Parse(templateIDStr)
@@ -128,6 +172,17 @@ func (h *BusSeatLayoutHandler) UpdateTemplate(c *gin.Context) {
 }
 
 // DeleteTemplate deletes a template
+// @Summary Delete a seat layout template
+// @Description Soft delete a seat layout template (marks as inactive)
+// @Tags Seat Layouts
+// @Produce json
+// @Param id path string true "Template ID"
+// @Success 200 {object} map[string]interface{} "Deletion success message"
+// @Failure 400 {object} map[string]interface{} "Invalid template ID"
+// @Failure 404 {object} map[string]interface{} "Template not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Security BearerAuth
+// @Router /api/v1/admin/seat-layouts/{id} [delete]
 func (h *BusSeatLayoutHandler) DeleteTemplate(c *gin.Context) {
 	templateIDStr := c.Param("id")
 	templateID, err := uuid.Parse(templateIDStr)

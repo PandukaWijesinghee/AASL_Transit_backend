@@ -95,7 +95,7 @@ func (h *AdminAuthHandler) RefreshToken(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param refreshRequest body models.AdminRefreshRequest true "Refresh token"
-// @Success 200 {object} SuccessResponse
+// @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} ErrorResponse
 // @Router /admin/auth/logout [post]
 func (h *AdminAuthHandler) Logout(c *gin.Context) {
@@ -155,7 +155,7 @@ func (h *AdminAuthHandler) GetProfile(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param changePasswordRequest body models.AdminChangePasswordRequest true "Password change request"
-// @Success 200 {object} SuccessResponse
+// @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} ErrorResponse
 // @Failure 401 {object} ErrorResponse
 // @Router /admin/auth/change-password [post]

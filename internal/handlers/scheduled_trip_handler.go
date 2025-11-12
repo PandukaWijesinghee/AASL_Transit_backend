@@ -1180,7 +1180,20 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 }
 
 // AssignSeatLayout assigns a seat layout template to a scheduled trip
-// PATCH /api/v1/scheduled-trips/:id/assign-seat-layout
+// @Summary Assign seat layout to scheduled trip
+// @Description Assign a seat layout template to a scheduled trip (bus owner only)
+// @Tags Scheduled Trips
+// @Accept json
+// @Produce json
+// @Param id path string true "Scheduled Trip ID"
+// @Param request body map[string]string true "Seat layout assignment (seat_layout_id)"
+// @Success 200 {object} map[string]interface{} "Assignment success message"
+// @Failure 400 {object} map[string]interface{} "Invalid request"
+// @Failure 403 {object} map[string]interface{} "Forbidden - not owner"
+// @Failure 404 {object} map[string]interface{} "Trip not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Security BearerAuth
+// @Router /api/v1/scheduled-trips/{id}/assign-seat-layout [patch]
 func (h *ScheduledTripHandler) AssignSeatLayout(c *gin.Context) {
 	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
