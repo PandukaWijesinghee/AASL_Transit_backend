@@ -38,6 +38,9 @@ type Bus struct {
 	InsuranceExpiry      *time.Time `json:"insurance_expiry,omitempty" db:"insurance_expiry"`
 	Status               BusStatus  `json:"status" db:"status"`
 
+	// Seat Layout
+	SeatLayoutID *string `json:"seat_layout_id,omitempty" db:"seat_layout_id"`
+
 	// Amenities
 	HasWifi          bool `json:"has_wifi" db:"has_wifi"`
 	HasAC            bool `json:"has_ac" db:"has_ac"`
@@ -59,6 +62,7 @@ type CreateBusRequest struct {
 	LastMaintenanceDate *string `json:"last_maintenance_date,omitempty"` // Format: YYYY-MM-DD
 	InsuranceExpiry     *string `json:"insurance_expiry,omitempty"`      // Format: YYYY-MM-DD
 	Status              *string `json:"status,omitempty"`
+	SeatLayoutID        *string `json:"seat_layout_id,omitempty"`
 
 	// Amenities
 	HasWifi          bool `json:"has_wifi"`
@@ -77,6 +81,7 @@ type UpdateBusRequest struct {
 	LastMaintenanceDate *string `json:"last_maintenance_date,omitempty"` // Format: YYYY-MM-DD
 	InsuranceExpiry     *string `json:"insurance_expiry,omitempty"`      // Format: YYYY-MM-DD
 	Status              *string `json:"status,omitempty"`
+	SeatLayoutID        *string `json:"seat_layout_id,omitempty"`
 
 	// Amenities
 	HasWifi          *bool `json:"has_wifi,omitempty"`

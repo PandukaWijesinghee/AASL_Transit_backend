@@ -5388,6 +5388,11 @@ components:
           type: string
           enum: [active, maintenance, inactive]
           example: "active"
+        seat_layout_id:
+          type: string
+          format: uuid
+          example: "2c2c3e2b-4328-47b7-ac34-d8e08b46f265"
+          description: "Optional default seat layout for this bus"
         has_wifi:
           type: boolean
           example: true
@@ -5452,6 +5457,11 @@ components:
           enum: [active, maintenance, inactive]
           default: active
           example: "active"
+        seat_layout_id:
+          type: string
+          format: uuid
+          example: "2c2c3e2b-4328-47b7-ac34-d8e08b46f265"
+          description: "Optional default seat layout for this bus"
         has_wifi:
           type: boolean
           default: false
@@ -5503,6 +5513,11 @@ components:
           type: string
           enum: [active, maintenance, inactive]
           example: "maintenance"
+        seat_layout_id:
+          type: string
+          format: uuid
+          example: "2c2c3e2b-4328-47b7-ac34-d8e08b46f265"
+          description: "Optional default seat layout for this bus"
         has_wifi:
           type: boolean
           example: true
