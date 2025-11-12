@@ -230,6 +230,13 @@ func main() {
 	adminAuthHandler := handlers.NewAdminAuthHandler(adminAuthService, logger)
 	logger.Info("✓ Admin authentication system initialized")
 
+	// Initialize bus seat layout system
+	logger.Info("Initializing bus seat layout system...")
+	busSeatLayoutRepository := database.NewBusSeatLayoutRepository(db)
+	busSeatLayoutService := services.NewBusSeatLayoutService(busSeatLayoutRepository)
+	busSeatLayoutHandler := handlers.NewBusSeatLayoutHandler(busSeatLayoutService, logger)
+	logger.Info("✓ Bus seat layout system initialized")
+
 	// Initialize trip scheduling handlers
 	tripScheduleHandler := handlers.NewTripScheduleHandler(
 		tripScheduleRepo,
@@ -351,6 +358,24 @@ func main() {
 			}
 		}
 		logger.Info("🔐 Admin Authentication routes registered successfully")
+
+		// Bus Seat Layout routes (admin only)
+		logger.Info("🚌 Registering Bus Seat Layout routes...")
+		busSeatLayout := v1.Group("/admin/seat-layouts")
+		busSeatLayout.Use(middleware.AuthMiddleware(jwtService))
+		{
+			logger.Info("  ✅ POST /api/v1/admin/seat-layouts")
+			busSeatLayout.POST("", busSeatLayoutHandler.CreateTemplate)
+			logger.Info("  ✅ GET /api/v1/admin/seat-layouts")
+			busSeatLayout.GET("", busSeatLayoutHandler.ListTemplates)
+			logger.Info("  ✅ GET /api/v1/admin/seat-layouts/:id")
+			busSeatLayout.GET("/:id", busSeatLayoutHandler.GetTemplate)
+			logger.Info("  ✅ PUT /api/v1/admin/seat-layouts/:id")
+			busSeatLayout.PUT("/:id", busSeatLayoutHandler.UpdateTemplate)
+			logger.Info("  ✅ DELETE /api/v1/admin/seat-layouts/:id")
+			busSeatLayout.DELETE("/:id", busSeatLayoutHandler.DeleteTemplate)
+		}
+		logger.Info("🚌 Bus Seat Layout routes registered successfully")
 
 		// User routes (protected)
 		user := v1.Group("/user")
