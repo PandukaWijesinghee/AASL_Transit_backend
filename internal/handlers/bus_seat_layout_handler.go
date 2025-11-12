@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"github.com/smarttransit/sms-auth-backend/internal/middleware"
 	"github.com/smarttransit/sms-auth-backend/internal/models"
 	"github.com/smarttransit/sms-auth-backend/internal/services"
 )
@@ -34,20 +35,20 @@ func (h *BusSeatLayoutHandler) CreateTemplate(c *gin.Context) {
 		return
 	}
 
-	// Get admin ID from context (set by auth middleware)
-	adminIDStr, exists := c.Get("user_id")
+	// Get user context from middleware
+	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
-		h.logger.Error("Admin ID not found in context")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		h.logger.Error("User context not found - auth middleware may not be applied")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized", "message": "User context not found"})
 		return
 	}
 
-	adminID, err := uuid.Parse(adminIDStr.(string))
-	if err != nil {
-		h.logger.Error("Invalid admin ID format", "error", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid admin ID"})
-		return
-	}
+	adminID := userCtx.UserID
+	h.logger.WithFields(logrus.Fields{
+		"admin_id": adminID,
+		"phone":    userCtx.Phone,
+		"roles":    userCtx.Roles,
+	}).Info("Creating bus seat layout template")
 
 	// Create template
 	template, err := h.service.CreateTemplate(c.Request.Context(), &req, adminID)
