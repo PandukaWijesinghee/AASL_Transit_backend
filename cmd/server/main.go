@@ -568,6 +568,8 @@ func main() {
 
 			// NEW: Assign staff and permit
 			scheduledTrips.PATCH("/:id/assign", scheduledTripHandler.AssignStaffAndPermit)
+			// NEW: Assign seat layout
+			scheduledTrips.PATCH("/:id/assign-seat-layout", scheduledTripHandler.AssignSeatLayout)
 		}
 
 		// Permit-specific trip routes

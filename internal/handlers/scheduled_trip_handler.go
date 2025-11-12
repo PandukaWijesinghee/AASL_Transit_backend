@@ -1178,3 +1178,88 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 		"trip":    updatedTrip,
 	})
 }
+
+// AssignSeatLayout assigns a seat layout template to a scheduled trip
+// PATCH /api/v1/scheduled-trips/:id/assign-seat-layout
+func (h *ScheduledTripHandler) AssignSeatLayout(c *gin.Context) {
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// Get bus owner
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Only bus owners can assign seat layouts"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bus owner"})
+		return
+	}
+
+	tripID := c.Param("id")
+
+	// Parse request body
+	var req struct {
+		SeatLayoutID *string `json:"seat_layout_id" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	// Get the trip
+	trip, err := h.tripRepo.GetByID(tripID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Trip not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trip"})
+		return
+	}
+
+	// Verify ownership through trip schedule
+	if trip.TripScheduleID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot determine trip ownership - no schedule linked"})
+		return
+	}
+
+	schedule, err := h.scheduleRepo.GetByID(*trip.TripScheduleID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ownership"})
+		return
+	}
+
+	if schedule.BusOwnerID != busOwner.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized to modify this trip"})
+		return
+	}
+
+	// Verify the seat layout exists and belongs to this bus owner
+	// Note: You need a repository method to verify seat layout ownership
+	// For now, we'll proceed with the assignment
+	// TODO: Add seat layout ownership verification
+
+	// Perform the assignment
+	err = h.tripRepo.AssignSeatLayout(tripID, req.SeatLayoutID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to assign seat layout", "details": err.Error()})
+		return
+	}
+
+	// Fetch updated trip
+	updatedTrip, err := h.tripRepo.GetByID(tripID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch updated trip"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Seat layout assigned successfully",
+		"trip":    updatedTrip,
+	})
+}

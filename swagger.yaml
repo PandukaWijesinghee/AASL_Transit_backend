@@ -4257,7 +4257,19 @@ paths:
   /api/v1/scheduled-trips/{id}/publish:
     put:
       summary: Publish a scheduled trip for booking
-      description: Make a scheduled trip available for passenger booking by setting is_bookable=true. Only the trip owner can publish their trips.
+      description: |
+        Make a scheduled trip available for passenger booking by setting is_bookable=true. 
+        Only the trip owner can publish their trips.
+        
+        **Requirements**:
+        - Trip MUST have seat_layout_id assigned before publishing
+        - Attempting to publish without seat_layout_id will fail with error
+        - Once published, ever_published flag is set to true permanently
+        
+        **Validation**:
+        The system validates that seat_layout_id IS NOT NULL before allowing publish.
+        Use the `/scheduled-trips/{id}/assign-seat-layout` endpoint to assign a seat 
+        layout before publishing.
       operationId: publishScheduledTrip
       tags:
         - Scheduled Trips
@@ -4287,7 +4299,18 @@ paths:
                     format: uuid
                     example: "123e4567-e89b-12d3-a456-426614174000"
         "400":
-          description: Invalid trip ID
+          description: |
+            Validation failed:
+            - Invalid trip ID format
+            - Seat layout not assigned (seat_layout_id is NULL)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "cannot publish trip: seat layout must be assigned before publishing"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -4457,10 +4480,116 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/scheduled-trips/{id}/assign-seat-layout:
+    patch:
+      summary: Assign seat layout template to a scheduled trip
+      description: |
+        Assign a seat layout template to a specific scheduled trip. 
+        
+        **Business Context**:
+        In Sri Lanka, buses change frequently on the same route, so seat layouts 
+        are assigned per trip rather than per bus. Each trip needs its own seat 
+        layout assignment before it can be published for booking.
+        
+        **Requirements**:
+        - Only the bus owner who owns the trip can assign seat layouts
+        - Seat layout must be assigned before trip can be published (is_bookable=true)
+        - Attempting to publish without seat_layout_id will fail with validation error
+        
+        **Database Constraint**:
+        A check constraint enforces that if is_bookable=true, then seat_layout_id 
+        must NOT be NULL.
+      operationId: assignSeatLayout
+      tags:
+        - Scheduled Trips
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the trip to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - seat_layout_id
+              properties:
+                seat_layout_id:
+                  type: string
+                  format: uuid
+                  description: UUID of the seat layout template to assign
+                  example: "550e8400-e29b-41d4-a716-446655440001"
+              example:
+                seat_layout_id: "550e8400-e29b-41d4-a716-446655440001"
+      responses:
+        "200":
+          description: Seat layout assigned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Seat layout assigned successfully"
+                  trip:
+                    $ref: "#/components/schemas/ScheduledTrip"
+        "400":
+          description: |
+            Invalid request body:
+            - seat_layout_id is required
+            - Trip has no schedule link (cannot determine ownership)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid request body"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: |
+            Access denied:
+            - Only bus owners can assign seat layouts
+            - Trip does not belong to your organization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Unauthorized to modify this trip"
+        "404":
+          description: Trip not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /api/v1/scheduled-trips/bulk-publish:
     post:
       summary: Bulk publish scheduled trips for booking
-      description: Publish multiple scheduled trips at once by setting is_bookable=true. Only the trip owner can publish their trips.
+      description: |
+        Publish multiple scheduled trips at once by setting is_bookable=true. 
+        Only the trip owner can publish their trips.
+        
+        **Requirements**:
+        - ALL trips MUST have seat_layout_id assigned before bulk publishing
+        - If ANY trip is missing seat_layout_id, the entire operation fails
+        - No partial publishing - either all trips succeed or none
+        
+        **Validation**:
+        The system validates that ALL trips have seat_layout_id assigned. If any trip 
+        is missing a seat layout, the operation fails with an error indicating how many 
+        trips need seat layouts assigned.
       operationId: bulkPublishScheduledTrips
       tags:
         - Scheduled Trips
@@ -4506,7 +4635,18 @@ paths:
                     description: Number of trip IDs requested
                     example: 5
         "400":
-          description: Invalid request body or no trip IDs provided
+          description: |
+            Validation failed:
+            - Invalid request body or no trip IDs provided
+            - One or more trips missing seat_layout_id assignment
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "cannot publish 3 trip(s) without seat layout assigned"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -5509,6 +5649,12 @@ components:
           type: string
           format: uuid
           example: "g6eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        seat_layout_id:
+          type: string
+          format: uuid
+          nullable: true
+          example: "550e8400-e29b-41d4-a716-446655440001"
+          description: "Seat layout template assigned to this specific trip. Required before trip can be published (is_bookable=true). In Sri Lanka, same route uses different buses frequently, so seat layout is assigned per trip not per bus."
         driver_name:
           type: string
           example: "John Doe"
