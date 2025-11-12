@@ -737,7 +737,14 @@ func (h *ScheduledTripHandler) PublishTrip(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Trip not found or access denied"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish trip for booking"})
+		if err.Error() == "cannot publish trip: seat layout must be assigned before publishing" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Seat layout required",
+				"message": "Please assign a seat layout to this trip before publishing for booking",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish trip for booking", "details": err.Error()})
 		return
 	}
 
@@ -839,6 +846,18 @@ func (h *ScheduledTripHandler) BulkPublishTrips(c *gin.Context) {
 	if err != nil {
 		log.Printf("Bulk publish: Failed to publish trips for bus owner %s: %v (Trip IDs: %v)",
 			busOwner.ID, err, req.TripIDs)
+		
+		// Check if error is about missing seat layouts
+		errMsg := err.Error()
+		if len(errMsg) > 14 && errMsg[:14] == "cannot publish" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Some trips missing seat layout",
+				"message": "All trips must have a seat layout assigned before publishing for booking",
+				"details": errMsg,
+			})
+			return
+		}
+		
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish trips", "details": err.Error()})
 		return
 	}
