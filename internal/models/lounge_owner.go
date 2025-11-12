@@ -24,8 +24,8 @@ type LoungeOwner struct {
 	ManagerNICBackURL  sql.NullString `db:"manager_nic_back_url" json:"manager_nic_back_url,omitempty"`   // Manager's NIC back image
 
 	// Registration Progress Tracking
-	RegistrationStep string `db:"registration_step" json:"registration_step"` // phone_verified, business_info, nic_uploaded, lounge_added, completed
-	ProfileCompleted bool   `db:"profile_completed" json:"profile_completed"` // True when registration_step = 'completed'
+	RegistrationStep string `db:"registration_step" json:"registration_step"` // phone_verified, business_info, lounge_added, completed (no NIC verification step)
+	ProfileCompleted bool   `db:"profile_completed" json:"profile_completed"` // True when registration_step = 'completed' (but still pending admin approval)
 
 	// Verification
 	VerificationStatus string         `db:"verification_status" json:"verification_status"` // pending, approved, rejected
@@ -41,10 +41,18 @@ type LoungeOwner struct {
 }
 
 // Registration step constants
+// New flow: phone_verified -> business_info -> lounge_added -> completed
+// Note: nic_uploaded step has been removed (NIC images collected with business_info, verified by admin)
 const (
 	RegStepPhoneVerified = "phone_verified"
 	RegStepBusinessInfo  = "business_info"
-	RegStepNICUploaded   = "nic_uploaded"
 	RegStepLoungeAdded   = "lounge_added"
 	RegStepCompleted     = "completed"
+)
+
+// Lounge owner verification status constants (for admin approval)
+const (
+	LoungeVerificationPending  = "pending"
+	LoungeVerificationApproved = "approved"
+	LoungeVerificationRejected = "rejected"
 )

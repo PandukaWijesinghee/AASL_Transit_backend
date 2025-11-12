@@ -52,20 +52,20 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 				continue
 			}
 
-		// Get total seats from bus seat layout (if assigned)
-		totalSeats := 50 // Default
-		if schedule.BusID != nil {
-			bus, err := s.busRepo.GetByID(*schedule.BusID)
-			if err == nil && bus.SeatLayoutID != nil {
-				// Parse seat layout ID and fetch template
-				if layoutID, parseErr := uuid.Parse(*bus.SeatLayoutID); parseErr == nil {
-					layout, layoutErr := s.seatLayoutRepo.GetTemplateByID(context.Background(), layoutID)
-					if layoutErr == nil && layout != nil {
-						totalSeats = layout.TotalSeats
+			// Get total seats from bus seat layout (if assigned)
+			totalSeats := 50 // Default
+			if schedule.BusID != nil {
+				bus, err := s.busRepo.GetByID(*schedule.BusID)
+				if err == nil && bus.SeatLayoutID != nil {
+					// Parse seat layout ID and fetch template
+					if layoutID, parseErr := uuid.Parse(*bus.SeatLayoutID); parseErr == nil {
+						layout, layoutErr := s.seatLayoutRepo.GetTemplateByID(context.Background(), layoutID)
+						if layoutErr == nil && layout != nil {
+							totalSeats = layout.TotalSeats
+						}
 					}
 				}
-			}
-		}			// Calculate max bookable seats
+			} // Calculate max bookable seats
 			maxBookableSeats := totalSeats
 			if schedule.MaxBookableSeats != nil && *schedule.MaxBookableSeats < totalSeats {
 				maxBookableSeats = *schedule.MaxBookableSeats

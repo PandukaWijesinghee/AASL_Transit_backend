@@ -342,7 +342,7 @@ func (h *BusHandler) GetBusesByStatus(c *gin.Context) {
 	// Validate status
 	busStatus := models.BusStatus(status)
 	if busStatus != models.BusStatusActive && busStatus != models.BusStatusMaintenance &&
-	   busStatus != models.BusStatusInactive {
+		busStatus != models.BusStatusInactive {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status. Must be active, maintenance, or inactive"})
 		return
 	}

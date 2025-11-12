@@ -2337,6 +2337,20 @@ paths:
   # ============================================================================
   # Lounge Owner Endpoints
   # ============================================================================
+  #
+  # LOUNGE OWNER REGISTRATION FLOW (3 STEPS):
+  # ==========================================
+  # Step 1: Business & Manager Info   - /api/v1/lounge-owner/register/business-info
+  # Step 2: Add Lounge                - /api/v1/lounge-owner/register/add-lounge
+  # Step 3: Add Staff (optional)      - /api/v1/lounges/{lounge_id}/staff
+  #
+  # After Step 2, registration_step becomes "lounge_added" and profile_completed = true
+  # Admin then reviews and approves/rejects via web dashboard
+  # verification_status: "pending" -> "approved" or "rejected"
+  #
+  # NOTE: NIC verification step was removed. NIC images can optionally be included
+  #       in Step 1 (business-info), and verification is done manually by admins.
+  # ============================================================================
   /api/v1/lounge-owner/register/business-info:
     post:
       summary: Save business and manager information
@@ -2409,60 +2423,37 @@ paths:
 
   /api/v1/lounge-owner/register/upload-manager-nic:
     post:
-      summary: Upload manager NIC front and back images
+      summary: "[DEPRECATED] Upload manager NIC front and back images"
+      deprecated: true
       description: |
-        Step 2 of lounge owner registration - upload manager's NIC images for verification.
+        **DEPRECATED**: This endpoint is no longer used in the registration flow.
+        NIC verification is now handled manually by admins after registration completion.
+        This endpoint returns HTTP 410 Gone if called.
       operationId: uploadManagerNIC
       tags:
         - Lounge Owner
       security:
         - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - manager_nic_front_url
-                - manager_nic_back_url
-              properties:
-                manager_nic_front_url:
-                  type: string
-                  format: uri
-                  example: "https://storage.supabase.co/path/to/manager_nic_front.jpg"
-                  description: URL to manager NIC front image (upload to Supabase Storage first)
-                manager_nic_back_url:
-                  type: string
-                  format: uri
-                  example: "https://storage.supabase.co/path/to/manager_nic_back.jpg"
-                  description: URL to manager NIC back image (upload to Supabase Storage first)
       responses:
-        "200":
-          description: Manager NIC images uploaded successfully
+        "410":
+          description: Endpoint deprecated
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  error:
+                    type: string
+                    example: "deprecated_endpoint"
                   message:
                     type: string
-                    example: "Manager NIC images uploaded successfully"
-                  registration_step:
-                    type: string
-                    example: "nic_uploaded"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
+                    example: "This endpoint is deprecated. Please include NIC images in the business-info step."
 
   /api/v1/lounge-owner/register/add-lounge:
     post:
       summary: Add lounge with pricing information
       description: |
-        Step 3 of lounge owner registration - add lounge location and pricing.
+        Step 2 of lounge owner registration - add lounge location and pricing.
         Can be called multiple times to add multiple lounges.
         Includes pricing for 3 types: 1 hour, 2 hours, until bus arrives.
       operationId: addLounge
@@ -2590,7 +2581,6 @@ paths:
                       [
                         "phone_verified",
                         "business_info",
-                        "nic_uploaded",
                         "lounge_added",
                         "completed",
                       ]
@@ -2617,9 +2607,6 @@ paths:
                       business_info:
                         type: boolean
                         example: true
-                      nic_uploaded:
-                        type: boolean
-                        example: false
                       lounge_added:
                         type: boolean
                         example: false
@@ -2696,7 +2683,6 @@ paths:
                       [
                         "phone_verified",
                         "business_info",
-                        "nic_uploaded",
                         "lounge_added",
                         "completed",
                       ]
@@ -2973,7 +2959,7 @@ paths:
     post:
       summary: Add staff to lounge
       description: |
-        Step 4 (optional) - Add staff member to a specific lounge.
+        Step 3 (optional) - Add staff member to a specific lounge.
         Staff will be invited and can register later.
       operationId: addStaffToLounge
       tags:

@@ -62,12 +62,16 @@ func (h *LoungeHandler) AddLounge(c *gin.Context) {
 
 	var req AddLoungeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("ERROR: Failed to bind request body for user %s: %v", userCtx.UserID, err)
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "validation_error",
 			Message: "Invalid request body: " + err.Error(),
 		})
 		return
 	}
+
+	log.Printf("INFO: Add lounge request received - User: %s, Lounge: %s, City: %s, Photos: %d",
+		userCtx.UserID, req.LoungeName, req.City, len(req.Images))
 
 	// Get lounge owner record
 	owner, err := h.loungeOwnerRepo.GetLoungeOwnerByUserID(userCtx.UserID)
@@ -88,11 +92,15 @@ func (h *LoungeHandler) AddLounge(c *gin.Context) {
 		return
 	}
 
-	// Check if previous steps are completed (must have uploaded NIC)
-	if owner.RegistrationStep != models.RegStepNICUploaded && owner.RegistrationStep != models.RegStepLoungeAdded && owner.RegistrationStep != models.RegStepCompleted {
+	log.Printf("INFO: Current registration step for user %s: %s", userCtx.UserID, owner.RegistrationStep)
+
+	// Check if previous steps are completed (must have completed business info)
+	// New flow: phone_verified -> business_info -> lounge_added -> completed
+	if owner.RegistrationStep != models.RegStepBusinessInfo && owner.RegistrationStep != models.RegStepLoungeAdded && owner.RegistrationStep != models.RegStepCompleted {
+		log.Printf("ERROR: User %s attempted to add lounge with invalid step: %s", userCtx.UserID, owner.RegistrationStep)
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "incomplete_registration",
-			Message: "Please complete previous registration steps first (business info and NIC upload required)",
+			Message: "Please complete business information step first",
 		})
 		return
 	}

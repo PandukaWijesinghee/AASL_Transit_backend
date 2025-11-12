@@ -145,27 +145,102 @@ func (r *LoungeOwnerRepository) UpdateBusinessAndManagerInfo(
 	return nil
 }
 
+// UpdateBusinessAndManagerInfoWithNIC updates business and manager information including optional NIC images (Step 1 - New Flow)
+func (r *LoungeOwnerRepository) UpdateBusinessAndManagerInfoWithNIC(
+	userID uuid.UUID,
+	businessName string,
+	businessLicense string,
+	managerFullName string,
+	managerNICNumber string,
+	managerEmail *string,
+	managerNICFrontURL *string,
+	managerNICBackURL *string,
+) error {
+	query := `
+		UPDATE lounge_owners
+		SET
+			business_name = $1,
+			business_license = $2,
+			manager_full_name = $3,
+			manager_nic_number = $4,
+			manager_email = $5,
+			manager_nic_front_url = $6,
+			manager_nic_back_url = $7,
+			registration_step = $8,
+			updated_at = NOW()
+		WHERE user_id = $9
+	`
+
+	var emailValue interface{}
+	if managerEmail != nil && *managerEmail != "" {
+		emailValue = *managerEmail
+	} else {
+		emailValue = nil
+	}
+
+	var nicFrontValue interface{}
+	if managerNICFrontURL != nil && *managerNICFrontURL != "" {
+		nicFrontValue = *managerNICFrontURL
+	} else {
+		nicFrontValue = nil
+	}
+
+	var nicBackValue interface{}
+	if managerNICBackURL != nil && *managerNICBackURL != "" {
+		nicBackValue = *managerNICBackURL
+	} else {
+		nicBackValue = nil
+	}
+
+	result, err := r.db.Exec(
+		query,
+		businessName,
+		businessLicense,
+		managerFullName,
+		managerNICNumber,
+		emailValue,
+		nicFrontValue,
+		nicBackValue,
+		models.RegStepBusinessInfo,
+		userID,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to update business and manager info with NIC: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("lounge owner not found")
+	}
+
+	return nil
+}
+
 // UpdateManagerNICImages updates manager NIC image URLs (Step 2)
+// DEPRECATED: NIC verification step removed. This function only updates URLs without changing registration step.
 func (r *LoungeOwnerRepository) UpdateManagerNICImages(
 	userID uuid.UUID,
 	frontImageURL string,
 	backImageURL string,
 ) error {
 	query := `
-		UPDATE lounge_owners 
-		SET 
+		UPDATE lounge_owners
+		SET
 			manager_nic_front_url = $1,
 			manager_nic_back_url = $2,
-			registration_step = $3,
 			updated_at = NOW()
-		WHERE user_id = $4
+		WHERE user_id = $3
 	`
 
 	result, err := r.db.Exec(
 		query,
 		frontImageURL,
 		backImageURL,
-		models.RegStepNICUploaded,
 		userID,
 	)
 

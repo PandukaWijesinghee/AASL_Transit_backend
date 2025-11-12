@@ -32,12 +32,15 @@ func NewLoungeOwnerHandler(
 // ===================================================================
 
 // SaveBusinessAndManagerInfoRequest represents the business/manager info request
+// NIC images are optional - can be uploaded here or later for admin review
 type SaveBusinessAndManagerInfoRequest struct {
-	BusinessName     string  `json:"business_name" binding:"required"`
-	BusinessLicense  *string `json:"business_license"`
-	ManagerFullName  string  `json:"manager_full_name" binding:"required"`
-	ManagerNICNumber string  `json:"manager_nic_number" binding:"required"`
-	ManagerEmail     *string `json:"manager_email"`
+	BusinessName       string  `json:"business_name" binding:"required"`
+	BusinessLicense    *string `json:"business_license"`
+	ManagerFullName    string  `json:"manager_full_name" binding:"required"`
+	ManagerNICNumber   string  `json:"manager_nic_number" binding:"required"`
+	ManagerEmail       *string `json:"manager_email"`
+	ManagerNICFrontURL *string `json:"manager_nic_front_url"` // Optional: NIC front image URL from Supabase
+	ManagerNICBackURL  *string `json:"manager_nic_back_url"`  // Optional: NIC back image URL from Supabase
 }
 
 // SaveBusinessAndManagerInfo handles POST /api/v1/lounge-owner/register/business-info
@@ -80,18 +83,21 @@ func (h *LoungeOwnerHandler) SaveBusinessAndManagerInfo(c *gin.Context) {
 		return
 	}
 
-	// Update business and manager info
+	// Update business and manager info (including optional NIC images)
 	businessLicenseVal := ""
 	if req.BusinessLicense != nil {
 		businessLicenseVal = *req.BusinessLicense
 	}
-	err = h.loungeOwnerRepo.UpdateBusinessAndManagerInfo(
+
+	err = h.loungeOwnerRepo.UpdateBusinessAndManagerInfoWithNIC(
 		userCtx.UserID,
 		req.BusinessName,
 		businessLicenseVal,
 		req.ManagerFullName,
 		req.ManagerNICNumber,
 		req.ManagerEmail,
+		req.ManagerNICFrontURL,
+		req.ManagerNICBackURL,
 	)
 	if err != nil {
 		log.Printf("ERROR: Failed to update business/manager info for user %s: %v", userCtx.UserID, err)
@@ -111,8 +117,11 @@ func (h *LoungeOwnerHandler) SaveBusinessAndManagerInfo(c *gin.Context) {
 }
 
 // ===================================================================
-// STEP 2: Upload Manager NIC Images
+// DEPRECATED: STEP 2: Upload Manager NIC Images
 // ===================================================================
+// This endpoint is DEPRECATED and kept for backward compatibility only.
+// NIC images should now be uploaded as part of business_info step.
+// This endpoint is no longer used in the new registration flow.
 
 // UploadManagerNICRequest represents the manager NIC upload request
 type UploadManagerNICRequest struct {
@@ -121,74 +130,11 @@ type UploadManagerNICRequest struct {
 }
 
 // UploadManagerNIC handles POST /api/v1/lounge-owner/register/upload-manager-nic
+// DEPRECATED: Use SaveBusinessAndManagerInfo with NIC URLs instead
 func (h *LoungeOwnerHandler) UploadManagerNIC(c *gin.Context) {
-	// Get user context from JWT middleware
-	userCtx, exists := middleware.GetUserContext(c)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Error:   "unauthorized",
-			Message: "User context not found",
-		})
-		return
-	}
-
-	var req UploadManagerNICRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "validation_error",
-			Message: "Invalid request body: " + err.Error(),
-		})
-		return
-	}
-
-	// Get lounge owner record
-	owner, err := h.loungeOwnerRepo.GetLoungeOwnerByUserID(userCtx.UserID)
-	if err != nil {
-		log.Printf("ERROR: Failed to get lounge owner for user %s: %v", userCtx.UserID, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error:   "database_error",
-			Message: "Failed to retrieve lounge owner",
-		})
-		return
-	}
-
-	if owner == nil {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Error:   "not_found",
-			Message: "Lounge owner record not found",
-		})
-		return
-	}
-
-	// Check if previous step (business_info) is completed
-	if owner.RegistrationStep != models.RegStepBusinessInfo {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "incomplete_registration",
-			Message: "Please complete business information step first",
-		})
-		return
-	}
-
-	// Save manager NIC images
-	err = h.loungeOwnerRepo.UpdateManagerNICImages(
-		userCtx.UserID,
-		req.ManagerNICFrontURL,
-		req.ManagerNICBackURL,
-	)
-	if err != nil {
-		log.Printf("ERROR: Failed to update manager NIC images for user %s: %v", userCtx.UserID, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error:   "update_failed",
-			Message: "Failed to save manager NIC images",
-		})
-		return
-	}
-
-	log.Printf("INFO: Manager NIC images uploaded successfully for lounge owner %s (step: nic_uploaded)", userCtx.UserID)
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":           "Manager NIC images uploaded successfully",
-		"registration_step": models.RegStepNICUploaded,
+	c.JSON(http.StatusGone, ErrorResponse{
+		Error:   "deprecated_endpoint",
+		Message: "This endpoint is deprecated. Please include NIC images in the business-info step.",
 	})
 }
 
@@ -235,13 +181,27 @@ func (h *LoungeOwnerHandler) GetRegistrationProgress(c *gin.Context) {
 		"total_staff":         owner.TotalStaff,
 	}
 
-	// Add step completion status
+	// Add step completion status (new flow: phone_verified -> business_info -> lounge_added -> completed)
 	response["steps"] = gin.H{
 		"phone_verified": true, // Always true if they have a record
-		"business_info":  owner.RegistrationStep == models.RegStepBusinessInfo || owner.RegistrationStep == models.RegStepNICUploaded || owner.RegistrationStep == models.RegStepLoungeAdded || owner.RegistrationStep == models.RegStepCompleted,
-		"nic_uploaded":   owner.RegistrationStep == models.RegStepNICUploaded || owner.RegistrationStep == models.RegStepLoungeAdded || owner.RegistrationStep == models.RegStepCompleted,
+		"business_info":  owner.RegistrationStep == models.RegStepBusinessInfo || owner.RegistrationStep == models.RegStepLoungeAdded || owner.RegistrationStep == models.RegStepCompleted,
 		"lounge_added":   owner.RegistrationStep == models.RegStepLoungeAdded || owner.RegistrationStep == models.RegStepCompleted,
 		"completed":      owner.RegistrationStep == models.RegStepCompleted,
+	}
+
+	// If completed but pending approval, add pending_approval flag
+	if owner.RegistrationStep == models.RegStepCompleted && owner.VerificationStatus == models.LoungeVerificationPending {
+		response["pending_approval"] = true
+		response["approval_message"] = "Your registration is complete and awaiting admin approval"
+	} else if owner.VerificationStatus == models.LoungeVerificationApproved {
+		response["approved"] = true
+		response["approval_message"] = "Your account has been approved"
+	} else if owner.VerificationStatus == models.LoungeVerificationRejected {
+		response["rejected"] = true
+		response["approval_message"] = "Your account has been rejected"
+		if owner.VerificationNotes.Valid {
+			response["rejection_reason"] = owner.VerificationNotes.String
+		}
 	}
 
 	c.JSON(http.StatusOK, response)
