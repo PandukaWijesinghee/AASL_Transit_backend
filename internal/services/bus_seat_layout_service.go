@@ -80,41 +80,23 @@ func (s *BusSeatLayoutService) generateSeatsFromMap(seatMap [][]bool) []models.B
 			}
 		}
 
-		// Generate seats for selected positions
-		leftSeats := []int{}
-		rightSeats := []int{}
+		// Generate seats for selected positions with continuous numbering
+		totalSeatsInRow := len(selectedPositions)
+		seatCounter := 0
 
+		// Generate seats in order (left side first, then right side)
 		for _, pos := range selectedPositions {
-			if pos < 3 {
-				leftSeats = append(leftSeats, pos)
-			} else {
-				rightSeats = append(rightSeats, pos)
-			}
-		}
+			seatCounter++
+			isLeftSide := pos < 3
 
-		// Generate left side seats
-		for idx, pos := range leftSeats {
 			seat := models.BusSeatLayoutSeat{
 				RowNumber:    rowNumber,
 				RowLabel:     rowLabel,
 				Position:     pos + 1, // Convert 0-indexed to 1-indexed
-				IsWindowSeat: idx == 0,                  // First seat on left is window
-				IsAisleSeat:  idx == len(leftSeats)-1,   // Last seat on left is aisle
+				IsWindowSeat: seatCounter == 1 || seatCounter == totalSeatsInRow, // First or last seat
+				IsAisleSeat:  (isLeftSide && pos == 2) || (!isLeftSide && pos == 3), // Aisle positions
 			}
-			seat.SeatNumber = s.generateSeatNumber(rowLabel, len(leftSeats), idx, true)
-			seats = append(seats, seat)
-		}
-
-		// Generate right side seats
-		for idx, pos := range rightSeats {
-			seat := models.BusSeatLayoutSeat{
-				RowNumber:    rowNumber,
-				RowLabel:     rowLabel,
-				Position:     pos + 1, // Convert 0-indexed to 1-indexed
-				IsAisleSeat:  idx == 0,                    // First seat on right is aisle
-				IsWindowSeat: idx == len(rightSeats)-1,    // Last seat on right is window
-			}
-			seat.SeatNumber = s.generateSeatNumber(rowLabel, len(rightSeats), idx, false)
+			seat.SeatNumber = s.generateSeatNumber(rowLabel, totalSeatsInRow, seatCounter)
 			seats = append(seats, seat)
 		}
 	}
@@ -123,16 +105,14 @@ func (s *BusSeatLayoutService) generateSeatsFromMap(seatMap [][]bool) []models.B
 }
 
 // generateSeatNumber generates a seat number like A1W, A2, B3W
-func (s *BusSeatLayoutService) generateSeatNumber(rowLabel string, totalSeatsInSide int, seatIndex int, isLeftSide bool) string {
-	seatNum := seatIndex + 1
-
-	// Check if it's a window seat (first on left, last on right)
-	isWindow := (isLeftSide && seatIndex == 0) || (!isLeftSide && seatIndex == totalSeatsInSide-1)
+func (s *BusSeatLayoutService) generateSeatNumber(rowLabel string, totalSeatsInRow int, seatNumber int) string {
+	// Check if it's a window seat (first or last seat in the row)
+	isWindow := seatNumber == 1 || seatNumber == totalSeatsInRow
 
 	if isWindow {
-		return fmt.Sprintf("%s%dW", rowLabel, seatNum)
+		return fmt.Sprintf("%s%dW", rowLabel, seatNumber)
 	}
-	return fmt.Sprintf("%s%d", rowLabel, seatNum)
+	return fmt.Sprintf("%s%d", rowLabel, seatNumber)
 }
 
 // getRowLabel converts row number to alphabetic label (1->A, 2->B, etc.)
