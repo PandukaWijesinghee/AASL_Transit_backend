@@ -27,7 +27,8 @@ type ScheduledTrip struct {
 	EstimatedDurationMinutes *int                `json:"estimated_duration_minutes,omitempty" db:"estimated_duration_minutes"` // Duration in minutes (industry standard - calculate arrival on-the-fly)
 	AssignedDriverID         *string             `json:"assigned_driver_id,omitempty" db:"assigned_driver_id"`
 	AssignedConductorID      *string             `json:"assigned_conductor_id,omitempty" db:"assigned_conductor_id"`
-	IsBookable               bool                `json:"is_bookable" db:"is_bookable"` // Controls if trip is available for passenger booking
+	IsBookable               bool                `json:"is_bookable" db:"is_bookable"`               // Controls if trip is available for passenger booking
+	EverPublished            bool                `json:"ever_published" db:"ever_published"`         // Tracks if trip was ever made bookable (stays true once set)
 	TotalSeats               int                 `json:"total_seats" db:"total_seats"`
 	AvailableSeats           int                 `json:"available_seats" db:"available_seats"`
 	BookedSeats              int                 `json:"booked_seats" db:"booked_seats"`

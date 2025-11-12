@@ -5539,6 +5539,10 @@ components:
           type: boolean
           example: false
           description: Whether this trip is available for passenger booking. Must be explicitly published to make bookable.
+        ever_published:
+          type: boolean
+          example: false
+          description: Tracks if this trip was ever made bookable (published). Once true, stays true even if is_bookable becomes false. Used to show trip history.
         base_fare:
           type: number
           format: double
