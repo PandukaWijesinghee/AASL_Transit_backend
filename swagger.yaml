@@ -5634,7 +5634,7 @@ components:
         seat_number:
           type: string
           example: "A1W"
-          description: "Generated seat number (e.g., A1W for window seat, A2 for regular)"
+          description: "Generated seat number with continuous numbering across row (e.g., A1W, A2, A3, A4, A5W - first and last seats have W suffix for window)"
         is_window_seat:
           type: boolean
           example: true
@@ -5748,6 +5748,7 @@ components:
                     example: "A"
                   left_seats:
                     type: array
+                    description: "Left side seats with continuous numbering (e.g., A1W, A2, A3)"
                     items:
                       type: object
                       properties:
@@ -5757,6 +5758,7 @@ components:
                         seat_number:
                           type: string
                           example: "A1W"
+                          description: "Continuous numbering across row - first seat has W suffix"
                         is_window_seat:
                           type: boolean
                           example: true
@@ -5765,6 +5767,7 @@ components:
                           example: false
                   right_seats:
                     type: array
+                    description: "Right side seats continuing from left (e.g., A4, A5, A6W)"
                     items:
                       type: object
                       properties:
@@ -5774,12 +5777,13 @@ components:
                         seat_number:
                           type: string
                           example: "A4"
+                          description: "Continues from left side - e.g., if left has 1-3, right has 4-6"
                         is_window_seat:
                           type: boolean
                           example: false
                         is_aisle_seat:
                           type: boolean
-                          example: false
+                          example: true
 
   responses:
     BadRequest:
