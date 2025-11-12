@@ -1213,7 +1213,7 @@ func (h *ScheduledTripHandler) AssignSeatLayout(c *gin.Context) {
 	}
 
 	tripID := c.Param("id")
-	fmt.Printf("📊 AssignSeatLayout called - Trip ID: %s, User ID: %s, Bus Owner ID: %s\n", 
+	fmt.Printf("📊 AssignSeatLayout called - Trip ID: %s, User ID: %s, Bus Owner ID: %s\n",
 		tripID, userCtx.UserID.String(), busOwner.ID)
 
 	// Parse request body
@@ -1241,7 +1241,7 @@ func (h *ScheduledTripHandler) AssignSeatLayout(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("✅ Trip found: %s, Schedule ID: %v\n", trip.ID, trip.TripScheduleID)	// Verify ownership through trip schedule
+	fmt.Printf("✅ Trip found: %s, Schedule ID: %v\n", trip.ID, trip.TripScheduleID) // Verify ownership through trip schedule
 	if trip.TripScheduleID == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot determine trip ownership - no schedule linked"})
 		return
