@@ -2664,19 +2664,29 @@ paths:
                     example: "3edeb9af-51c3-4c24-a5d0-76c9dee2d4ea"
                   business_name:
                     type: string
+                    nullable: true
                     example: "Grand Hotel Colombo"
+                    description: "Business name - nullable (sql.NullString)"
                   business_license:
                     type: string
+                    nullable: true
                     example: "BR2024123456"
+                    description: "Business license number - nullable (sql.NullString)"
                   manager_full_name:
                     type: string
+                    nullable: true
                     example: "John Doe"
+                    description: "Manager full name - nullable (sql.NullString)"
                   manager_nic_number:
                     type: string
+                    nullable: true
                     example: "200012345678"
+                    description: "Manager NIC number - nullable (sql.NullString)"
                   manager_email:
                     type: string
+                    nullable: true
                     example: "manager@grandhotel.com"
+                    description: "Manager email - nullable (sql.NullString)"
                   registration_step:
                     type: string
                     enum:
@@ -2694,6 +2704,17 @@ paths:
                     type: string
                     enum: ["pending", "approved", "rejected"]
                     example: "pending"
+                  verification_notes:
+                    type: string
+                    nullable: true
+                    example: "Pending document verification"
+                    description: "Admin verification notes - nullable (sql.NullString)"
+                  verified_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    example: "2025-10-19T12:00:00Z"
+                    description: "Verification timestamp - nullable (sql.NullTime)"
                   total_lounges:
                     type: integer
                     example: 2
