@@ -204,7 +204,7 @@ func (r *LoungeStaffRepository) GetStaffWithUserDetails(staffID uuid.UUID) (map[
 		JOIN users u ON ls.user_id = u.id
 		WHERE ls.id = $1
 	`
-	
+
 	result := make(map[string]interface{})
 	err := r.db.QueryRowx(query, staffID).MapScan(result)
 	if err == sql.ErrNoRows {
@@ -213,6 +213,6 @@ func (r *LoungeStaffRepository) GetStaffWithUserDetails(staffID uuid.UUID) (map[
 	if err != nil {
 		return nil, fmt.Errorf("failed to get staff with user details: %w", err)
 	}
-	
+
 	return result, nil
 }

@@ -118,19 +118,19 @@ func (h *LoungeStaffHandler) GetStaffByLounge(c *gin.Context) {
 	response := make([]gin.H, 0, len(staff))
 	for _, s := range staff {
 		response = append(response, gin.H{
-			"id":                 s.ID,
-			"lounge_id":          s.LoungeID,
-			"user_id":            s.UserID,
-			"full_name":          s.FullName,
-			"nic_number":         s.NICNumber,
-			"email":              s.Email,
-			"profile_completed":  s.ProfileCompleted,
-			"employment_status":  s.EmploymentStatus,
-			"hired_date":         s.HiredDate,
-			"terminated_date":    s.TerminatedDate,
-			"notes":              s.Notes,
-			"created_at":         s.CreatedAt,
-			"updated_at":         s.UpdatedAt,
+			"id":                s.ID,
+			"lounge_id":         s.LoungeID,
+			"user_id":           s.UserID,
+			"full_name":         s.FullName,
+			"nic_number":        s.NICNumber,
+			"email":             s.Email,
+			"profile_completed": s.ProfileCompleted,
+			"employment_status": s.EmploymentStatus,
+			"hired_date":        s.HiredDate,
+			"terminated_date":   s.TerminatedDate,
+			"notes":             s.Notes,
+			"created_at":        s.CreatedAt,
+			"updated_at":        s.UpdatedAt,
 		})
 	}
 
@@ -362,19 +362,19 @@ func (h *LoungeStaffHandler) GetMyStaffProfile(c *gin.Context) {
 	}
 
 	response := gin.H{
-		"id":                 staff.ID,
-		"lounge_id":          staff.LoungeID,
-		"user_id":            staff.UserID,
-		"full_name":          staff.FullName,
-		"nic_number":         staff.NICNumber,
-		"email":              staff.Email,
-		"profile_completed":  staff.ProfileCompleted,
-		"employment_status":  staff.EmploymentStatus,
-		"hired_date":         staff.HiredDate,
-		"terminated_date":    staff.TerminatedDate,
-		"notes":              staff.Notes,
-		"created_at":         staff.CreatedAt,
-		"updated_at":         staff.UpdatedAt,
+		"id":                staff.ID,
+		"lounge_id":         staff.LoungeID,
+		"user_id":           staff.UserID,
+		"full_name":         staff.FullName,
+		"nic_number":        staff.NICNumber,
+		"email":             staff.Email,
+		"profile_completed": staff.ProfileCompleted,
+		"employment_status": staff.EmploymentStatus,
+		"hired_date":        staff.HiredDate,
+		"terminated_date":   staff.TerminatedDate,
+		"notes":             staff.Notes,
+		"created_at":        staff.CreatedAt,
+		"updated_at":        staff.UpdatedAt,
 	}
 
 	if lounge != nil {

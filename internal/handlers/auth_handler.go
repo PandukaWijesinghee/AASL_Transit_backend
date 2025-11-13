@@ -1122,6 +1122,7 @@ type RefreshTokenResponse struct {
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	var req RefreshTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("❌ REFRESH TOKEN ERROR: Invalid request body - %v", err)
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "invalid_request",
 			Message: "Invalid request body",
@@ -1129,9 +1130,13 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
+	log.Printf("🔄 REFRESH TOKEN REQUEST: Token length: %d, DeviceID: %s, DeviceType: %s", 
+		len(req.RefreshToken), req.DeviceID, req.DeviceType)
+
 	// Validate refresh token
 	claims, err := h.jwtService.ValidateRefreshToken(req.RefreshToken)
 	if err != nil {
+		log.Printf("❌ REFRESH TOKEN ERROR: Token validation failed - %v", err)
 		c.JSON(http.StatusUnauthorized, ErrorResponse{
 			Error:   "invalid_token",
 			Message: "Invalid or expired refresh token",
@@ -1139,9 +1144,16 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
+	log.Printf("✅ REFRESH TOKEN: Token validated successfully for user: %s, phone: %s", 
+		claims.UserID, claims.Phone)
+
+	log.Printf("✅ REFRESH TOKEN: Token validated successfully for user: %s, phone: %s", 
+		claims.UserID, claims.Phone)
+
 	// Check if token is revoked in database
 	revoked, err := h.refreshTokenRepository.IsTokenRevoked(req.RefreshToken)
 	if err != nil {
+		log.Printf("❌ REFRESH TOKEN ERROR: Failed to check if token is revoked - %v", err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "token_check_failed",
 			Message: "Failed to verify token status",
@@ -1150,6 +1162,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	}
 
 	if revoked {
+		log.Printf("❌ REFRESH TOKEN ERROR: Token has been revoked for user: %s", claims.UserID)
 		c.JSON(http.StatusUnauthorized, ErrorResponse{
 			Error:   "token_revoked",
 			Message: "Refresh token has been revoked",
@@ -1157,9 +1170,12 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
+	log.Printf("✅ REFRESH TOKEN: Token is not revoked, fetching user: %s", claims.UserID)
+
 	// Get user from database to ensure they still exist and get current profile status
 	user, err := h.userRepository.GetUserByID(claims.UserID)
 	if err != nil {
+		log.Printf("❌ REFRESH TOKEN ERROR: Failed to fetch user %s - %v", claims.UserID, err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "user_fetch_failed",
 			Message: "Failed to fetch user information",
@@ -1168,6 +1184,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	}
 
 	if user == nil {
+		log.Printf("❌ REFRESH TOKEN ERROR: User %s no longer exists", claims.UserID)
 		c.JSON(http.StatusUnauthorized, ErrorResponse{
 			Error:   "user_not_found",
 			Message: "User no longer exists",
@@ -1175,8 +1192,11 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
+	log.Printf("✅ REFRESH TOKEN: User found - ID: %s, Status: %s", user.ID, user.Status)
+
 	// Check if user is active
 	if user.Status != "active" {
+		log.Printf("❌ REFRESH TOKEN ERROR: User %s is not active, status: %s", user.ID, user.Status)
 		c.JSON(http.StatusForbidden, ErrorResponse{
 			Error:   "user_inactive",
 			Message: "User account is not active",
@@ -1247,6 +1267,8 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 
 	// Log successful token refresh
 	h.auditService.LogTokenRefresh(user.ID, clientIP, userAgent, true)
+
+	log.Printf("✅ REFRESH TOKEN SUCCESS: New tokens generated for user: %s", user.ID)
 
 	c.JSON(http.StatusOK, RefreshTokenResponse{
 		AccessToken:  accessToken,
