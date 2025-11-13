@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
 
@@ -254,19 +255,30 @@ func (h *LoungeOwnerHandler) GetProfile(c *gin.Context) {
 	loungeCount, _ := h.loungeOwnerRepo.GetLoungeCount(owner.ID)
 	staffCount, _ := h.loungeOwnerRepo.GetStaffCount(owner.ID)
 
+	// Helper function to extract string from sql.NullString
+	getNullableString := func(ns sql.NullString) *string {
+		if ns.Valid {
+			return &ns.String
+		}
+		return nil
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"id":                  owner.ID,
 		"user_id":             owner.UserID,
-		"business_name":       owner.BusinessName,
-		"business_license":    owner.BusinessLicense,
-		"manager_full_name":   owner.ManagerFullName,
-		"manager_nic_number":  owner.ManagerNICNumber,
-		"manager_email":       owner.ManagerEmail,
+		"business_name":       getNullableString(owner.BusinessName),
+		"business_license":    getNullableString(owner.BusinessLicense),
+		"manager_full_name":   getNullableString(owner.ManagerFullName),
+		"manager_nic_number":  getNullableString(owner.ManagerNICNumber),
+		"manager_email":       getNullableString(owner.ManagerEmail),
 		"registration_step":   owner.RegistrationStep,
 		"profile_completed":   owner.ProfileCompleted,
 		"verification_status": owner.VerificationStatus,
+		"verification_notes":  getNullableString(owner.VerificationNotes),
+		"verified_at":         owner.VerifiedAt,
 		"total_lounges":       loungeCount,
 		"total_staff":         staffCount,
 		"created_at":          owner.CreatedAt,
+		"updated_at":          owner.UpdatedAt,
 	})
 }
