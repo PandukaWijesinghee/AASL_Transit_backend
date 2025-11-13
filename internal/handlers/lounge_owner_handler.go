@@ -255,10 +255,18 @@ func (h *LoungeOwnerHandler) GetProfile(c *gin.Context) {
 	loungeCount, _ := h.loungeOwnerRepo.GetLoungeCount(owner.ID)
 	staffCount, _ := h.loungeOwnerRepo.GetStaffCount(owner.ID)
 
-	// Helper function to extract string from sql.NullString
+	// Helper functions to extract values from sql.Null* types
 	getNullableString := func(ns sql.NullString) *string {
 		if ns.Valid {
 			return &ns.String
+		}
+		return nil
+	}
+
+	getNullableTime := func(nt sql.NullTime) *string {
+		if nt.Valid {
+			timeStr := nt.Time.Format("2006-01-02T15:04:05Z07:00")
+			return &timeStr
 		}
 		return nil
 	}
@@ -275,7 +283,7 @@ func (h *LoungeOwnerHandler) GetProfile(c *gin.Context) {
 		"profile_completed":   owner.ProfileCompleted,
 		"verification_status": owner.VerificationStatus,
 		"verification_notes":  getNullableString(owner.VerificationNotes),
-		"verified_at":         owner.VerifiedAt,
+		"verified_at":         getNullableTime(owner.VerifiedAt),
 		"total_lounges":       loungeCount,
 		"total_staff":         staffCount,
 		"created_at":          owner.CreatedAt,
