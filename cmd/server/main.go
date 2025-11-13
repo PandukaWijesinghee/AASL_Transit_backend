@@ -472,14 +472,13 @@ func main() {
 				// Staff management for specific lounge (use :id to match other lounge routes)
 				logger.Info("  ✅ POST /api/v1/lounges/:id/staff")
 				loungesProtected.POST("/:id/staff", loungeStaffHandler.AddStaff)
-				logger.Info("  ✅ GET /api/v1/lounges/:id/staff")
-				loungesProtected.GET("/:id/staff", loungeStaffHandler.GetStaffByLounge)
-				logger.Info("  ✅ PUT /api/v1/lounges/:id/staff/:staff_id/permission")
-				loungesProtected.PUT("/:id/staff/:staff_id/permission", loungeStaffHandler.UpdateStaffPermission)
-				logger.Info("  ✅ PUT /api/v1/lounges/:id/staff/:staff_id/status")
-				loungesProtected.PUT("/:id/staff/:staff_id/status", loungeStaffHandler.UpdateStaffStatus)
-				logger.Info("  ✅ DELETE /api/v1/lounges/:id/staff/:staff_id")
-				loungesProtected.DELETE("/:id/staff/:staff_id", loungeStaffHandler.RemoveStaff)
+			logger.Info("  ✅ GET /api/v1/lounges/:id/staff")
+			loungesProtected.GET("/:id/staff", loungeStaffHandler.GetStaffByLounge)
+			// Permission management moved to users.roles array - removed permission_type field
+			logger.Info("  ✅ PUT /api/v1/lounges/:id/staff/:staff_id/status")
+			loungesProtected.PUT("/:id/staff/:staff_id/status", loungeStaffHandler.UpdateStaffStatus)
+			logger.Info("  ✅ DELETE /api/v1/lounges/:id/staff/:staff_id")
+			loungesProtected.DELETE("/:id/staff/:staff_id", loungeStaffHandler.RemoveStaff)
 			}
 		}
 		logger.Info("� Lounge routes registered successfully")

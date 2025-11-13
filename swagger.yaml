@@ -2595,9 +2595,11 @@ paths:
                   total_lounges:
                     type: integer
                     example: 0
+                    description: Dynamic count - calculated from lounges table
                   total_staff:
                     type: integer
                     example: 0
+                    description: Dynamic count - calculated from lounge_staff table
                   steps:
                     type: object
                     properties:
@@ -2669,14 +2671,6 @@ paths:
                   manager_email:
                     type: string
                     example: "manager@grandhotel.com"
-                  manager_nic_front:
-                    type: string
-                    format: uri
-                    example: "https://storage.supabase.co/path/to/manager_nic_front.jpg"
-                  manager_nic_back:
-                    type: string
-                    format: uri
-                    example: "https://storage.supabase.co/path/to/manager_nic_back.jpg"
                   registration_step:
                     type: string
                     enum:
@@ -2697,9 +2691,11 @@ paths:
                   total_lounges:
                     type: integer
                     example: 2
+                    description: Dynamic count - calculated from lounges table
                   total_staff:
                     type: integer
                     example: 5
+                    description: Dynamic count - calculated from lounge_staff table
                   created_at:
                     type: string
                     format: date-time
@@ -2957,10 +2953,10 @@ paths:
   # ============================================================================
   /api/v1/lounges/{lounge_id}/staff:
     post:
-      summary: Add staff to lounge
+      summary: Add staff to lounge (Not Implemented)
       description: |
         Step 3 (optional) - Add staff member to a specific lounge.
-        Staff will be invited and can register later.
+        Note: This feature is not yet implemented.
       operationId: addStaffToLounge
       tags:
         - Lounge Owner
@@ -2980,48 +2976,29 @@ paths:
             schema:
               type: object
               required:
-                - lounge_id
-                - phone_number
-                - full_name
-                - nic_number
-                - permission_type
+                - phone
               properties:
                 lounge_id:
                   type: string
                   format: uuid
-                phone_number:
+                phone:
                   type: string
                   example: "+94771234567"
-                full_name:
-                  type: string
-                  example: "Jane Smith"
-                nic_number:
-                  type: string
-                  example: "199812345678"
-                permission_type:
-                  type: string
-                  enum: ["admin", "staff"]
-                  example: "staff"
-                  description: "admin = full access, staff = view-only"
+                  description: "Staff's phone number for invitation"
       responses:
-        "201":
-          description: Staff added successfully
+        "501":
+          description: Feature not yet implemented
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  error:
+                    type: string
+                    example: "not_implemented"
                   message:
                     type: string
-                  staff_id:
-                    type: string
-                    format: uuid
-                  phone_number:
-                    type: string
-                  permission_type:
-                    type: string
-                  has_registered:
-                    type: boolean
+                    example: "Staff invitation feature not yet implemented"
         "403":
           $ref: "#/components/responses/Forbidden"
         "500":
@@ -3061,47 +3038,8 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
-  /api/v1/lounges/{lounge_id}/staff/{staff_id}/permission:
-    put:
-      summary: Update staff permission
-      description: Change staff permission type between admin and staff
-      operationId: updateStaffPermission
-      tags:
-        - Lounge Owner
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: lounge_id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - name: staff_id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - permission_type
-              properties:
-                permission_type:
-                  type: string
-                  enum: ["admin", "staff"]
-      responses:
-        "200":
-          description: Permission updated
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
+  # Note: UpdateStaffPermission endpoint removed - permission_type field no longer exists
+  # Use users.roles array for permission management instead
 
   /api/v1/lounges/{lounge_id}/staff/{staff_id}/status:
     put:
@@ -5013,6 +4951,7 @@ components:
 
     LoungeStaff:
       type: object
+      description: Lounge staff member information (11 columns - cleaned schema)
       properties:
         id:
           type: string
@@ -5027,35 +4966,41 @@ components:
           format: uuid
           nullable: true
           example: "880e8400-e29b-41d4-a716-446655440003"
-        phone_number:
-          type: string
-          example: "+94771234567"
+          description: "References users.id after staff registers"
         full_name:
           type: string
           example: "John Doe"
         nic_number:
           type: string
           example: "199512345678"
-        permission_type:
+        email:
           type: string
-          enum: [admin, staff]
-          example: "staff"
-          description: "admin = full access, staff = view only"
-        employment_status:
-          type: string
-          enum: [active, inactive, terminated]
-          example: "active"
-        has_registered:
+          format: email
+          nullable: true
+          example: "john.doe@example.com"
+        profile_completed:
           type: boolean
           example: false
-          description: "True if staff has registered with their phone number"
-        invited_at:
+          description: "True when staff completes their profile after registration"
+        employment_status:
           type: string
-          format: date-time
-        registered_at:
+          enum: [active, suspended, terminated]
+          example: "active"
+          description: "Staff employment status"
+        hired_date:
           type: string
           format: date-time
           nullable: true
+          description: "Date staff was hired"
+        terminated_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: "Date staff was terminated (if applicable)"
+        notes:
+          type: string
+          nullable: true
+          description: "Additional notes about the staff member"
         created_at:
           type: string
           format: date-time

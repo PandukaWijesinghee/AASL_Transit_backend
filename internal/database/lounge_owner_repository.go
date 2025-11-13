@@ -28,7 +28,6 @@ func (r *LoungeOwnerRepository) CreateLoungeOwner(userID uuid.UUID) (*models.Lou
 		RegistrationStep:   models.RegStepPhoneVerified,
 		ProfileCompleted:   false,
 		VerificationStatus: "pending",
-		TotalLounges:       0,
 		CreatedAt:          time.Now(),
 		UpdatedAt:          time.Now(),
 	}
@@ -36,9 +35,9 @@ func (r *LoungeOwnerRepository) CreateLoungeOwner(userID uuid.UUID) (*models.Lou
 	query := `
 		INSERT INTO lounge_owners (
 			id, user_id, registration_step, profile_completed, 
-			verification_status, total_lounges, created_at, updated_at
+			verification_status, created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at, updated_at
 	`
 
@@ -49,7 +48,6 @@ func (r *LoungeOwnerRepository) CreateLoungeOwner(userID uuid.UUID) (*models.Lou
 		loungeOwner.RegistrationStep,
 		loungeOwner.ProfileCompleted,
 		loungeOwner.VerificationStatus,
-		loungeOwner.TotalLounges,
 		loungeOwner.CreatedAt,
 		loungeOwner.UpdatedAt,
 	).Scan(&loungeOwner.ID, &loungeOwner.CreatedAt, &loungeOwner.UpdatedAt)
@@ -145,7 +143,8 @@ func (r *LoungeOwnerRepository) UpdateBusinessAndManagerInfo(
 	return nil
 }
 
-// UpdateBusinessAndManagerInfoWithNIC updates business and manager information including optional NIC images (Step 1 - New Flow)
+// UpdateBusinessAndManagerInfoWithNIC updates business and manager information (Step 1 - New Flow)
+// Note: NIC images are now stored in Supabase only, not in database
 func (r *LoungeOwnerRepository) UpdateBusinessAndManagerInfoWithNIC(
 	userID uuid.UUID,
 	businessName string,
@@ -164,11 +163,9 @@ func (r *LoungeOwnerRepository) UpdateBusinessAndManagerInfoWithNIC(
 			manager_full_name = $3,
 			manager_nic_number = $4,
 			manager_email = $5,
-			manager_nic_front_url = $6,
-			manager_nic_back_url = $7,
-			registration_step = $8,
+			registration_step = $6,
 			updated_at = NOW()
-		WHERE user_id = $9
+		WHERE user_id = $7
 	`
 
 	var emailValue interface{}
@@ -178,20 +175,6 @@ func (r *LoungeOwnerRepository) UpdateBusinessAndManagerInfoWithNIC(
 		emailValue = nil
 	}
 
-	var nicFrontValue interface{}
-	if managerNICFrontURL != nil && *managerNICFrontURL != "" {
-		nicFrontValue = *managerNICFrontURL
-	} else {
-		nicFrontValue = nil
-	}
-
-	var nicBackValue interface{}
-	if managerNICBackURL != nil && *managerNICBackURL != "" {
-		nicBackValue = *managerNICBackURL
-	} else {
-		nicBackValue = nil
-	}
-
 	result, err := r.db.Exec(
 		query,
 		businessName,
@@ -199,8 +182,6 @@ func (r *LoungeOwnerRepository) UpdateBusinessAndManagerInfoWithNIC(
 		managerFullName,
 		managerNICNumber,
 		emailValue,
-		nicFrontValue,
-		nicBackValue,
 		models.RegStepBusinessInfo,
 		userID,
 	)
@@ -361,4 +342,31 @@ func (r *LoungeOwnerRepository) GetPendingLoungeOwners(limit int, offset int) ([
 	}
 
 	return owners, nil
+}
+
+// GetLoungeCount returns the number of lounges for a lounge owner
+func (r *LoungeOwnerRepository) GetLoungeCount(ownerID uuid.UUID) (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM lounges WHERE lounge_owner_id = $1`
+	err := r.db.Get(&count, query, ownerID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get lounge count: %w", err)
+	}
+	return count, nil
+}
+
+// GetStaffCount returns the number of staff across all lounges for a lounge owner
+func (r *LoungeOwnerRepository) GetStaffCount(ownerID uuid.UUID) (int, error) {
+	var count int
+	query := `
+		SELECT COUNT(*) 
+		FROM lounge_staff ls
+		JOIN lounges l ON ls.lounge_id = l.id
+		WHERE l.lounge_owner_id = $1
+	`
+	err := r.db.Get(&count, query, ownerID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get staff count: %w", err)
+	}
+	return count, nil
 }

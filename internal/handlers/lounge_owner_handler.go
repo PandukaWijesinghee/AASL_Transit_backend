@@ -173,12 +173,16 @@ func (h *LoungeOwnerHandler) GetRegistrationProgress(c *gin.Context) {
 		return
 	}
 
+	// Get dynamic counts
+	loungeCount, _ := h.loungeOwnerRepo.GetLoungeCount(owner.ID)
+	staffCount, _ := h.loungeOwnerRepo.GetStaffCount(owner.ID)
+
 	response := gin.H{
 		"registration_step":   owner.RegistrationStep,
 		"profile_completed":   owner.ProfileCompleted,
 		"verification_status": owner.VerificationStatus,
-		"total_lounges":       owner.TotalLounges,
-		"total_staff":         owner.TotalStaff,
+		"total_lounges":       loungeCount,
+		"total_staff":         staffCount,
 	}
 
 	// Add step completion status (new flow: phone_verified -> business_info -> lounge_added -> completed)
@@ -242,6 +246,10 @@ func (h *LoungeOwnerHandler) GetProfile(c *gin.Context) {
 		return
 	}
 
+	// Get dynamic counts
+	loungeCount, _ := h.loungeOwnerRepo.GetLoungeCount(owner.ID)
+	staffCount, _ := h.loungeOwnerRepo.GetStaffCount(owner.ID)
+
 	c.JSON(http.StatusOK, gin.H{
 		"id":                  owner.ID,
 		"user_id":             owner.UserID,
@@ -250,13 +258,11 @@ func (h *LoungeOwnerHandler) GetProfile(c *gin.Context) {
 		"manager_full_name":   owner.ManagerFullName,
 		"manager_nic_number":  owner.ManagerNICNumber,
 		"manager_email":       owner.ManagerEmail,
-		"manager_nic_front":   owner.ManagerNICFrontURL,
-		"manager_nic_back":    owner.ManagerNICBackURL,
 		"registration_step":   owner.RegistrationStep,
 		"profile_completed":   owner.ProfileCompleted,
 		"verification_status": owner.VerificationStatus,
-		"total_lounges":       owner.TotalLounges,
-		"total_staff":         owner.TotalStaff,
+		"total_lounges":       loungeCount,
+		"total_staff":         staffCount,
 		"created_at":          owner.CreatedAt,
 	})
 }
