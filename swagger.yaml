@@ -2344,7 +2344,7 @@ paths:
   # Step 2: Add Lounge                - /api/v1/lounge-owner/register/add-lounge
   # Step 3: Add Staff (optional)      - /api/v1/lounges/{lounge_id}/staff
   #
-  # After Step 2, registration_step becomes "lounge_added" and profile_completed = true
+  # After Step 2, registration_step becomes "completed" and profile_completed = true
   # Admin then reviews and approves/rejects via web dashboard
   # verification_status: "pending" -> "approved" or "rejected"
   #
@@ -2546,10 +2546,16 @@ paths:
                     example: "d581c281-ba77-49d2-8f68-5f7377417bf8"
                   registration_step:
                     type: string
-                    example: "lounge_added"
+                    example: "completed"
+                    description: "Registration is now complete"
+                  profile_completed:
+                    type: boolean
+                    example: true
+                    description: "Profile completion status"
                   status:
                     type: string
                     example: "pending"
+                    description: "Lounge approval status (pending admin review)"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":

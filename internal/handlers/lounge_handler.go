@@ -133,11 +133,13 @@ func (h *LoungeHandler) AddLounge(c *gin.Context) {
 		return
 	}
 
-	// Update registration step to lounge_added (triggers will handle counts and profile completion)
-	err = h.loungeOwnerRepo.UpdateRegistrationStep(userCtx.UserID, models.RegStepLoungeAdded)
+	// Mark registration as completed (sets profile_completed = TRUE and registration_step = 'completed')
+	err = h.loungeOwnerRepo.CompleteRegistration(userCtx.UserID)
 	if err != nil {
-		log.Printf("ERROR: Failed to update registration step: %v", err)
-		// Continue anyway - trigger should have done it
+		log.Printf("ERROR: Failed to complete registration for user %s: %v", userCtx.UserID, err)
+		// Continue anyway - lounge was created successfully
+	} else {
+		log.Printf("INFO: Registration completed for user %s", userCtx.UserID)
 	}
 
 	log.Printf("INFO: Lounge created successfully for lounge owner %s (lounge_id: %s)", userCtx.UserID, lounge.ID)
@@ -145,7 +147,8 @@ func (h *LoungeHandler) AddLounge(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"message":           "Lounge added successfully",
 		"lounge_id":         lounge.ID,
-		"registration_step": models.RegStepLoungeAdded,
+		"registration_step": models.RegStepCompleted, // ✅ Now 'completed' instead of 'lounge_added'
+		"profile_completed": true,                     // ✅ Explicitly return this
 		"status":            lounge.Status,
 	})
 }
