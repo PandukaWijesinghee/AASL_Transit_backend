@@ -1130,7 +1130,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	log.Printf("🔄 REFRESH TOKEN REQUEST: Token length: %d, DeviceID: %s, DeviceType: %s", 
+	log.Printf("🔄 REFRESH TOKEN REQUEST: Token length: %d, DeviceID: %s, DeviceType: %s",
 		len(req.RefreshToken), req.DeviceID, req.DeviceType)
 
 	// Validate refresh token
@@ -1144,10 +1144,10 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	log.Printf("✅ REFRESH TOKEN: Token validated successfully for user: %s, phone: %s", 
+	log.Printf("✅ REFRESH TOKEN: Token validated successfully for user: %s, phone: %s",
 		claims.UserID, claims.Phone)
 
-	log.Printf("✅ REFRESH TOKEN: Token validated successfully for user: %s, phone: %s", 
+	log.Printf("✅ REFRESH TOKEN: Token validated successfully for user: %s, phone: %s",
 		claims.UserID, claims.Phone)
 
 	// Check if token is revoked in database
@@ -1210,12 +1210,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		// In production, you'd log this properly
 	}
 
-	// Revoke the old refresh token (token rotation)
-	if err := h.refreshTokenRepository.RevokeToken(req.RefreshToken); err != nil {
-		// Log error but continue with new token generation
-	}
-
-	// Generate new access token
+	// Generate new access token FIRST (before revoking old token)
 	accessToken, err := h.jwtService.GenerateAccessToken(
 		user.ID,
 		user.Phone,
@@ -1240,7 +1235,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	// Store new refresh token in database
+	// Store new refresh token in database BEFORE revoking old one
 	clientIP := utils.GetRealIP(c)
 	userAgent := utils.GetUserAgent(c)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour) // 7 days
@@ -1263,6 +1258,13 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 			Message: "Failed to store new refresh token",
 		})
 		return
+	}
+
+	// ✅ IMPORTANT: Revoke old token AFTER successfully storing new one (token rotation)
+	// This prevents race conditions where concurrent requests might fail
+	if err := h.refreshTokenRepository.RevokeToken(req.RefreshToken); err != nil {
+		// Log error but don't fail the request - new tokens are already issued
+		log.Printf("⚠️ REFRESH TOKEN WARNING: Failed to revoke old token (non-critical): %v", err)
 	}
 
 	// Log successful token refresh
