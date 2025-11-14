@@ -382,7 +382,6 @@ func (h *LoungeStaffHandler) GetMyStaffProfile(c *gin.Context) {
 			"id":          lounge.ID,
 			"lounge_name": lounge.LoungeName,
 			"address":     lounge.Address,
-			"city":        lounge.City,
 			"status":      lounge.Status,
 		}
 	}

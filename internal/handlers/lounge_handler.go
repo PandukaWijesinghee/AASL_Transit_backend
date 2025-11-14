@@ -308,8 +308,6 @@ func (h *LoungeHandler) GetLoungeByID(c *gin.Context) {
 		"created_at":      lounge.CreatedAt,
 		"updated_at":      lounge.UpdatedAt,
 	})
-		"updated_at":      lounge.UpdatedAt,
-	})
 }
 
 // ===================================================================
@@ -400,12 +398,13 @@ func (h *LoungeHandler) UpdateLounge(c *gin.Context) {
 		loungeID,
 		req.LoungeName,
 		req.Address,
-		req.City,
 		req.ContactPhone,
 		req.Latitude,
 		req.Longitude,
+		req.Capacity,
 		req.Price1Hour,
 		req.Price2Hours,
+		req.Price3Hours,
 		req.PriceUntilBus,
 		amenitiesJSON,
 		imagesJSON,

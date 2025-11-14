@@ -453,8 +453,8 @@ func main() {
 		lounges := v1.Group("/lounges")
 		{
 			// Public routes (no authentication)
-			logger.Info("  ✅ GET /api/v1/lounges/city/:city (public)")
-			lounges.GET("/city/:city", loungeHandler.GetLoungesByCity)
+			logger.Info("  ✅ GET /api/v1/lounges/active (public)")
+			lounges.GET("/active", loungeHandler.GetAllActiveLounges)
 
 			// Protected routes (require JWT authentication)
 			loungesProtected := lounges.Group("")
