@@ -43,7 +43,7 @@ type Lounge struct {
 	Images []byte `db:"images" json:"images,omitempty"` // ["url1", "url2"]
 
 	// Status
-	Status        string `db:"status" json:"status"`               // pending, active, inactive, suspended
+	Status        string `db:"status" json:"status"` // pending, active, inactive, suspended
 	IsOperational bool   `db:"is_operational" json:"is_operational"`
 
 	// Metadata

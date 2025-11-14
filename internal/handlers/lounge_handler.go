@@ -38,15 +38,15 @@ type AddLoungeRequest struct {
 	LoungeName    string   `json:"lounge_name" binding:"required"`
 	Address       string   `json:"address" binding:"required"`
 	ContactPhone  string   `json:"contact_phone" binding:"required"`
-	Latitude      *string  `json:"latitude" binding:"required"`    // Required for map location
-	Longitude     *string  `json:"longitude" binding:"required"`   // Required for map location
-	Capacity      *int     `json:"capacity"`                        // Maximum number of people
-	Price1Hour    *string  `json:"price_1_hour"`                   // DECIMAL as string (e.g., "500.00")
-	Price2Hours   *string  `json:"price_2_hours"`                  // DECIMAL as string (e.g., "900.00")
-	Price3Hours   *string  `json:"price_3_hours"`                  // DECIMAL as string (e.g., "1200.00")
-	PriceUntilBus *string  `json:"price_until_bus"`                // DECIMAL as string (e.g., "1500.00")
-	Amenities     []string `json:"amenities"`                      // Array: ["wifi", "ac", "cafeteria", "charging_ports", "entertainment", "parking", "restrooms", "waiting_area"]
-	Images        []string `json:"images"`                         // Array of image URLs
+	Latitude      *string  `json:"latitude" binding:"required"`  // Required for map location
+	Longitude     *string  `json:"longitude" binding:"required"` // Required for map location
+	Capacity      *int     `json:"capacity"`                     // Maximum number of people
+	Price1Hour    *string  `json:"price_1_hour"`                 // DECIMAL as string (e.g., "500.00")
+	Price2Hours   *string  `json:"price_2_hours"`                // DECIMAL as string (e.g., "900.00")
+	Price3Hours   *string  `json:"price_3_hours"`                // DECIMAL as string (e.g., "1200.00")
+	PriceUntilBus *string  `json:"price_until_bus"`              // DECIMAL as string (e.g., "1500.00")
+	Amenities     []string `json:"amenities"`                    // Array: ["wifi", "ac", "cafeteria", "charging_ports", "entertainment", "parking", "restrooms", "waiting_area"]
+	Images        []string `json:"images"`                       // Array of image URLs
 }
 
 // AddLounge handles POST /api/v1/lounge-owner/register/add-lounge

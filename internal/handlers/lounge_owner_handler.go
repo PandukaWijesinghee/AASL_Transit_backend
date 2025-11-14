@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/smarttransit/sms-auth-backend/internal/database"
@@ -102,6 +103,17 @@ func (h *LoungeOwnerHandler) SaveBusinessAndManagerInfo(c *gin.Context) {
 	)
 	if err != nil {
 		log.Printf("ERROR: Failed to update business/manager info for user %s: %v", userCtx.UserID, err)
+		
+		// Check if it's a duplicate key error
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "duplicate key") && strings.Contains(errMsg, "business_license") {
+			c.JSON(http.StatusConflict, ErrorResponse{
+				Error:   "duplicate_business_license",
+				Message: "This business license number is already registered. Please use a different license number or contact support if you believe this is an error.",
+			})
+			return
+		}
+		
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "update_failed",
 			Message: "Failed to save business and manager information",

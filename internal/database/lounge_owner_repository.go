@@ -155,6 +155,14 @@ func (r *LoungeOwnerRepository) UpdateBusinessAndManagerInfoWithNIC(
 	managerNICFrontURL *string,
 	managerNICBackURL *string,
 ) error {
+	// Handle empty business license as NULL to avoid unique constraint issues
+	var businessLicenseValue interface{}
+	if businessLicense == "" {
+		businessLicenseValue = nil
+	} else {
+		businessLicenseValue = businessLicense
+	}
+
 	query := `
 		UPDATE lounge_owners
 		SET
@@ -178,7 +186,7 @@ func (r *LoungeOwnerRepository) UpdateBusinessAndManagerInfoWithNIC(
 	result, err := r.db.Exec(
 		query,
 		businessName,
-		businessLicense,
+		businessLicenseValue,
 		managerFullName,
 		managerNICNumber,
 		emailValue,
