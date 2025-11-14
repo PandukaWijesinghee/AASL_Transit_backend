@@ -2383,7 +2383,10 @@ paths:
                   type: string
                   maxLength: 100
                   example: "BR2024123456"
-                  description: Business registration number (optional)
+                  description: |
+                    Business registration number (optional).
+                    Must be unique across all lounge owners.
+                    Leave empty if not applicable.
                 manager_full_name:
                   type: string
                   minLength: 3
@@ -2418,6 +2421,19 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: Duplicate business license
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "duplicate_business_license"
+                  message:
+                    type: string
+                    example: "This business license number is already registered. Please use a different license number or contact support if you believe this is an error."
         "500":
           $ref: "#/components/responses/InternalServerError"
 
