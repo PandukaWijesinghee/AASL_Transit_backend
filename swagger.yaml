@@ -2470,8 +2470,9 @@ paths:
               required:
                 - lounge_name
                 - address
-                - city
                 - contact_phone
+                - latitude
+                - longitude
               properties:
                 lounge_name:
                   type: string
@@ -2479,15 +2480,23 @@ paths:
                   maxLength: 255
                   example: "City Central Lounge"
                   description: Name of the lounge
+                description:
+                  type: string
+                  example: "Comfortable lounge with modern amenities"
+                  description: Brief description of the lounge
                 address:
                   type: string
                   minLength: 10
                   example: "123 Main St, Colombo 7"
                   description: Full address of the lounge
-                city:
+                state:
                   type: string
-                  example: "Colombo"
-                  description: City where lounge is located
+                  example: "Western Province"
+                  description: State or province
+                postal_code:
+                  type: string
+                  example: "00700"
+                  description: Postal/ZIP code
                 contact_phone:
                   type: string
                   example: "+94112345678"
@@ -2495,11 +2504,15 @@ paths:
                 latitude:
                   type: string
                   example: "6.9271"
-                  description: GPS latitude coordinate (as string)
+                  description: GPS latitude coordinate (required, as string)
                 longitude:
                   type: string
                   example: "79.8612"
-                  description: GPS longitude coordinate (as string)
+                  description: GPS longitude coordinate (required, as string)
+                capacity:
+                  type: integer
+                  example: 50
+                  description: Maximum number of people the lounge can accommodate
                 price_1_hour:
                   type: string
                   example: "500.00"
@@ -2508,6 +2521,10 @@ paths:
                   type: string
                   example: "900.00"
                   description: Price in LKR for 2 hours access (DECIMAL as string)
+                price_3_hours:
+                  type: string
+                  example: "1200.00"
+                  description: Price in LKR for 3 hours access (DECIMAL as string)
                 price_until_bus:
                   type: string
                   example: "1500.00"
@@ -2775,48 +2792,78 @@ paths:
                         id:
                           type: string
                           format: uuid
+                        lounge_owner_id:
+                          type: string
+                          format: uuid
                         lounge_name:
                           type: string
                           example: "City Central Lounge"
+                        description:
+                          type: string
+                          nullable: true
                         address:
                           type: string
-                        city:
+                        state:
                           type: string
+                          nullable: true
+                        country:
+                          type: string
+                          nullable: true
+                        postal_code:
+                          type: string
+                          nullable: true
                         contact_phone:
                           type: string
+                          nullable: true
                         latitude:
                           type: string
+                          nullable: true
                         longitude:
                           type: string
+                          nullable: true
+                        capacity:
+                          type: integer
+                          nullable: true
+                          example: 50
                         price_1_hour:
                           type: string
+                          nullable: true
                           example: "500.00"
                         price_2_hours:
                           type: string
+                          nullable: true
                           example: "900.00"
+                        price_3_hours:
+                          type: string
+                          nullable: true
+                          example: "1200.00"
                         price_until_bus:
                           type: string
+                          nullable: true
                           example: "1500.00"
                         amenities:
                           type: array
                           items:
                             type: string
+                          nullable: true
+                          example: ["wifi", "ac", "cafeteria", "charging_ports"]
                         images:
                           type: array
                           items:
                             type: string
+                          nullable: true
                         status:
                           type: string
                           enum: ["pending", "active", "inactive", "suspended"]
                         is_operational:
                           type: boolean
-                        total_staff:
-                          type: integer
                         average_rating:
                           type: string
-                        total_bookings:
-                          type: integer
+                          nullable: true
                         created_at:
+                          type: string
+                          format: date-time
+                        updated_at:
                           type: string
                           format: date-time
                   total:
@@ -2942,23 +2989,16 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
-  /api/v1/lounges/city/{city}:
+  /api/v1/lounges/active:
     get:
-      summary: Get lounges by city (Public)
-      description: Search for active lounges in a specific city - no authentication required
-      operationId: getLoungesByCity
+      summary: Get all active lounges (Public)
+      description: Retrieve all active and operational lounges - no authentication required
+      operationId: getAllActiveLounges
       tags:
-        - Lounge Owner
-      parameters:
-        - name: city
-          in: path
-          required: true
-          schema:
-            type: string
-          example: "Colombo"
+        - Lounge
       responses:
         "200":
-          description: Lounges retrieved
+          description: Active lounges retrieved
           content:
             application/json:
               schema:
@@ -2970,8 +3010,7 @@ paths:
                       $ref: "#/components/schemas/Lounge"
                   total:
                     type: integer
-                  city:
-                    type: string
+                    description: Total number of active lounges
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -4912,42 +4951,74 @@ components:
         lounge_name:
           type: string
           example: "City Transit Lounge"
+        description:
+          type: string
+          nullable: true
+          example: "Modern lounge with comfortable seating"
         address:
           type: string
           example: "123 Main Street, Colombo"
-        city:
+        state:
           type: string
-          example: "Colombo"
+          nullable: true
+          example: "Western Province"
+        country:
+          type: string
+          nullable: true
+          example: "Sri Lanka"
+        postal_code:
+          type: string
+          nullable: true
+          example: "00700"
         contact_phone:
           type: string
+          nullable: true
           example: "+94771234567"
         latitude:
           type: string
+          nullable: true
           example: "6.9271"
         longitude:
           type: string
+          nullable: true
           example: "79.8612"
+        capacity:
+          type: integer
+          nullable: true
+          example: 50
+          description: "Maximum number of people the lounge can accommodate"
         price_1_hour:
           type: string
+          nullable: true
           description: "Price for 1 hour in LKR (DECIMAL stored as string)"
           example: "500.00"
         price_2_hours:
           type: string
+          nullable: true
           description: "Price for 2 hours in LKR (DECIMAL stored as string)"
           example: "900.00"
+        price_3_hours:
+          type: string
+          nullable: true
+          description: "Price for 3 hours in LKR (DECIMAL stored as string)"
+          example: "1200.00"
         price_until_bus:
           type: string
+          nullable: true
           description: "Price until bus departure in LKR (DECIMAL stored as string)"
           example: "1500.00"
         amenities:
           type: array
           items:
             type: string
-          example: ["WiFi", "AC", "Food", "Restrooms", "Charging"]
+          nullable: true
+          example: ["wifi", "ac", "cafeteria", "charging_ports", "entertainment", "parking", "restrooms", "waiting_area"]
+          description: "Standard amenity codes"
         images:
           type: array
           items:
             type: string
+          nullable: true
           example:
             [
               "https://example.com/lounge1.jpg",
@@ -4960,15 +5031,10 @@ components:
         is_operational:
           type: boolean
           example: true
-        total_staff:
-          type: integer
-          example: 3
         average_rating:
           type: string
+          nullable: true
           example: "4.5"
-        total_bookings:
-          type: integer
-          example: 150
         created_at:
           type: string
           format: date-time
