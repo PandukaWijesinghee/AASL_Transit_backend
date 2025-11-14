@@ -1348,12 +1348,17 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		log.Printf("Revoking specific token for user %s", userCtx.UserID)
 		err := h.refreshTokenRepository.RevokeToken(req.RefreshToken)
 		if err != nil {
-			log.Printf("ERROR: Failed to revoke token for user %s: %v", userCtx.UserID, err)
-			c.JSON(http.StatusInternalServerError, ErrorResponse{
-				Error:   "logout_failed",
-				Message: "Failed to revoke token",
-			})
-			return
+			// Check if token is already revoked - this is not an error for logout
+			if err.Error() == "token not found or already revoked" {
+				log.Printf("INFO: Token already revoked for user %s - treating as success", userCtx.UserID)
+			} else {
+				log.Printf("ERROR: Failed to revoke token for user %s: %v", userCtx.UserID, err)
+				c.JSON(http.StatusInternalServerError, ErrorResponse{
+					Error:   "logout_failed",
+					Message: "Failed to revoke token",
+				})
+				return
+			}
 		}
 
 		// Deactivate session for this device
