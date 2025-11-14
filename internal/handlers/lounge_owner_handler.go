@@ -248,7 +248,7 @@ func (h *LoungeOwnerHandler) GetProfile(c *gin.Context) {
 	}
 
 	// 🔍 DEBUG: Log what database returns
-	log.Printf("🔍 GET PROFILE - User: %s, RegistrationStep: %s, ProfileCompleted: %t", 
+	log.Printf("🔍 GET PROFILE - User: %s, RegistrationStep: %s, ProfileCompleted: %t",
 		userCtx.UserID, owner.RegistrationStep, owner.ProfileCompleted)
 
 	// Get dynamic counts

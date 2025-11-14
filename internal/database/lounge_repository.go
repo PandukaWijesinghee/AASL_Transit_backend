@@ -24,12 +24,13 @@ func (r *LoungeRepository) CreateLounge(
 	loungeOwnerID uuid.UUID,
 	loungeName string,
 	address string,
-	city string,
 	contactPhone string,
 	latitude *string,
 	longitude *string,
+	capacity *int,
 	price1Hour *string,
 	price2Hours *string,
+	price3Hours *string,
 	priceUntilBus *string,
 	amenities []byte,
 	images []byte,
@@ -39,22 +40,20 @@ func (r *LoungeRepository) CreateLounge(
 		LoungeOwnerID: loungeOwnerID,
 		Status:        models.LoungeStatusPending,
 		IsOperational: true,
-		TotalStaff:    0,
-		TotalBookings: 0,
 	}
 
 	query := `
 		INSERT INTO lounges (
-			id, lounge_owner_id, lounge_name, address, city, 
-			contact_phone, latitude, longitude,
-			price_1_hour, price_2_hours, price_until_bus,
+			id, lounge_owner_id, lounge_name, address,
+			contact_phone, latitude, longitude, capacity,
+			price_1_hour, price_2_hours, price_3_hours, price_until_bus,
 			amenities, images,
-			status, is_operational, total_staff, total_bookings,
+			status, is_operational,
 			created_at, updated_at
 		)
 		VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 
-			$14, $15, $16, $17, NOW(), NOW()
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+			$15, $16, NOW(), NOW()
 		)
 		RETURNING id, created_at, updated_at
 	`
@@ -65,19 +64,18 @@ func (r *LoungeRepository) CreateLounge(
 		loungeOwnerID,
 		loungeName,
 		address,
-		city,
 		contactPhone,
 		latitude,
 		longitude,
+		capacity,
 		price1Hour,
 		price2Hours,
+		price3Hours,
 		priceUntilBus,
 		amenities,
 		images,
 		lounge.Status,
 		lounge.IsOperational,
-		lounge.TotalStaff,
-		lounge.TotalBookings,
 	).Scan(&lounge.ID, &lounge.CreatedAt, &lounge.UpdatedAt)
 
 	if err != nil {
@@ -116,17 +114,17 @@ func (r *LoungeRepository) GetLoungesByOwnerID(ownerID uuid.UUID) ([]models.Loun
 	return lounges, nil
 }
 
-// GetLoungesByCity retrieves all active lounges in a city
-func (r *LoungeRepository) GetLoungesByCity(city string) ([]models.Lounge, error) {
+// GetAllActiveLounges retrieves all active lounges (for public listing)
+func (r *LoungeRepository) GetAllActiveLounges() ([]models.Lounge, error) {
 	var lounges []models.Lounge
 	query := `
 		SELECT * FROM lounges 
-		WHERE city = $1 AND status = 'active' AND is_operational = true
+		WHERE status = 'active' AND is_operational = true
 		ORDER BY lounge_name
 	`
-	err := r.db.Select(&lounges, query, city)
+	err := r.db.Select(&lounges, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get lounges by city: %w", err)
+		return nil, fmt.Errorf("failed to get active lounges: %w", err)
 	}
 	return lounges, nil
 }
@@ -136,12 +134,13 @@ func (r *LoungeRepository) UpdateLounge(
 	id uuid.UUID,
 	loungeName string,
 	address string,
-	city string,
 	contactPhone string,
 	latitude *string,
 	longitude *string,
+	capacity *int,
 	price1Hour *string,
 	price2Hours *string,
+	price3Hours *string,
 	priceUntilBus *string,
 	amenities []byte,
 	images []byte,
@@ -151,29 +150,31 @@ func (r *LoungeRepository) UpdateLounge(
 		SET 
 			lounge_name = $1,
 			address = $2,
-			city = $3,
-			contact_phone = $4,
-			latitude = $5,
-			longitude = $6,
+			contact_phone = $3,
+			latitude = $4,
+			longitude = $5,
+			capacity = $6,
 			price_1_hour = $7,
 			price_2_hours = $8,
-			price_until_bus = $9,
-			amenities = $10,
-			images = $11,
+			price_3_hours = $9,
+			price_until_bus = $10,
+			amenities = $11,
+			images = $12,
 			updated_at = NOW()
-		WHERE id = $12
+		WHERE id = $13
 	`
 
 	result, err := r.db.Exec(
 		query,
 		loungeName,
 		address,
-		city,
 		contactPhone,
 		latitude,
 		longitude,
+		capacity,
 		price1Hour,
 		price2Hours,
+		price3Hours,
 		priceUntilBus,
 		amenities,
 		images,

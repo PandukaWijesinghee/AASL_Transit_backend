@@ -37,15 +37,16 @@ func NewLoungeHandler(
 type AddLoungeRequest struct {
 	LoungeName    string   `json:"lounge_name" binding:"required"`
 	Address       string   `json:"address" binding:"required"`
-	City          string   `json:"city" binding:"required"`
 	ContactPhone  string   `json:"contact_phone" binding:"required"`
-	Latitude      *string  `json:"latitude"`
-	Longitude     *string  `json:"longitude"`
-	Price1Hour    *string  `json:"price_1_hour"`    // DECIMAL as string (e.g., "500.00")
-	Price2Hours   *string  `json:"price_2_hours"`   // DECIMAL as string (e.g., "900.00")
-	PriceUntilBus *string  `json:"price_until_bus"` // DECIMAL as string (e.g., "1500.00")
-	Amenities     []string `json:"amenities"`       // Array: ["WiFi", "AC", "Food"]
-	Images        []string `json:"images"`          // Array of image URLs
+	Latitude      *string  `json:"latitude" binding:"required"`    // Required for map location
+	Longitude     *string  `json:"longitude" binding:"required"`   // Required for map location
+	Capacity      *int     `json:"capacity"`                        // Maximum number of people
+	Price1Hour    *string  `json:"price_1_hour"`                   // DECIMAL as string (e.g., "500.00")
+	Price2Hours   *string  `json:"price_2_hours"`                  // DECIMAL as string (e.g., "900.00")
+	Price3Hours   *string  `json:"price_3_hours"`                  // DECIMAL as string (e.g., "1200.00")
+	PriceUntilBus *string  `json:"price_until_bus"`                // DECIMAL as string (e.g., "1500.00")
+	Amenities     []string `json:"amenities"`                      // Array: ["wifi", "ac", "cafeteria", "charging_ports", "entertainment", "parking", "restrooms", "waiting_area"]
+	Images        []string `json:"images"`                         // Array of image URLs
 }
 
 // AddLounge handles POST /api/v1/lounge-owner/register/add-lounge
@@ -70,8 +71,8 @@ func (h *LoungeHandler) AddLounge(c *gin.Context) {
 		return
 	}
 
-	log.Printf("INFO: Add lounge request received - User: %s, Lounge: %s, City: %s, Photos: %d",
-		userCtx.UserID, req.LoungeName, req.City, len(req.Images))
+	log.Printf("INFO: Add lounge request received - User: %s, Lounge: %s, Capacity: %v, Photos: %d",
+		userCtx.UserID, req.LoungeName, req.Capacity, len(req.Images))
 
 	// Get lounge owner record
 	owner, err := h.loungeOwnerRepo.GetLoungeOwnerByUserID(userCtx.UserID)
@@ -114,12 +115,13 @@ func (h *LoungeHandler) AddLounge(c *gin.Context) {
 		owner.ID,
 		req.LoungeName,
 		req.Address,
-		req.City,
 		req.ContactPhone,
 		req.Latitude,
 		req.Longitude,
+		req.Capacity,
 		req.Price1Hour,
 		req.Price2Hours,
+		req.Price3Hours,
 		req.PriceUntilBus,
 		amenitiesJSON,
 		imagesJSON,
@@ -217,20 +219,19 @@ func (h *LoungeHandler) GetMyLounges(c *gin.Context) {
 			"id":              lounge.ID,
 			"lounge_name":     lounge.LoungeName,
 			"address":         lounge.Address,
-			"city":            lounge.City,
 			"contact_phone":   lounge.ContactPhone,
 			"latitude":        lounge.Latitude,
 			"longitude":       lounge.Longitude,
+			"capacity":        lounge.Capacity,
 			"price_1_hour":    lounge.Price1Hour,
 			"price_2_hours":   lounge.Price2Hours,
+			"price_3_hours":   lounge.Price3Hours,
 			"price_until_bus": lounge.PriceUntilBus,
 			"amenities":       amenities,
 			"images":          images,
 			"status":          lounge.Status,
 			"is_operational":  lounge.IsOperational,
-			"total_staff":     lounge.TotalStaff,
 			"average_rating":  lounge.AverageRating,
-			"total_bookings":  lounge.TotalBookings,
 			"created_at":      lounge.CreatedAt,
 		})
 	}
@@ -291,21 +292,22 @@ func (h *LoungeHandler) GetLoungeByID(c *gin.Context) {
 		"lounge_owner_id": lounge.LoungeOwnerID,
 		"lounge_name":     lounge.LoungeName,
 		"address":         lounge.Address,
-		"city":            lounge.City,
 		"contact_phone":   lounge.ContactPhone,
 		"latitude":        lounge.Latitude,
 		"longitude":       lounge.Longitude,
+		"capacity":        lounge.Capacity,
 		"price_1_hour":    lounge.Price1Hour,
 		"price_2_hours":   lounge.Price2Hours,
+		"price_3_hours":   lounge.Price3Hours,
 		"price_until_bus": lounge.PriceUntilBus,
 		"amenities":       amenities,
 		"images":          images,
 		"status":          lounge.Status,
 		"is_operational":  lounge.IsOperational,
-		"total_staff":     lounge.TotalStaff,
 		"average_rating":  lounge.AverageRating,
-		"total_bookings":  lounge.TotalBookings,
 		"created_at":      lounge.CreatedAt,
+		"updated_at":      lounge.UpdatedAt,
+	})
 		"updated_at":      lounge.UpdatedAt,
 	})
 }
@@ -318,12 +320,13 @@ func (h *LoungeHandler) GetLoungeByID(c *gin.Context) {
 type UpdateLoungeRequest struct {
 	LoungeName    string   `json:"lounge_name" binding:"required"`
 	Address       string   `json:"address" binding:"required"`
-	City          string   `json:"city" binding:"required"`
 	ContactPhone  string   `json:"contact_phone" binding:"required"`
-	Latitude      *string  `json:"latitude"`
-	Longitude     *string  `json:"longitude"`
+	Latitude      *string  `json:"latitude" binding:"required"`
+	Longitude     *string  `json:"longitude" binding:"required"`
+	Capacity      *int     `json:"capacity"`
 	Price1Hour    *string  `json:"price_1_hour"`
 	Price2Hours   *string  `json:"price_2_hours"`
+	Price3Hours   *string  `json:"price_3_hours"`
 	PriceUntilBus *string  `json:"price_until_bus"`
 	Amenities     []string `json:"amenities"`
 	Images        []string `json:"images"`
@@ -492,16 +495,14 @@ func (h *LoungeHandler) DeleteLounge(c *gin.Context) {
 }
 
 // ===================================================================
-// GET LOUNGES BY CITY (PUBLIC)
+// GET ALL ACTIVE LOUNGES (PUBLIC)
 // ===================================================================
 
-// GetLoungesByCity handles GET /api/v1/lounges/city/:city
-func (h *LoungeHandler) GetLoungesByCity(c *gin.Context) {
-	city := c.Param("city")
-
-	lounges, err := h.loungeRepo.GetLoungesByCity(city)
+// GetAllActiveLounges handles GET /api/v1/lounges/active
+func (h *LoungeHandler) GetAllActiveLounges(c *gin.Context) {
+	lounges, err := h.loungeRepo.GetAllActiveLounges()
 	if err != nil {
-		log.Printf("ERROR: Failed to get lounges for city %s: %v", city, err)
+		log.Printf("ERROR: Failed to get active lounges: %v", err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "database_error",
 			Message: "Failed to retrieve lounges",
@@ -527,22 +528,21 @@ func (h *LoungeHandler) GetLoungesByCity(c *gin.Context) {
 			"id":              lounge.ID,
 			"lounge_name":     lounge.LoungeName,
 			"address":         lounge.Address,
-			"city":            lounge.City,
 			"latitude":        lounge.Latitude,
 			"longitude":       lounge.Longitude,
+			"capacity":        lounge.Capacity,
 			"price_1_hour":    lounge.Price1Hour,
 			"price_2_hours":   lounge.Price2Hours,
+			"price_3_hours":   lounge.Price3Hours,
 			"price_until_bus": lounge.PriceUntilBus,
 			"amenities":       amenities,
 			"images":          images,
 			"average_rating":  lounge.AverageRating,
-			"total_bookings":  lounge.TotalBookings,
 		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"lounges": response,
 		"total":   len(response),
-		"city":    city,
 	})
 }
