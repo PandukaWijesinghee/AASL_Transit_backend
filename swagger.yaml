@@ -2012,7 +2012,7 @@ paths:
                   type: integer
                   minimum: 1
                   example: 420
-                  description: Estimated trip duration in minutes (optional - will be calculated from route if not provided)
+                  description: Estimated trip duration in minutes (optional - defaults to 60 minutes if not provided)
                 base_fare:
                   type: number
                   format: double
@@ -3904,19 +3904,19 @@ paths:
       summary: Create trip schedule
       description: |
         Create a new trip schedule template (timetable). 
-        
+
         **Trip Generation:**
         - Trips are automatically generated for the next 7 days (configurable via system_settings.trip_generation_days_ahead)
         - Generation starts from `valid_from` if in the future, otherwise from current date
         - Only generates trips within the `valid_until` date if specified
         - Trips are created with proper `departure_datetime` (date + time combined)
         - Skips dates that don't match recurrence rules (daily/weekly/interval)
-        
+
         **Validation:**
         - Departure time must be in HH:MM or HH:MM:SS format
         - Recurrence rules are validated (e.g., weekly requires recurrence_days)
         - Schedule must be active (is_active=true) for trip generation
-        
+
         **Response includes:**
         - Created schedule object
         - Number of trips generated
