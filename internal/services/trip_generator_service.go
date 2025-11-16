@@ -40,10 +40,16 @@ func NewTripGeneratorService(
 func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSchedule, startDate, endDate time.Time) (int, error) {
 	generated := 0
 	currentDate := startDate
+	
+	fmt.Printf(">>> GenerateTripsForSchedule: Schedule %s from %s to %s\n", 
+		schedule.ID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
 
 	for currentDate.Before(endDate) || currentDate.Equal(endDate) {
 		// Check if schedule is valid for this date
-		if schedule.IsValidForDate(currentDate) {
+		isValid := schedule.IsValidForDate(currentDate)
+		fmt.Printf("  Day %s: IsValid=%v\n", currentDate.Format("2006-01-02"), isValid)
+		
+		if isValid {
 			// Check if trip already exists for this date
 			existing, err := s.scheduledTripRepo.GetByScheduleAndDate(schedule.ID, currentDate)
 			if err == nil && existing != nil {
@@ -83,10 +89,24 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 
 			// Parse departure time from schedule and combine with current date to create departure_datetime
 			var departureDatetime time.Time
+			var parseErr error
+			
 			if t, err := time.Parse("15:04", schedule.DepartureTime); err == nil {
-				departureDatetime = time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), t.Hour(), t.Minute(), 0, 0, currentDate.Location())
+				departureDatetime = time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), t.Hour(), t.Minute(), 0, 0, time.UTC)
 			} else if t, err := time.Parse("15:04:05", schedule.DepartureTime); err == nil {
-				departureDatetime = time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), t.Hour(), t.Minute(), t.Second(), 0, currentDate.Location())
+				departureDatetime = time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), t.Hour(), t.Minute(), t.Second(), 0, time.UTC)
+			} else {
+				parseErr = fmt.Errorf("failed to parse departure time '%s' for schedule %s", schedule.DepartureTime, schedule.ID)
+				fmt.Printf("ERROR: %v\n", parseErr)
+				currentDate = currentDate.AddDate(0, 0, 1)
+				continue // Skip this date if time parsing fails
+			}
+
+			// Ensure departure datetime is valid (not zero value)
+			if departureDatetime.IsZero() {
+				fmt.Printf("ERROR: Zero departure datetime for schedule %s on date %s\n", schedule.ID, currentDate.Format("2006-01-02"))
+				currentDate = currentDate.AddDate(0, 0, 1)
+				continue
 			}
 
 			assignmentDeadline := departureDatetime.Add(-time.Duration(assignmentDeadlineHours) * time.Hour)
@@ -132,24 +152,43 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 // Uses trip_generation_days_ahead from system_settings (default: 7 days)
 func (s *TripGeneratorService) GenerateTripsForNewSchedule(schedule *models.TripSchedule) (int, error) {
 	startDate := time.Now()
+	
+	fmt.Printf("=== GenerateTripsForNewSchedule START ===\n")
+	fmt.Printf("Schedule ID: %s\n", schedule.ID)
+	fmt.Printf("Departure Time: %s\n", schedule.DepartureTime)
+	fmt.Printf("Recurrence Type: %s\n", schedule.RecurrenceType)
+	fmt.Printf("Valid From: %v\n", schedule.ValidFrom)
+	fmt.Printf("Valid Until: %v\n", schedule.ValidUntil)
 
 	// Start from valid_from if it's in the future
 	if schedule.ValidFrom.After(startDate) {
 		startDate = schedule.ValidFrom
+		fmt.Printf("Using ValidFrom as start date: %s\n", startDate.Format("2006-01-02"))
+	} else {
+		fmt.Printf("Using current time as start date: %s\n", startDate.Format("2006-01-02"))
 	}
 
 	// Get days ahead from system settings (default: 7)
 	daysAhead := s.settingsRepo.GetIntValue("trip_generation_days_ahead", 7)
+	fmt.Printf("Days ahead to generate: %d\n", daysAhead)
 
 	// Generate for configured days ahead
 	endDate := startDate.AddDate(0, 0, daysAhead)
+	fmt.Printf("End date (before valid_until check): %s\n", endDate.Format("2006-01-02"))
 
 	// Don't exceed valid_until
 	if schedule.ValidUntil != nil && endDate.After(*schedule.ValidUntil) {
 		endDate = *schedule.ValidUntil
+		fmt.Printf("Adjusted end date to valid_until: %s\n", endDate.Format("2006-01-02"))
 	}
 
-	return s.GenerateTripsForSchedule(schedule, startDate, endDate)
+	fmt.Printf("Final date range: %s to %s\n", startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+	
+	generated, err := s.GenerateTripsForSchedule(schedule, startDate, endDate)
+	fmt.Printf("Trips generated: %d, Error: %v\n", generated, err)
+	fmt.Printf("=== GenerateTripsForNewSchedule END ===\n\n")
+	
+	return generated, err
 }
 
 // GenerateFutureTrips generates trips for all active timetables (maintains 7 occurrences ahead)

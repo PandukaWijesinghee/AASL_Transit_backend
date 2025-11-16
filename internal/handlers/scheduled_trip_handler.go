@@ -122,7 +122,7 @@ func (h *ScheduledTripHandler) GetTripsByDateRange(c *gin.Context) {
 
 	// MODIFIED: Get trips from schedules AND special trips (trip_schedule_id IS NULL)
 	var ownerTrips []models.ScheduledTripWithRouteInfo
-	
+
 	// Get trips from timetables/schedules
 	if len(scheduleIDs) > 0 {
 		fmt.Printf("🔍 STEP 6A: Querying scheduled_trips WHERE trip_schedule_id IN (%d IDs) AND date BETWEEN %s AND %s\n",
@@ -136,7 +136,7 @@ func (h *ScheduledTripHandler) GetTripsByDateRange(c *gin.Context) {
 		ownerTrips = append(ownerTrips, scheduleTrips...)
 		fmt.Printf("✅ STEP 6A RESULT: Found %d trips from schedules\n", len(scheduleTrips))
 	}
-	
+
 	// Get special trips (trip_schedule_id IS NULL and bus_owner_route_id belongs to this owner)
 	fmt.Printf("🔍 STEP 6B: Querying special trips WHERE trip_schedule_id IS NULL AND date BETWEEN %s AND %s\n",
 		startDateStr, endDateStr)
@@ -150,7 +150,7 @@ func (h *ScheduledTripHandler) GetTripsByDateRange(c *gin.Context) {
 		fmt.Printf("✅ STEP 6B RESULT: Found %d special trips\n", len(specialTrips))
 	}
 
-	fmt.Printf("✅ STEP 6 RESULT: Found %d total trips (%d from schedules + %d special)\n", 
+	fmt.Printf("✅ STEP 6 RESULT: Found %d total trips (%d from schedules + %d special)\n",
 		len(ownerTrips), len(ownerTrips)-len(specialTrips), len(specialTrips))
 	if len(ownerTrips) > 0 {
 		for i, trip := range ownerTrips {
