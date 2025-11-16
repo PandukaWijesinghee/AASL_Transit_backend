@@ -594,6 +594,24 @@ func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
 		// but not enforced here. User decides what fare and seats to set for the timetable.
 	}
 
+	// Parse valid_from date (required)
+	validFrom, err := time.Parse("2006-01-02", req.ValidFrom)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid valid_from date format", "details": err.Error()})
+		return
+	}
+
+	// Parse valid_until date (optional)
+	var validUntil *time.Time
+	if req.ValidUntil != nil {
+		parsed, err := time.Parse("2006-01-02", *req.ValidUntil)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid valid_until date format", "details": err.Error()})
+			return
+		}
+		validUntil = &parsed
+	}
+
 	// Create timetable
 	recurrenceDaysStr := models.IntSliceToString(req.RecurrenceDays)
 
@@ -601,6 +619,7 @@ func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
 		ID:                       uuid.New().String(),
 		BusOwnerID:               busOwner.ID,
 		PermitID:                 req.PermitID,
+		BusOwnerRouteID:          &req.CustomRouteID,
 		ScheduleName:             req.ScheduleName,
 		RecurrenceType:           models.RecurrenceType(req.RecurrenceType),
 		RecurrenceDays:           recurrenceDaysStr,
@@ -612,6 +631,8 @@ func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
 		MaxBookableSeats:         &req.MaxBookableSeats,
 		BookingAdvanceHours:      req.BookingAdvanceHours,
 		IsActive:                 true,
+		ValidFrom:                validFrom,
+		ValidUntil:               validUntil,
 		Notes:                    req.Notes,
 	}
 
@@ -620,5 +641,19 @@ func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, schedule)
+	// IMMEDIATE GENERATION: Generate trips for next 7 days (same as CreateSchedule)
+	tripsGenerated, err := h.tripGeneratorSvc.GenerateTripsForNewSchedule(schedule)
+	if err != nil {
+		// Log error but don't fail the request - schedule was created successfully
+		println("WARNING: Failed to generate trips for timetable:", schedule.ID, "Error:", err.Error())
+	}
+
+	// Return schedule with trip count
+	response := gin.H{
+		"schedule":        schedule,
+		"trips_generated": tripsGenerated,
+		"message":         "Timetable created successfully",
+	}
+
+	c.JSON(http.StatusCreated, response)
 }
