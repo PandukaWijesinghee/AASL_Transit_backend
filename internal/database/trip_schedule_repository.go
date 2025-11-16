@@ -25,10 +25,9 @@ func (r *TripScheduleRepository) CreateTimetable(schedule *models.TripSchedule) 
 		INSERT INTO trip_schedules (
 			id, bus_owner_id, bus_owner_route_id, schedule_name,
 			recurrence_type, recurrence_days, recurrence_interval, departure_time,
-			estimated_duration_minutes, base_fare, is_bookable, max_bookable_seats,
-			booking_advance_hours, is_active, valid_from, valid_until, notes
+			estimated_duration_minutes, base_fare, is_active, valid_from, valid_until, notes
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
 		)
 		RETURNING created_at, updated_at
 	`
@@ -42,8 +41,7 @@ func (r *TripScheduleRepository) CreateTimetable(schedule *models.TripSchedule) 
 		query,
 		schedule.ID, schedule.BusOwnerID, schedule.BusOwnerRouteID, schedule.ScheduleName,
 		schedule.RecurrenceType, schedule.RecurrenceDays, schedule.RecurrenceInterval, schedule.DepartureTime,
-		schedule.EstimatedDurationMinutes, schedule.BaseFare, schedule.IsBookable, schedule.MaxBookableSeats,
-		schedule.BookingAdvanceHours, schedule.IsActive, schedule.ValidFrom, schedule.ValidUntil, schedule.Notes,
+		schedule.EstimatedDurationMinutes, schedule.BaseFare, schedule.IsActive, schedule.ValidFrom, schedule.ValidUntil, schedule.Notes,
 	).Scan(&schedule.CreatedAt, &schedule.UpdatedAt)
 
 	return err
