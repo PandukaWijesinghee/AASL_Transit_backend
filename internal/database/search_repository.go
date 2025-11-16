@@ -88,7 +88,7 @@ func (r *SearchRepository) FindDirectTrips(
 				(COALESCE(st.estimated_duration_minutes, 0) * interval '1 minute') as estimated_arrival,
 			COALESCE(st.estimated_duration_minutes, 0) as duration_minutes,
 			-- Calculate available seats (total - booked)
-			COALESCE(b.total_seats, 0) - COALESCE(
+			COALESCE(bslt.total_seats, 0) - COALESCE(
 				(
 					SELECT SUM(number_of_seats)
 					FROM bookings
@@ -96,7 +96,7 @@ func (r *SearchRepository) FindDirectTrips(
 					  AND booking_status IN ('confirmed')
 				), 0
 			) as available_seats,
-			COALESCE(b.total_seats, 0) as total_seats,
+			COALESCE(bslt.total_seats, 0) as total_seats,
 			COALESCE(rp.approved_fare, st.base_fare, 0) as fare,
 			from_stop.stop_name as boarding_point,
 			to_stop.stop_name as dropping_point,
@@ -113,6 +113,8 @@ func (r *SearchRepository) FindDirectTrips(
 		-- Join permit for fare and bus
 		LEFT JOIN route_permits rp ON st.permit_id = rp.id
 		LEFT JOIN buses b ON rp.bus_registration_number = b.license_plate
+		-- Join seat layout template to get total_seats
+		LEFT JOIN bus_seat_layout_templates bslt ON b.seat_layout_id = bslt.id
 		-- Get stop information
 		JOIN master_route_stops from_stop ON from_stop.id = $1
 		JOIN master_route_stops to_stop ON to_stop.id = $2
