@@ -191,6 +191,48 @@ func (r *ScheduledTripRepository) GetByScheduleIDsAndDateRangeWithRouteInfo(sche
 	return trips, nil
 }
 
+// GetSpecialTripsByBusOwnerAndDateRange retrieves special trips (trip_schedule_id IS NULL) for a bus owner within a date range
+func (r *ScheduledTripRepository) GetSpecialTripsByBusOwnerAndDateRange(busOwnerID string, startDate, endDate time.Time) ([]models.ScheduledTripWithRouteInfo, error) {
+	fmt.Printf("🔍 REPO: GetSpecialTripsByBusOwnerAndDateRange called for bus_owner=%s, dates: %s to %s\n",
+		busOwnerID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+
+	query := `
+		SELECT 
+			st.id, st.trip_schedule_id, st.permit_id, st.departure_datetime,
+			st.estimated_duration_minutes, st.assigned_driver_id, st.assigned_conductor_id,
+			st.seat_layout_id, st.is_bookable, st.ever_published, st.base_fare, st.status, st.cancellation_reason, st.cancelled_at,
+			st.assignment_deadline, st.created_at, st.updated_at,
+			mr.route_number, mr.origin_city, mr.destination_city,
+			bor.direction
+		FROM scheduled_trips st
+		LEFT JOIN bus_owner_routes bor ON st.bus_owner_route_id = bor.id
+		LEFT JOIN master_routes mr ON bor.master_route_id = mr.id
+		WHERE st.trip_schedule_id IS NULL
+		  AND bor.bus_owner_id = $1
+		  AND DATE(st.departure_datetime) BETWEEN $2 AND $3
+		ORDER BY st.departure_datetime
+	`
+
+	fmt.Printf("📝 REPO: Executing SQL query for special trips\n")
+
+	rows, err := r.db.Query(query, busOwnerID, startDate, endDate)
+	if err != nil {
+		fmt.Printf("❌ REPO: SQL query error: %v\n", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	fmt.Println("✅ REPO: SQL query executed successfully, scanning special trips...")
+	trips, scanErr := r.scanTripsWithRouteInfo(rows)
+	if scanErr != nil {
+		fmt.Printf("❌ REPO: Error scanning special trips: %v\n", scanErr)
+		return nil, scanErr
+	}
+
+	fmt.Printf("✅ REPO: Successfully scanned %d special trips from database\n", len(trips))
+	return trips, nil
+}
+
 // GetByDateRange retrieves scheduled trips within a date range
 func (r *ScheduledTripRepository) GetByDateRange(startDate, endDate time.Time) ([]models.ScheduledTrip, error) {
 	query := `

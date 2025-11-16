@@ -1,0 +1,162 @@
+# ============================================================================
+# SEARCH ENDPOINTS - Add this to swagger.yaml at the end of the paths section
+# ============================================================================
+# Copy everything below this line and paste at the end of swagger.yaml before components:
+# ============================================================================
+
+  # ============================================================================
+  # SEARCH ENDPOINTS (Phase 1 MVP - Trip Discovery)
+  # ============================================================================
+  /api/v1/search:
+    post:
+      summary: Search for available trips
+      description: |
+        Search for bus trips between two locations.
+
+        **Phase 1 Features:**
+        - Exact stop name matching (case-insensitive)
+        - Direct trips only (no transfers)
+        - Date/time filtering
+        - Available seat calculation
+        - Bus features display
+      operationId: searchTrips
+      tags:
+        - Search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - from
+                - to
+              properties:
+                from:
+                  type: string
+                  description: Origin stop name
+                  example: "Colombo Fort"
+                to:
+                  type: string
+                  description: Destination stop name
+                  example: "Kandy"
+                datetime:
+                  type: string
+                  format: date-time
+                  description: Departure datetime filter (optional, defaults to now)
+                  example: "2025-11-20T08:00:00Z"
+                limit:
+                  type: integer
+                  description: Maximum number of results (default 20, max 100)
+                  example: 20
+      responses:
+        "200":
+          description: Search completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success, partial, error]
+                  message:
+                    type: string
+                  search_details:
+                    type: object
+                  results:
+                    type: array
+                    items:
+                      type: object
+                  search_time_ms:
+                    type: integer
+        "400":
+          description: Invalid request
+        "500":
+          description: Internal server error
+
+  /api/v1/search/popular:
+    get:
+      summary: Get popular routes
+      description: Returns frequently searched routes for quick selection
+      operationId: getPopularRoutes
+      tags:
+        - Search
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of routes to return
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Popular routes retrieved successfully
+
+  /api/v1/search/autocomplete:
+    get:
+      summary: Get stop autocomplete suggestions
+      description: Returns bus stop suggestions as user types
+      operationId: getStopAutocomplete
+      tags:
+        - Search
+      parameters:
+        - name: q
+          in: query
+          description: Search term (minimum 2 characters)
+          required: true
+          schema:
+            type: string
+            minLength: 2
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Autocomplete suggestions retrieved
+
+  /api/v1/search/health:
+    get:
+      summary: Search service health check
+      operationId: searchHealthCheck
+      tags:
+        - Search
+      responses:
+        "200":
+          description: Search service is healthy
+
+  /api/v1/admin/search/analytics:
+    get:
+      summary: Get search analytics (Admin only)
+      operationId: getSearchAnalytics
+      tags:
+        - Search
+        - Admin Authentication
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: days
+          in: query
+          description: Number of days to analyze
+          required: false
+          schema:
+            type: integer
+            default: 7
+      responses:
+        "200":
+          description: Analytics retrieved successfully
+        "401":
+          description: Unauthorized
+
+# ============================================================================
+# INSTRUCTIONS:
+# 1. Open swagger.yaml
+# 2. Find the end of the "paths:" section (before "components:")
+# 3. Paste the endpoints above (starting from /api/v1/search:)
+# 4. Save the file
+# 5. Choreo will auto-rebuild on commit to main
+# ============================================================================

@@ -54,6 +54,8 @@ tags:
     description: Trip schedule template management
   - name: Scheduled Trips
     description: Generated trip instances and bookings
+  - name: Search
+    description: Trip search and discovery endpoints (Phase 1 MVP)
 
 paths:
   # ============================================================================
@@ -4117,14 +4119,20 @@ paths:
       description: |
         Retrieve scheduled trips within a specified date range for the authenticated bus owner.
 
-        Efficient filtering logic:
+        **Updated Logic (includes special trips):**
         1. Gets bus_owner_id from authenticated user
         2. Queries trip_schedules table: WHERE bus_owner_id = X
         3. Extracts schedule IDs
-        4. Queries scheduled_trips: WHERE trip_schedule_id IN (...) AND DATE(departure_datetime) BETWEEN start AND end
+        4. Queries scheduled_trips WHERE trip_schedule_id IN (...) AND DATE(departure_datetime) BETWEEN start AND end
+        5. **ALSO queries special trips**: WHERE trip_schedule_id IS NULL AND bus_owner_route_id belongs to owner AND date in range
+        6. Combines both result sets
 
-        This ensures only trips from the bus owner's timetables are returned,
-        using a single optimized SQL query with IN clause.
+        This ensures ALL trips are returned:
+        - Trips generated from timetables/schedules
+        - Special one-time trips (created via /api/v1/special-trips)
+        
+        All trips include route information (origin city, destination city, route number, direction)
+        joined from bus_owner_routes and master_routes tables.
       operationId: getScheduledTrips
       tags:
         - Scheduled Trips
@@ -4147,7 +4155,7 @@ paths:
           example: "2025-11-15"
       responses:
         "200":
-          description: List of scheduled trips
+          description: List of scheduled trips (includes both schedule-based and special trips)
           content:
             application/json:
               schema:

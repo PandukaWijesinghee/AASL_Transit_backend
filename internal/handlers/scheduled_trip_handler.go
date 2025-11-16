@@ -118,25 +118,40 @@ func (h *ScheduledTripHandler) GetTripsByDateRange(c *gin.Context) {
 		fmt.Printf("   - Schedule[%d]: id=%s, name=%v\n", i+1, schedule.ID, schedule.ScheduleName)
 	}
 
-	if len(scheduleIDs) == 0 {
-		fmt.Println("⚠️  WARNING: No schedules found - returning empty trips array")
-		c.JSON(http.StatusOK, []models.ScheduledTripWithRouteInfo{})
-		return
-	}
-
 	fmt.Printf("✅ STEP 5: Extracted %d schedule IDs\n", len(scheduleIDs))
 
-	// Get trips directly by schedule IDs and date range
-	fmt.Printf("🔍 STEP 6: Querying scheduled_trips WHERE trip_schedule_id IN (%d IDs) AND date BETWEEN %s AND %s\n",
-		len(scheduleIDs), startDateStr, endDateStr)
-	ownerTrips, err := h.tripRepo.GetByScheduleIDsAndDateRangeWithRouteInfo(scheduleIDs, startDate, endDate)
+	// MODIFIED: Get trips from schedules AND special trips (trip_schedule_id IS NULL)
+	var ownerTrips []models.ScheduledTripWithRouteInfo
+	
+	// Get trips from timetables/schedules
+	if len(scheduleIDs) > 0 {
+		fmt.Printf("🔍 STEP 6A: Querying scheduled_trips WHERE trip_schedule_id IN (%d IDs) AND date BETWEEN %s AND %s\n",
+			len(scheduleIDs), startDateStr, endDateStr)
+		scheduleTrips, err := h.tripRepo.GetByScheduleIDsAndDateRangeWithRouteInfo(scheduleIDs, startDate, endDate)
+		if err != nil {
+			fmt.Printf("❌ ERROR: Failed to fetch schedule trips: %v\n", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trips"})
+			return
+		}
+		ownerTrips = append(ownerTrips, scheduleTrips...)
+		fmt.Printf("✅ STEP 6A RESULT: Found %d trips from schedules\n", len(scheduleTrips))
+	}
+	
+	// Get special trips (trip_schedule_id IS NULL and bus_owner_route_id belongs to this owner)
+	fmt.Printf("🔍 STEP 6B: Querying special trips WHERE trip_schedule_id IS NULL AND date BETWEEN %s AND %s\n",
+		startDateStr, endDateStr)
+	specialTrips, err := h.tripRepo.GetSpecialTripsByBusOwnerAndDateRange(busOwner.ID, startDate, endDate)
 	if err != nil {
-		fmt.Printf("❌ ERROR: Failed to fetch trips: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trips"})
-		return
+		fmt.Printf("❌ ERROR: Failed to fetch special trips: %v\n", err)
+		// Don't fail the request, just log the error
+		fmt.Println("⚠️  Continuing without special trips")
+	} else {
+		ownerTrips = append(ownerTrips, specialTrips...)
+		fmt.Printf("✅ STEP 6B RESULT: Found %d special trips\n", len(specialTrips))
 	}
 
-	fmt.Printf("✅ STEP 6 RESULT: Found %d trips in scheduled_trips table with route info\n", len(ownerTrips))
+	fmt.Printf("✅ STEP 6 RESULT: Found %d total trips (%d from schedules + %d special)\n", 
+		len(ownerTrips), len(ownerTrips)-len(specialTrips), len(specialTrips))
 	if len(ownerTrips) > 0 {
 		for i, trip := range ownerTrips {
 			routeInfo := "no route"

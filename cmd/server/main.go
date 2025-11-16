@@ -262,6 +262,13 @@ func main() {
 	systemSettingHandler := handlers.NewSystemSettingHandler(systemSettingRepo)
 	logger.Info("Trip scheduling handlers initialized")
 
+	// Initialize search system
+	logger.Info("Initializing search system...")
+	searchRepo := database.NewSearchRepository(db)
+	searchService := services.NewSearchService(searchRepo, logger)
+	searchHandler := handlers.NewSearchHandler(searchService, logger)
+	logger.Info("✓ Search system initialized")
+
 	// Initialize Gin router
 	router := gin.New()
 
@@ -580,6 +587,28 @@ func main() {
 		// Public bookable trips (no auth required)
 		v1.GET("/bookable-trips", scheduledTripHandler.GetBookableTrips)
 
+		// ============================================================================
+		// SEARCH ROUTES (Phase 1 MVP - Trip Discovery)
+		// ============================================================================
+		logger.Info("🔍 Registering Search routes...")
+
+		// Public search routes (no authentication required)
+		search := v1.Group("/search")
+		{
+			logger.Info("  ✅ POST /api/v1/search - Main search endpoint")
+			search.POST("", searchHandler.SearchTrips)
+
+			logger.Info("  ✅ GET /api/v1/search/popular - Popular routes")
+			search.GET("/popular", searchHandler.GetPopularRoutes)
+
+			logger.Info("  ✅ GET /api/v1/search/autocomplete - Stop suggestions")
+			search.GET("/autocomplete", searchHandler.GetStopAutocomplete)
+
+			logger.Info("  ✅ GET /api/v1/search/health - Health check")
+			search.GET("/health", searchHandler.HealthCheck)
+		}
+		logger.Info("🔍 Search routes registered successfully")
+
 		// System Settings routes (protected)
 		systemSettings := v1.Group("/system-settings")
 		systemSettings.Use(middleware.AuthMiddleware(jwtService))
@@ -630,6 +659,9 @@ func main() {
 
 			// Dashboard stats (TODO: Implement)
 			admin.GET("/dashboard/stats", adminHandler.GetDashboardStats)
+
+			// Search analytics
+			admin.GET("/search/analytics", searchHandler.GetSearchAnalytics)
 		}
 	}
 

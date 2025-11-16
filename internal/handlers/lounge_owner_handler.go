@@ -103,7 +103,7 @@ func (h *LoungeOwnerHandler) SaveBusinessAndManagerInfo(c *gin.Context) {
 	)
 	if err != nil {
 		log.Printf("ERROR: Failed to update business/manager info for user %s: %v", userCtx.UserID, err)
-		
+
 		// Check if it's a duplicate key error
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "duplicate key") && strings.Contains(errMsg, "business_license") {
@@ -113,7 +113,7 @@ func (h *LoungeOwnerHandler) SaveBusinessAndManagerInfo(c *gin.Context) {
 			})
 			return
 		}
-		
+
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "update_failed",
 			Message: "Failed to save business and manager information",
