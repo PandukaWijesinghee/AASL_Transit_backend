@@ -1946,12 +1946,20 @@ paths:
     post:
       summary: Create a new timetable (repeating trip schedule)
       description: |
-        Creates a timetable for automatic trip generation. Upon creation, the system immediately generates 
-        trips for the next 7 days (configurable via system_settings.trip_generation_days_ahead). 
+        Creates a timetable for automatic trip generation. Upon creation, the system immediately generates
+        trips for the next 7 days (configurable via system_settings.trip_generation_days_ahead).
 
-        A daily cron job (runs at 2 AM) maintains a rolling 7-day window by generating new trips for upcoming dates.
+        **How it works:**
+        - Timetable stores the template: route, times, recurrence pattern, valid_from/until dates
+        - The system automatically generates individual scheduled_trips based on the template
+        - Values like is_bookable, max_bookable_seats, booking_advance_hours are applied to each generated trip
+        - Generated trips use the valid_from/until dates to determine which dates to create trips for
 
-        After creation, use the publish endpoints to make trips available for passenger booking (is_bookable=true).
+        **Automatic Generation:**
+        - Trips are generated immediately upon timetable creation
+        - A daily cron job (runs at 2 AM) maintains a rolling 7-day window by generating new trips for upcoming dates
+
+        After creation, use the publish endpoints to make trips available for passenger booking.
       operationId: createTimetable
       tags:
         - Timetables
