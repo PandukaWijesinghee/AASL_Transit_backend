@@ -4130,7 +4130,7 @@ paths:
         This ensures ALL trips are returned:
         - Trips generated from timetables/schedules
         - Special one-time trips (created via /api/v1/special-trips)
-        
+
         All trips include route information (origin city, destination city, route number, direction)
         joined from bus_owner_routes and master_routes tables.
       operationId: getScheduledTrips
@@ -4274,12 +4274,12 @@ paths:
       description: |
         Make a scheduled trip available for passenger booking by setting is_bookable=true. 
         Only the trip owner can publish their trips.
-        
+
         **Requirements**:
         - Trip MUST have seat_layout_id assigned before publishing
         - Attempting to publish without seat_layout_id will fail with error
         - Once published, ever_published flag is set to true permanently
-        
+
         **Validation**:
         The system validates that seat_layout_id IS NOT NULL before allowing publish.
         Use the `/scheduled-trips/{id}/assign-seat-layout` endpoint to assign a seat 
@@ -4499,17 +4499,17 @@ paths:
       summary: Assign seat layout template to a scheduled trip
       description: |
         Assign a seat layout template to a specific scheduled trip. 
-        
+
         **Business Context**:
         In Sri Lanka, buses change frequently on the same route, so seat layouts 
         are assigned per trip rather than per bus. Each trip needs its own seat 
         layout assignment before it can be published for booking.
-        
+
         **Requirements**:
         - Only the bus owner who owns the trip can assign seat layouts
         - Seat layout must be assigned before trip can be published (is_bookable=true)
         - Attempting to publish without seat_layout_id will fail with validation error
-        
+
         **Database Constraint**:
         A check constraint enforces that if is_bookable=true, then seat_layout_id 
         must NOT be NULL.
@@ -4594,12 +4594,12 @@ paths:
       description: |
         Publish multiple scheduled trips at once by setting is_bookable=true. 
         Only the trip owner can publish their trips.
-        
+
         **Requirements**:
         - ALL trips MUST have seat_layout_id assigned before bulk publishing
         - If ANY trip is missing seat_layout_id, the entire operation fails
         - No partial publishing - either all trips succeed or none
-        
+
         **Validation**:
         The system validates that ALL trips have seat_layout_id assigned. If any trip 
         is missing a seat layout, the operation fails with an error indicating how many 
@@ -5184,7 +5184,17 @@ components:
           items:
             type: string
           nullable: true
-          example: ["wifi", "ac", "cafeteria", "charging_ports", "entertainment", "parking", "restrooms", "waiting_area"]
+          example:
+            [
+              "wifi",
+              "ac",
+              "cafeteria",
+              "charging_ports",
+              "entertainment",
+              "parking",
+              "restrooms",
+              "waiting_area",
+            ]
           description: "Standard amenity codes"
         images:
           type: array
@@ -6018,11 +6028,12 @@ components:
             type: array
             items:
               type: boolean
-          example: [
-            [true, true, true, true, true, true],
-            [true, true, false, false, true, true],
-            [true, true, true, true, true, true]
-          ]
+          example:
+            [
+              [true, true, true, true, true, true],
+              [true, true, false, false, true, true],
+              [true, true, true, true, true, true],
+            ]
 
     UpdateBusSeatLayoutTemplateRequest:
       type: object
