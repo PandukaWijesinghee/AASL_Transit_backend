@@ -10,6 +10,7 @@ info:
     - JWT token-based authorization
     - Profile management
     - Rate limiting and security
+    - Automated trip generation from timetables/schedules
 
     ## Authentication Flow
     1. Request OTP via `/auth/send-otp`
@@ -17,6 +18,18 @@ info:
     3. Receive JWT access & refresh tokens
     4. Use access token for protected endpoints
     5. Refresh token when access token expires
+
+    ## Trip Generation System
+    - **Automatic Generation**: When a schedule/timetable is created, trips are automatically generated for the next 7 days
+    - **Date Range**: Configurable via `system_settings.trip_generation_days_ahead` (default: 7 days)
+    - **Validation**: Trips are only created if:
+      - Schedule is active (`is_active=true`)
+      - Date falls within `valid_from` and `valid_until` range
+      - Date matches recurrence rules (daily/weekly/interval)
+      - Departure time is in valid format (HH:MM or HH:MM:SS)
+    - **Logging**: Comprehensive logs track schedule processing, date validation, and trip creation
+    - **Datetime Format**: All `departure_datetime` values combine the trip date with the schedule's departure time in UTC
+    - **Error Handling**: Invalid departure times or zero datetime values are logged and skipped
 
   version: 1.0.0
   contact:
@@ -3881,7 +3894,25 @@ paths:
   /api/v1/trip-schedules:
     post:
       summary: Create trip schedule
-      description: Create a new trip schedule template. Trips are generated instantly for the next 14 days.
+      description: |
+        Create a new trip schedule template (timetable). 
+        
+        **Trip Generation:**
+        - Trips are automatically generated for the next 7 days (configurable via system_settings.trip_generation_days_ahead)
+        - Generation starts from `valid_from` if in the future, otherwise from current date
+        - Only generates trips within the `valid_until` date if specified
+        - Trips are created with proper `departure_datetime` (date + time combined)
+        - Skips dates that don't match recurrence rules (daily/weekly/interval)
+        
+        **Validation:**
+        - Departure time must be in HH:MM or HH:MM:SS format
+        - Recurrence rules are validated (e.g., weekly requires recurrence_days)
+        - Schedule must be active (is_active=true) for trip generation
+        
+        **Response includes:**
+        - Created schedule object
+        - Number of trips generated
+        - Success message
       operationId: createTripSchedule
       tags:
         - Trip Schedules
