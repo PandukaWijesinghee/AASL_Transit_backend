@@ -40,15 +40,15 @@ func NewTripGeneratorService(
 func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSchedule, startDate, endDate time.Time) (int, error) {
 	generated := 0
 	currentDate := startDate
-	
-	fmt.Printf(">>> GenerateTripsForSchedule: Schedule %s from %s to %s\n", 
+
+	fmt.Printf(">>> GenerateTripsForSchedule: Schedule %s from %s to %s\n",
 		schedule.ID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
 
 	for currentDate.Before(endDate) || currentDate.Equal(endDate) {
 		// Check if schedule is valid for this date
 		isValid := schedule.IsValidForDate(currentDate)
 		fmt.Printf("  Day %s: IsValid=%v\n", currentDate.Format("2006-01-02"), isValid)
-		
+
 		if isValid {
 			// Check if trip already exists for this date
 			existing, err := s.scheduledTripRepo.GetByScheduleAndDate(schedule.ID, currentDate)
@@ -90,7 +90,7 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 			// Parse departure time from schedule and combine with current date to create departure_datetime
 			var departureDatetime time.Time
 			var parseErr error
-			
+
 			if t, err := time.Parse("15:04", schedule.DepartureTime); err == nil {
 				departureDatetime = time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), t.Hour(), t.Minute(), 0, 0, time.UTC)
 			} else if t, err := time.Parse("15:04:05", schedule.DepartureTime); err == nil {
@@ -120,7 +120,7 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 				PermitID:                 schedule.PermitID,        // Pass pointer directly (nil if not set)
 				BusID:                    schedule.BusID,
 				DepartureDatetime:        departureDatetime,                 // Specific departure date and time
-				EstimatedDurationMinutes: schedule.EstimatedDurationMinutes, // Copy duration from template (arrival calculated on-the-fly)
+				EstimatedDurationMinutes: getEstimatedDuration(schedule.EstimatedDurationMinutes), // Required field - use default 60 if nil
 				AssignedDriverID:         schedule.DefaultDriverID,
 				AssignedConductorID:      schedule.DefaultConductorID,
 				IsBookable:               schedule.IsBookable,
@@ -148,11 +148,20 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 	return generated, nil
 }
 
+// getEstimatedDuration returns the duration or default if nil
+func getEstimatedDuration(duration *int) *int {
+	if duration != nil && *duration > 0 {
+		return duration
+	}
+	defaultDuration := 60 // Default 60 minutes
+	return &defaultDuration
+}
+
 // GenerateTripsForNewSchedule generates trips for a newly created schedule
 // Uses trip_generation_days_ahead from system_settings (default: 7 days)
 func (s *TripGeneratorService) GenerateTripsForNewSchedule(schedule *models.TripSchedule) (int, error) {
 	startDate := time.Now()
-	
+
 	fmt.Printf("=== GenerateTripsForNewSchedule START ===\n")
 	fmt.Printf("Schedule ID: %s\n", schedule.ID)
 	fmt.Printf("Departure Time: %s\n", schedule.DepartureTime)
@@ -183,11 +192,11 @@ func (s *TripGeneratorService) GenerateTripsForNewSchedule(schedule *models.Trip
 	}
 
 	fmt.Printf("Final date range: %s to %s\n", startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
-	
+
 	generated, err := s.GenerateTripsForSchedule(schedule, startDate, endDate)
 	fmt.Printf("Trips generated: %d, Error: %v\n", generated, err)
 	fmt.Printf("=== GenerateTripsForNewSchedule END ===\n\n")
-	
+
 	return generated, err
 }
 
