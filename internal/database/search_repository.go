@@ -137,23 +137,56 @@ func (r *SearchRepository) FindDirectTrips(
 		LIMIT $4
 	`
 
-	var trips []models.TripResult
-	err := r.db.Select(&trips, query, fromStopID, toStopID, afterTime, limit)
+	// Use intermediate struct to scan flat SQL results
+	type tripWithFeatures struct {
+		TripID           uuid.UUID  `db:"trip_id"`
+		RouteName        string     `db:"route_name"`
+		RouteNumber      *string    `db:"route_number"`
+		BusType          string     `db:"bus_type"`
+		DepartureTime    time.Time  `db:"departure_time"`
+		EstimatedArrival time.Time  `db:"estimated_arrival"`
+		DurationMinutes  int        `db:"duration_minutes"`
+		TotalSeats       int        `db:"total_seats"`
+		Fare             float64    `db:"fare"`
+		BoardingPoint    string     `db:"boarding_point"`
+		DroppingPoint    string     `db:"dropping_point"`
+		HasWiFi          bool       `db:"has_wifi"`
+		HasAC            bool       `db:"has_ac"`
+		HasChargingPorts bool       `db:"has_charging_ports"`
+		HasEntertainment bool       `db:"has_entertainment"`
+		HasRefreshments  bool       `db:"has_refreshments"`
+		IsBookable       bool       `db:"is_bookable"`
+	}
+
+	var tempTrips []tripWithFeatures
+	err := r.db.Select(&tempTrips, query, fromStopID, toStopID, afterTime, limit)
 	if err != nil {
 		return nil, fmt.Errorf("error finding trips: %w", err)
 	}
 
-	// Map features into nested struct
-	for i := range trips {
-		// Features are already populated by the query
-		// Just ensure they're properly structured
-		trip := &trips[i]
-		trip.BusFeatures = models.BusFeatures{
-			HasWiFi:          false, // Will be populated from query
-			HasAC:            false,
-			HasChargingPorts: false,
-			HasEntertainment: false,
-			HasRefreshments:  false,
+	// Map to TripResult with nested BusFeatures
+	trips := make([]models.TripResult, len(tempTrips))
+	for i, temp := range tempTrips {
+		trips[i] = models.TripResult{
+			TripID:           temp.TripID,
+			RouteName:        temp.RouteName,
+			RouteNumber:      temp.RouteNumber,
+			BusType:          temp.BusType,
+			DepartureTime:    temp.DepartureTime,
+			EstimatedArrival: temp.EstimatedArrival,
+			DurationMinutes:  temp.DurationMinutes,
+			TotalSeats:       temp.TotalSeats,
+			Fare:             temp.Fare,
+			BoardingPoint:    temp.BoardingPoint,
+			DroppingPoint:    temp.DroppingPoint,
+			BusFeatures: models.BusFeatures{
+				HasWiFi:          temp.HasWiFi,
+				HasAC:            temp.HasAC,
+				HasChargingPorts: temp.HasChargingPorts,
+				HasEntertainment: temp.HasEntertainment,
+				HasRefreshments:  temp.HasRefreshments,
+			},
+			IsBookable: temp.IsBookable,
 		}
 	}
 
