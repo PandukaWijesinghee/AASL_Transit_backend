@@ -106,7 +106,7 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 				AssignedDriverID:         schedule.DefaultDriverID,
 				AssignedConductorID:      schedule.DefaultConductorID,
 				SeatLayoutID:             seatLayoutID, // Use bus's seat layout if available
-				IsBookable:               schedule.IsBookable,
+				IsBookable:               schedule.IsBookable && seatLayoutID != nil, // Only bookable if we have a seat layout
 				BaseFare:                 schedule.BaseFare,
 				AssignmentDeadline:       &assignmentDeadline,
 				Status:                   models.ScheduledTripStatusScheduled,
@@ -228,6 +228,15 @@ func (s *TripGeneratorService) GenerateFutureTrips() (int, error) {
 
 			assignmentDeadline := departureDatetime.Add(-time.Duration(assignmentDeadlineHours) * time.Hour)
 
+			// Get seat layout ID from bus (if assigned)
+			var seatLayoutID *string
+			if timetable.BusID != nil {
+				bus, err := s.busRepo.GetByID(*timetable.BusID)
+				if err == nil && bus.SeatLayoutID != nil {
+					seatLayoutID = bus.SeatLayoutID
+				}
+			}
+
 			// Create scheduled trip
 			scheduleID := timetable.ID
 			trip := &models.ScheduledTrip{
@@ -240,7 +249,8 @@ func (s *TripGeneratorService) GenerateFutureTrips() (int, error) {
 				EstimatedDurationMinutes: timetable.EstimatedDurationMinutes, // Copy duration from template (arrival calculated on-the-fly)
 				AssignedDriverID:         timetable.DefaultDriverID,
 				AssignedConductorID:      timetable.DefaultConductorID,
-				IsBookable:               timetable.IsBookable,
+				SeatLayoutID:             seatLayoutID,                               // Use bus's seat layout if available
+				IsBookable:               timetable.IsBookable && seatLayoutID != nil, // Only bookable if we have a seat layout
 				TotalSeats:               totalSeats,
 				// AvailableSeats and BookedSeats removed - managed in separate booking table
 				BaseFare:                 timetable.BaseFare,
