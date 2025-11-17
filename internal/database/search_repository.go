@@ -76,6 +76,13 @@ func (r *SearchRepository) FindDirectTrips(
 	afterTime time.Time,
 	limit int,
 ) ([]models.TripResult, error) {
+	// Log search parameters
+	fmt.Printf("\n🔍 === SEARCH QUERY DEBUG ===\n")
+	fmt.Printf("FROM Stop ID: %s\n", fromStopID.String())
+	fmt.Printf("TO Stop ID: %s\n", toStopID.String())
+	fmt.Printf("After Time: %s\n", afterTime.Format(time.RFC3339))
+	fmt.Printf("Limit: %d\n", limit)
+
 	query := `
 		SELECT DISTINCT ON (st.id)
 			st.id as trip_id,
@@ -161,7 +168,19 @@ func (r *SearchRepository) FindDirectTrips(
 	var tempTrips []tripWithFeatures
 	err := r.db.Select(&tempTrips, query, fromStopID, toStopID, afterTime, limit)
 	if err != nil {
+		fmt.Printf("❌ SQL Query Error: %v\n", err)
 		return nil, fmt.Errorf("error finding trips: %w", err)
+	}
+
+	fmt.Printf("✅ SQL Query successful - Found %d trips\n", len(tempTrips))
+
+	// Log each trip found for debugging
+	for i, trip := range tempTrips {
+		fmt.Printf("  Trip %d: %s (%s) - Departs: %s\n",
+			i+1,
+			trip.RouteName,
+			trip.TripID.String()[:8],
+			trip.DepartureTime.Format("2006-01-02 15:04"))
 	}
 
 	// Map to TripResult with nested BusFeatures
