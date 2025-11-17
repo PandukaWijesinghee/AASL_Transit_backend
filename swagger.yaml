@@ -4875,21 +4875,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    enum: [success, partial, error]
-                  message:
-                    type: string
-                  search_details:
-                    type: object
-                  results:
-                    type: array
-                    items:
-                      type: object
-                  search_time_ms:
-                    type: integer
+                $ref: "#/components/schemas/SearchResponse"
         "400":
           description: Invalid request
         "500":
@@ -4913,6 +4899,15 @@ paths:
       responses:
         "200":
           description: Popular routes retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  routes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PopularRoute"
 
   /api/v1/search/autocomplete:
     get:
@@ -4938,6 +4933,15 @@ paths:
       responses:
         "200":
           description: Autocomplete suggestions retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/StopAutocomplete"
 
   /api/v1/search/health:
     get:
@@ -6196,6 +6200,178 @@ components:
                         is_aisle_seat:
                           type: boolean
                           example: true
+
+    # ========== Search Service Schemas ==========
+
+    SearchResponse:
+      type: object
+      description: Response from trip search API
+      properties:
+        status:
+          type: string
+          enum: [success, partial, error]
+          example: "success"
+          description: "success = found results, partial = stop not found, error = validation failed"
+        message:
+          type: string
+          example: "Found 5 trip(s) from Colombo Fort to Kandy"
+        search_details:
+          $ref: "#/components/schemas/SearchDetails"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/TripResult"
+        search_time_ms:
+          type: integer
+          format: int64
+          example: 234
+          description: "Search execution time in milliseconds"
+
+    SearchDetails:
+      type: object
+      description: Details about how the search was performed
+      properties:
+        from_stop:
+          $ref: "#/components/schemas/StopInfo"
+        to_stop:
+          $ref: "#/components/schemas/StopInfo"
+        search_type:
+          type: string
+          enum: [exact, fuzzy, failed]
+          example: "exact"
+          description: "exact = direct match, fuzzy = approximate match, failed = no match"
+
+    StopInfo:
+      type: object
+      description: Bus stop information with matching details
+      properties:
+        id:
+          type: string
+          format: uuid
+          nullable: true
+          example: "550e8400-e29b-41d4-a716-446655440000"
+          description: "Stop ID (null if not found)"
+        name:
+          type: string
+          example: "Colombo Fort"
+          description: "Matched stop name"
+        matched:
+          type: boolean
+          example: true
+          description: "Whether stop was found in database"
+        original_input:
+          type: string
+          example: "colombo"
+          description: "What user typed"
+
+    TripResult:
+      type: object
+      description: A single trip in search results
+      properties:
+        trip_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        route_name:
+          type: string
+          example: "Colombo - Kandy Express"
+        route_number:
+          type: string
+          nullable: true
+          example: "001"
+        bus_type:
+          type: string
+          enum: [normal, semi-luxury, luxury, super-luxury, ac-luxury]
+          example: "ac-luxury"
+        departure_time:
+          type: string
+          format: date-time
+          example: "2025-11-17T08:00:00+05:30"
+          description: "Departure time in Asia/Colombo timezone with RFC3339 format"
+        estimated_arrival:
+          type: string
+          format: date-time
+          example: "2025-11-17T12:00:00+05:30"
+          description: "Estimated arrival time in Asia/Colombo timezone with RFC3339 format"
+        duration_minutes:
+          type: integer
+          example: 240
+          description: "Trip duration in minutes"
+        total_seats:
+          type: integer
+          example: 40
+        fare:
+          type: number
+          format: float
+          example: 500.00
+          description: "Fare in LKR"
+        boarding_point:
+          type: string
+          example: "Colombo Fort"
+        dropping_point:
+          type: string
+          example: "Kandy Town"
+        bus_features:
+          $ref: "#/components/schemas/BusFeatures"
+        is_bookable:
+          type: boolean
+          example: true
+
+    BusFeatures:
+      type: object
+      description: Bus amenities and features
+      properties:
+        has_wifi:
+          type: boolean
+          example: true
+        has_ac:
+          type: boolean
+          example: true
+        has_charging_ports:
+          type: boolean
+          example: true
+        has_entertainment:
+          type: boolean
+          example: false
+        has_refreshments:
+          type: boolean
+          example: false
+
+    PopularRoute:
+      type: object
+      description: Frequently searched route for quick selection
+      properties:
+        from_stop_name:
+          type: string
+          example: "Colombo Fort"
+        to_stop_name:
+          type: string
+          example: "Kandy"
+        route_count:
+          type: integer
+          example: 15
+          description: "Number of routes available"
+        search_count:
+          type: integer
+          nullable: true
+          example: 1234
+          description: "How many times searched (from analytics)"
+
+    StopAutocomplete:
+      type: object
+      description: Stop suggestion for autocomplete
+      properties:
+        stop_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        stop_name:
+          type: string
+          example: "Colombo Fort"
+        route_count:
+          type: integer
+          example: 25
+          description: "Number of routes serving this stop"
 
   responses:
     BadRequest:
