@@ -41,7 +41,7 @@ func (s *SearchService) SearchTrips(
 		"from":    req.From,
 		"to":      req.To,
 		"user_id": userID,
-	}).Info("Processing search request")
+	}).Info("=== SearchService: Processing search request ===")
 
 	// Initialize response
 	response := &models.SearchResponse{
@@ -107,11 +107,20 @@ func (s *SearchService) SearchTrips(
 	searchTime := req.GetSearchDateTime()
 
 	// Step 5: Find available trips
+	s.logger.WithFields(logrus.Fields{
+		"from_stop_id": fromStopID.String(),
+		"to_stop_id":   toStopID.String(),
+		"search_time":  searchTime,
+		"limit":        req.Limit,
+	}).Info("Querying database for trips...")
+
 	trips, err := s.repo.FindDirectTrips(*fromStopID, *toStopID, searchTime, req.Limit)
 	if err != nil {
-		s.logger.WithError(err).Error("Error finding trips")
+		s.logger.WithError(err).Error("Error finding trips from database")
 		return nil, fmt.Errorf("error searching for trips: %w", err)
 	}
+
+	s.logger.WithField("trips_found", len(trips)).Info("Database query completed successfully")
 
 	response.Results = trips
 
@@ -146,6 +155,8 @@ func (s *SearchService) SearchTrips(
 		"results":      len(trips),
 		"response_ms":  response.SearchTimeMs,
 	}).Info("Search completed successfully")
+
+	s.logger.Info("=== SearchService: Returning response (JSON marshaling will happen next) ===")
 
 	return response, nil
 }
