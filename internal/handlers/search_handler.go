@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"bytes"
-	"io"
 	"net/http"
 	"strconv"
 
@@ -51,24 +49,7 @@ func (h *SearchHandler) SearchTrips(c *gin.Context) {
 		"authorization":  c.GetHeader("Authorization") != "",
 	}).Info("Request headers received")
 
-	// Read raw request body for debugging
-	bodyBytes, err := io.ReadAll(c.Request.Body)
-	if err != nil {
-		h.logger.WithError(err).Error("Failed to read request body")
-		c.JSON(http.StatusBadRequest, gin.H{
-			"status":  "error",
-			"message": "Failed to read request body",
-		})
-		return
-	}
-
-	// Log raw body
-	h.logger.WithField("raw_body", string(bodyBytes)).Info("Raw request body received")
-
-	// Restore the body for JSON parsing
-	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
-	// Parse request body
+	// Parse request body (let Gin handle body reading internally)
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.logger.WithError(err).Warn("Invalid search request - JSON parsing failed")
 		c.JSON(http.StatusBadRequest, gin.H{
