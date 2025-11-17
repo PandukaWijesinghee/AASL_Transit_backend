@@ -66,25 +66,19 @@ func (tr TripResult) MarshalJSON() ([]byte, error) {
 		loc = time.UTC
 	}
 
-	// Convert timestamps to the correct timezone if they don't have one
-	departureTime := tr.DepartureTime
-	estimatedArrival := tr.EstimatedArrival
+	// Always convert database timestamps to Asia/Colombo timezone
+	// Database stores times without timezone, so we interpret them as Sri Lankan local time
+	departureTime := time.Date(
+		tr.DepartureTime.Year(), tr.DepartureTime.Month(), tr.DepartureTime.Day(),
+		tr.DepartureTime.Hour(), tr.DepartureTime.Minute(), tr.DepartureTime.Second(),
+		tr.DepartureTime.Nanosecond(), loc,
+	)
 
-	// If the time doesn't have a timezone set, assume it's in the local timezone
-	if departureTime.Location() == time.UTC && departureTime.Format("Z07:00") == "+00:00" {
-		departureTime = time.Date(
-			departureTime.Year(), departureTime.Month(), departureTime.Day(),
-			departureTime.Hour(), departureTime.Minute(), departureTime.Second(),
-			departureTime.Nanosecond(), loc,
-		)
-	}
-	if estimatedArrival.Location() == time.UTC && estimatedArrival.Format("Z07:00") == "+00:00" {
-		estimatedArrival = time.Date(
-			estimatedArrival.Year(), estimatedArrival.Month(), estimatedArrival.Day(),
-			estimatedArrival.Hour(), estimatedArrival.Minute(), estimatedArrival.Second(),
-			estimatedArrival.Nanosecond(), loc,
-		)
-	}
+	estimatedArrival := time.Date(
+		tr.EstimatedArrival.Year(), tr.EstimatedArrival.Month(), tr.EstimatedArrival.Day(),
+		tr.EstimatedArrival.Hour(), tr.EstimatedArrival.Minute(), tr.EstimatedArrival.Second(),
+		tr.EstimatedArrival.Nanosecond(), loc,
+	)
 
 	type Alias TripResult
 	return json.Marshal(&struct {
