@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -51,7 +52,10 @@ func (h *SearchHandler) SearchTrips(c *gin.Context) {
 
 	// Parse request body (let Gin handle body reading internally)
 	if err := c.ShouldBindJSON(&req); err != nil {
-		h.logger.WithError(err).Warn("Invalid search request - JSON parsing failed")
+		h.logger.WithFields(logrus.Fields{
+			"error":        err.Error(),
+			"error_type":   fmt.Sprintf("%T", err),
+		}).Warn("Invalid search request - JSON parsing failed")
 		c.JSON(http.StatusBadRequest, gin.H{
 			"status":  "error",
 			"message": "Invalid request format",
