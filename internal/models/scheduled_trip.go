@@ -31,8 +31,7 @@ type ScheduledTrip struct {
 	IsBookable               bool                `json:"is_bookable" db:"is_bookable"`                 // Controls if trip is available for passenger booking
 	EverPublished            bool                `json:"ever_published" db:"ever_published"`           // Tracks if trip was ever made bookable (stays true once set)
 	TotalSeats               int                 `json:"total_seats" db:"total_seats"`
-	AvailableSeats           int                 `json:"available_seats" db:"available_seats"`
-	BookedSeats              int                 `json:"booked_seats" db:"booked_seats"`
+	// AvailableSeats and BookedSeats removed - will be calculated from separate booking tables
 	BaseFare                 float64             `json:"base_fare" db:"base_fare"`
 	BookingAdvanceHours      int                 `json:"booking_advance_hours" db:"booking_advance_hours"`       // NEW: Hours before trip that booking opens
 	AssignmentDeadline       *time.Time          `json:"assignment_deadline,omitempty" db:"assignment_deadline"` // NEW: Deadline to assign resources
@@ -173,6 +172,7 @@ func (s *ScheduledTrip) IsPastDeparture() bool {
 }
 
 // CanAcceptBooking checks if the trip can accept new bookings
+// TODO: Update to check available seats from separate booking table
 func (s *ScheduledTrip) CanAcceptBooking(seats int) bool {
 	if !s.IsBookable {
 		return false
@@ -186,42 +186,26 @@ func (s *ScheduledTrip) CanAcceptBooking(seats int) bool {
 		return false
 	}
 
-	return s.AvailableSeats >= seats
+	// TODO: Query booking table to check if seats are available
+	return true // Temporary - needs to check actual bookings
 }
 
-// ReserveSeats reserves seats for a booking
-func (s *ScheduledTrip) ReserveSeats(seats int) error {
-	if !s.CanAcceptBooking(seats) {
-		return errors.New("trip cannot accept bookings")
-	}
+// ReserveSeats - DEPRECATED: Seats will be managed in separate booking table
+// func (s *ScheduledTrip) ReserveSeats(seats int) error {
+// 	// This method is no longer used - bookings are stored in separate table
+// 	return errors.New("method deprecated - use booking table")
+// }
 
-	s.BookedSeats += seats
-	s.AvailableSeats -= seats
+// ReleaseSeats - DEPRECATED: Seats will be managed in separate booking table
+// func (s *ScheduledTrip) ReleaseSeats(seats int) {
+// 	// This method is no longer used - bookings are stored in separate table
+// }
 
-	return nil
-}
-
-// ReleaseSeats releases seats from a cancelled booking
-func (s *ScheduledTrip) ReleaseSeats(seats int) {
-	s.BookedSeats -= seats
-	s.AvailableSeats += seats
-
-	// Ensure values don't go negative or exceed total
-	if s.BookedSeats < 0 {
-		s.BookedSeats = 0
-	}
-	if s.AvailableSeats > s.TotalSeats {
-		s.AvailableSeats = s.TotalSeats
-	}
-}
-
-// OccupancyPercentage returns the percentage of booked seats
-func (s *ScheduledTrip) OccupancyPercentage() float64 {
-	if s.TotalSeats == 0 {
-		return 0
-	}
-	return float64(s.BookedSeats) / float64(s.TotalSeats) * 100
-}
+// OccupancyPercentage - DEPRECATED: Will be calculated from booking table
+// func (s *ScheduledTrip) OccupancyPercentage() float64 {
+// 	// This will need to query booking table to calculate occupancy
+// 	return 0
+// }
 
 // ScheduledTripWithRouteInfo extends ScheduledTrip with route details
 type ScheduledTripWithRouteInfo struct {

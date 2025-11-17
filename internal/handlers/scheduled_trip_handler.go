@@ -704,8 +704,7 @@ func (h *ScheduledTripHandler) CreateSpecialTrip(c *gin.Context) {
 		AssignedConductorID:      req.AssignedConductorID,
 		IsBookable:               req.IsBookable,
 		TotalSeats:               req.MaxBookableSeats,
-		AvailableSeats:           req.MaxBookableSeats,
-		BookedSeats:              0,
+		// AvailableSeats and BookedSeats removed - managed in separate booking table
 		BaseFare:                 req.BaseFare,
 		BookingAdvanceHours:      bookingAdvanceHours,
 		AssignmentDeadline:       &assignmentDeadline,

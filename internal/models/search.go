@@ -47,7 +47,7 @@ type TripResult struct {
 	DepartureTime       time.Time  `json:"departure_time" db:"departure_time"`
 	EstimatedArrival    time.Time  `json:"estimated_arrival" db:"estimated_arrival"`
 	DurationMinutes     int        `json:"duration_minutes" db:"duration_minutes"`
-	AvailableSeats      int        `json:"available_seats" db:"available_seats"`
+	// AvailableSeats removed - will be calculated from booking table in separate query
 	TotalSeats          int        `json:"total_seats" db:"total_seats"`
 	Fare                float64    `json:"fare" db:"fare"`
 	BoardingPoint       string     `json:"boarding_point" db:"boarding_point"`

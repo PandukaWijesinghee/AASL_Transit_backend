@@ -1,7 +1,6 @@
 package services
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -58,34 +57,17 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 				continue
 			}
 
-			// Get total seats from bus seat layout (if assigned)
-			totalSeats := 50 // Default
+			// Get seat layout ID from bus (if assigned)
+			var seatLayoutID *string
 			if schedule.BusID != nil {
 				bus, err := s.busRepo.GetByID(*schedule.BusID)
 				if err == nil && bus.SeatLayoutID != nil {
-					// Parse seat layout ID and fetch template
-					if layoutID, parseErr := uuid.Parse(*bus.SeatLayoutID); parseErr == nil {
-						layout, layoutErr := s.seatLayoutRepo.GetTemplateByID(context.Background(), layoutID)
-						if layoutErr == nil && layout != nil {
-							totalSeats = layout.TotalSeats
-						}
-					}
+					seatLayoutID = bus.SeatLayoutID
 				}
-			} // Calculate max bookable seats
-			maxBookableSeats := totalSeats
-			if schedule.MaxBookableSeats != nil && *schedule.MaxBookableSeats < totalSeats {
-				maxBookableSeats = *schedule.MaxBookableSeats
 			}
 
-			// Determine booking advance hours (use schedule's or default)
-			bookingAdvanceHours := 72 // system default
-			if schedule.BookingAdvanceHours != nil {
-				bookingAdvanceHours = *schedule.BookingAdvanceHours
-			}
-
-			// Calculate assignment deadline (e.g., 2 hours before departure)
-			// TODO: Get assignment_deadline_hours from system settings
-			assignmentDeadlineHours := 2
+			// Calculate assignment deadline from system settings
+			assignmentDeadlineHours := s.settingsRepo.GetIntValue("assignment_deadline_hours", 2)
 
 			// Parse departure time from schedule and combine with current date to create departure_datetime
 			var departureDatetime time.Time
@@ -119,16 +101,13 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 				BusOwnerRouteID:          schedule.BusOwnerRouteID, // Inherit route from schedule (can be updated later)
 				PermitID:                 schedule.PermitID,        // Pass pointer directly (nil if not set)
 				BusID:                    schedule.BusID,
-				DepartureDatetime:        departureDatetime,                 // Specific departure date and time
+				DepartureDatetime:        departureDatetime,                                      // Specific departure date and time
 				EstimatedDurationMinutes: getEstimatedDuration(schedule.EstimatedDurationMinutes), // Required field - use default 60 if nil
 				AssignedDriverID:         schedule.DefaultDriverID,
 				AssignedConductorID:      schedule.DefaultConductorID,
+				SeatLayoutID:             seatLayoutID, // Use bus's seat layout if available
 				IsBookable:               schedule.IsBookable,
-				TotalSeats:               totalSeats,
-				AvailableSeats:           maxBookableSeats,
-				BookedSeats:              0,
 				BaseFare:                 schedule.BaseFare,
-				BookingAdvanceHours:      bookingAdvanceHours,
 				AssignmentDeadline:       &assignmentDeadline,
 				Status:                   models.ScheduledTripStatusScheduled,
 				SelectedStopIDs:          schedule.SelectedStopIDs,
@@ -225,20 +204,19 @@ func (s *TripGeneratorService) GenerateFutureTrips() (int, error) {
 
 			// Get total seats (default to permit seating capacity)
 			totalSeats := 50 // Default
-			maxBookableSeats := totalSeats
 			if timetable.MaxBookableSeats != nil {
-				maxBookableSeats = *timetable.MaxBookableSeats
 				totalSeats = *timetable.MaxBookableSeats
 			}
 
-			// Determine booking advance hours
-			bookingAdvanceHours := 72 // system default
+			// Determine booking advance hours from system settings
+			defaultBookingAdvanceHours := s.settingsRepo.GetIntValue("booking_advance_hours_default", 72)
+			bookingAdvanceHours := defaultBookingAdvanceHours
 			if timetable.BookingAdvanceHours != nil {
 				bookingAdvanceHours = *timetable.BookingAdvanceHours
 			}
 
-			// Calculate assignment deadline (2 hours before departure)
-			assignmentDeadlineHours := 2
+			// Calculate assignment deadline from system settings
+			assignmentDeadlineHours := s.settingsRepo.GetIntValue("assignment_deadline_hours", 2)
 
 			// Parse departure time from timetable and combine with date to create departure_datetime
 			var departureDatetime time.Time
@@ -264,8 +242,7 @@ func (s *TripGeneratorService) GenerateFutureTrips() (int, error) {
 				AssignedConductorID:      timetable.DefaultConductorID,
 				IsBookable:               timetable.IsBookable,
 				TotalSeats:               totalSeats,
-				AvailableSeats:           maxBookableSeats,
-				BookedSeats:              0,
+				// AvailableSeats and BookedSeats removed - managed in separate booking table
 				BaseFare:                 timetable.BaseFare,
 				BookingAdvanceHours:      bookingAdvanceHours,
 				AssignmentDeadline:       &assignmentDeadline,

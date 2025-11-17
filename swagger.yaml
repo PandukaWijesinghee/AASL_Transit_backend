@@ -31,6 +31,24 @@ info:
     - **Datetime Format**: All `departure_datetime` values combine the trip date with the schedule's departure time in UTC
     - **Error Handling**: Invalid departure times or zero datetime values are logged and skipped
 
+    ## Bus Management
+    - **Seat Layout**: Buses reference a seat layout template via `seat_layout_id`
+    - **Total Seats**: The `total_seats` count is obtained from the `bus_seat_layout_templates` table, not stored in the buses table
+    - **Data Integrity**: This prevents data duplication and ensures seat count always matches the actual layout configuration
+
+    ## Booking & Seat Availability
+    - **Dynamic Calculation**: Available seats and booked seats are NOT stored in `scheduled_trips` table
+    - **Real-time Data**: These values are calculated dynamically from the `bookings` table when needed
+    - **Formula**: `available_seats = total_seats - COUNT(confirmed bookings)`
+    - **Benefits**: Always accurate, no stale data, single source of truth
+
+    ## System Settings
+    - **Dynamic Configuration**: Key system parameters are stored in `system_settings` table
+    - **booking_advance_hours_default**: Default hours before trip departure that booking opens (default: 72)
+    - **assignment_deadline_hours**: Hours before departure to assign bus/staff (default: 2)
+    - **trip_generation_days_ahead**: Number of days ahead to generate trips (default: 7)
+    - **Admin Configurable**: Settings can be updated via API without code changes
+
   version: 1.0.0
   contact:
     name: SmartTransit Development Team
@@ -5633,7 +5651,7 @@ components:
           type: string
           format: uuid
           example: "2c2c3e2b-4328-47b7-ac34-d8e08b46f265"
-          description: "Optional default seat layout for this bus"
+          description: "References the seat layout template. To get total_seats, join with bus_seat_layout_templates table using this ID."
         has_wifi:
           type: boolean
           example: true
@@ -5697,7 +5715,7 @@ components:
           type: string
           format: uuid
           example: "2c2c3e2b-4328-47b7-ac34-d8e08b46f265"
-          description: "Optional default seat layout for this bus"
+          description: "References the seat layout template. To get total_seats, join with bus_seat_layout_templates table using this ID."
         has_wifi:
           type: boolean
           default: false
@@ -5749,7 +5767,7 @@ components:
           type: string
           format: uuid
           example: "2c2c3e2b-4328-47b7-ac34-d8e08b46f265"
-          description: "Optional default seat layout for this bus"
+          description: "References the seat layout template. To get total_seats, join with bus_seat_layout_templates table using this ID."
         has_wifi:
           type: boolean
           example: true

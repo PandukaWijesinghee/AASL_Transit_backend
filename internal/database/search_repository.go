@@ -87,15 +87,7 @@ func (r *SearchRepository) FindDirectTrips(
 			st.departure_datetime +
 				(COALESCE(st.estimated_duration_minutes, 0) * interval '1 minute') as estimated_arrival,
 			COALESCE(st.estimated_duration_minutes, 0) as duration_minutes,
-			-- Calculate available seats (total - booked)
-			COALESCE(bslt.total_seats, 0) - COALESCE(
-				(
-					SELECT SUM(number_of_seats)
-					FROM bookings
-					WHERE scheduled_trip_id = st.id
-					  AND booking_status IN ('confirmed')
-				), 0
-			) as available_seats,
+			-- Available seats removed - will be calculated from separate booking table
 			COALESCE(bslt.total_seats, 0) as total_seats,
 			COALESCE(rp.approved_fare, st.base_fare, 0) as fare,
 			from_stop.stop_name as boarding_point,
