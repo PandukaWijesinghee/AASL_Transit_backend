@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,8 +45,8 @@ type TripResult struct {
 	RouteName           string     `json:"route_name" db:"route_name"`
 	RouteNumber         *string    `json:"route_number,omitempty" db:"route_number"`
 	BusType             string     `json:"bus_type" db:"bus_type"`
-	DepartureTime       time.Time  `json:"departure_time" db:"departure_time"`
-	EstimatedArrival    time.Time  `json:"estimated_arrival" db:"estimated_arrival"`
+	DepartureTime       time.Time  `json:"-" db:"departure_time"`
+	EstimatedArrival    time.Time  `json:"-" db:"estimated_arrival"`
 	DurationMinutes     int        `json:"duration_minutes" db:"duration_minutes"`
 	// AvailableSeats removed - will be calculated from booking table in separate query
 	TotalSeats          int        `json:"total_seats" db:"total_seats"`
@@ -54,6 +55,47 @@ type TripResult struct {
 	DroppingPoint       string     `json:"dropping_point" db:"dropping_point"`
 	BusFeatures         BusFeatures `json:"bus_features"`
 	IsBookable          bool       `json:"is_bookable" db:"is_bookable"`
+}
+
+// MarshalJSON implements custom JSON marshaling to handle timestamps without timezone
+func (tr TripResult) MarshalJSON() ([]byte, error) {
+	// Load Asia/Colombo timezone (Sri Lanka)
+	loc, err := time.LoadLocation("Asia/Colombo")
+	if err != nil {
+		// Fallback to UTC if timezone loading fails
+		loc = time.UTC
+	}
+
+	// Convert timestamps to the correct timezone if they don't have one
+	departureTime := tr.DepartureTime
+	estimatedArrival := tr.EstimatedArrival
+
+	// If the time doesn't have a timezone set, assume it's in the local timezone
+	if departureTime.Location() == time.UTC && departureTime.Format("Z07:00") == "+00:00" {
+		departureTime = time.Date(
+			departureTime.Year(), departureTime.Month(), departureTime.Day(),
+			departureTime.Hour(), departureTime.Minute(), departureTime.Second(),
+			departureTime.Nanosecond(), loc,
+		)
+	}
+	if estimatedArrival.Location() == time.UTC && estimatedArrival.Format("Z07:00") == "+00:00" {
+		estimatedArrival = time.Date(
+			estimatedArrival.Year(), estimatedArrival.Month(), estimatedArrival.Day(),
+			estimatedArrival.Hour(), estimatedArrival.Minute(), estimatedArrival.Second(),
+			estimatedArrival.Nanosecond(), loc,
+		)
+	}
+
+	type Alias TripResult
+	return json.Marshal(&struct {
+		DepartureTime    string `json:"departure_time"`
+		EstimatedArrival string `json:"estimated_arrival"`
+		*Alias
+	}{
+		DepartureTime:    departureTime.Format(time.RFC3339),
+		EstimatedArrival: estimatedArrival.Format(time.RFC3339),
+		Alias:            (*Alias)(&tr),
+	})
 }
 
 // BusFeatures represents amenities available on the bus
