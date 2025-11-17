@@ -70,6 +70,98 @@ func (r *SearchRepository) FindStopByName(stopName string) (*models.StopInfo, *u
 	return stopInfo, &result.ID, nil
 }
 
+// StopPairResult holds the result of finding two stops on the same route
+type StopPairResult struct {
+	FromStop  *models.StopInfo
+	ToStop    *models.StopInfo
+	FromID    uuid.UUID
+	ToID      uuid.UUID
+	RouteID   uuid.UUID
+	RouteName string
+	Matched   bool
+}
+
+// FindStopPairOnSameRoute finds two stops that are on the same route with fuzzy matching
+// This ensures both stops can be connected by a trip
+func (r *SearchRepository) FindStopPairOnSameRoute(fromName, toName string) (*StopPairResult, error) {
+	query := `
+		SELECT
+			from_stop.id as from_id,
+			from_stop.stop_name as from_name,
+			to_stop.id as to_id,
+			to_stop.stop_name as to_name,
+			from_stop.master_route_id as route_id,
+			mr.route_name,
+			from_stop.stop_order as from_order,
+			to_stop.stop_order as to_order
+		FROM master_route_stops from_stop
+		INNER JOIN master_route_stops to_stop
+			ON from_stop.master_route_id = to_stop.master_route_id
+		INNER JOIN master_routes mr ON mr.id = from_stop.master_route_id
+		WHERE
+			LOWER(from_stop.stop_name) LIKE LOWER('%' || $1 || '%')
+			AND LOWER(to_stop.stop_name) LIKE LOWER('%' || $2 || '%')
+			AND from_stop.stop_order < to_stop.stop_order
+			AND mr.is_active = true
+		ORDER BY
+			CASE WHEN LOWER(from_stop.stop_name) = LOWER($1) THEN 0 ELSE 1 END,
+			CASE WHEN LOWER(to_stop.stop_name) = LOWER($2) THEN 0 ELSE 1 END,
+			(SELECT COUNT(*) FROM master_route_stops WHERE master_route_id = mr.id) DESC
+		LIMIT 1
+	`
+
+	var result struct {
+		FromID    uuid.UUID `db:"from_id"`
+		FromName  string    `db:"from_name"`
+		ToID      uuid.UUID `db:"to_id"`
+		ToName    string    `db:"to_name"`
+		RouteID   uuid.UUID `db:"route_id"`
+		RouteName string    `db:"route_name"`
+		FromOrder int       `db:"from_order"`
+		ToOrder   int       `db:"to_order"`
+	}
+
+	err := r.db.Get(&result, query, strings.TrimSpace(fromName), strings.TrimSpace(toName))
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// No stop pair found on same route
+			return &StopPairResult{
+				FromStop: &models.StopInfo{
+					Matched:       false,
+					OriginalInput: fromName,
+				},
+				ToStop: &models.StopInfo{
+					Matched:       false,
+					OriginalInput: toName,
+				},
+				Matched: false,
+			}, nil
+		}
+		return nil, fmt.Errorf("error finding stop pair: %w", err)
+	}
+
+	// Successfully found both stops on the same route
+	return &StopPairResult{
+		FromStop: &models.StopInfo{
+			ID:            &result.FromID,
+			Name:          result.FromName,
+			Matched:       true,
+			OriginalInput: fromName,
+		},
+		ToStop: &models.StopInfo{
+			ID:            &result.ToID,
+			Name:          result.ToName,
+			Matched:       true,
+			OriginalInput: toName,
+		},
+		FromID:    result.FromID,
+		ToID:      result.ToID,
+		RouteID:   result.RouteID,
+		RouteName: result.RouteName,
+		Matched:   true,
+	}, nil
+}
+
 // FindDirectTrips finds all direct trips between two stops
 func (r *SearchRepository) FindDirectTrips(
 	fromStopID, toStopID uuid.UUID,

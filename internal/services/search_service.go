@@ -60,61 +60,62 @@ func (s *SearchService) SearchTrips(
 		Results: []models.TripResult{},
 	}
 
-	// Step 1: Find FROM stop
-	fromStopInfo, fromStopID, err := s.repo.FindStopByName(req.From)
+	// Step 1: Find stop pair on same route with fuzzy matching
+	stopPair, err := s.repo.FindStopPairOnSameRoute(req.From, req.To)
 	if err != nil {
-		s.logger.WithError(err).Error("Error finding from stop")
-		return nil, fmt.Errorf("error searching for origin stop: %w", err)
+		s.logger.WithError(err).Error("Error finding stop pair")
+		return nil, fmt.Errorf("error searching for stops: %w", err)
 	}
 
-	response.SearchDetails.FromStop = *fromStopInfo
+	response.SearchDetails.FromStop = *stopPair.FromStop
+	response.SearchDetails.ToStop = *stopPair.ToStop
 
-	if fromStopID == nil {
+	// Check if stop pair was found
+	if !stopPair.Matched {
 		response.Status = "partial"
-		response.Message = fmt.Sprintf("Origin stop '%s' not found. Please check spelling or try a nearby location.", req.From)
+		if !stopPair.FromStop.Matched && !stopPair.ToStop.Matched {
+			response.Message = fmt.Sprintf(
+				"Could not find stops '%s' and '%s' on the same route. Please check spelling or try nearby locations.",
+				req.From,
+				req.To,
+			)
+		} else if !stopPair.FromStop.Matched {
+			response.Message = fmt.Sprintf(
+				"Origin stop '%s' not found on any route to '%s'. Please check spelling or try a nearby location.",
+				req.From,
+				req.To,
+			)
+		} else {
+			response.Message = fmt.Sprintf(
+				"Destination stop '%s' not found on any route from '%s'. Please check spelling or try a nearby location.",
+				req.To,
+				req.From,
+			)
+		}
 		response.SearchDetails.SearchType = "failed"
 		s.logSearch(req, response, userID, &ipAddress, time.Since(startTime))
 		return response, nil
 	}
 
-	// Step 2: Find TO stop
-	toStopInfo, toStopID, err := s.repo.FindStopByName(req.To)
-	if err != nil {
-		s.logger.WithError(err).Error("Error finding to stop")
-		return nil, fmt.Errorf("error searching for destination stop: %w", err)
-	}
+	s.logger.WithFields(logrus.Fields{
+		"from_stop":  stopPair.FromStop.Name,
+		"to_stop":    stopPair.ToStop.Name,
+		"route":      stopPair.RouteName,
+		"route_id":   stopPair.RouteID,
+	}).Info("Found stop pair on same route")
 
-	response.SearchDetails.ToStop = *toStopInfo
-
-	if toStopID == nil {
-		response.Status = "partial"
-		response.Message = fmt.Sprintf("Destination stop '%s' not found. Please check spelling or try a nearby location.", req.To)
-		response.SearchDetails.SearchType = "failed"
-		s.logSearch(req, response, userID, &ipAddress, time.Since(startTime))
-		return response, nil
-	}
-
-	// Step 3: Check if both stops are on the same route
-	if fromStopID.String() == toStopID.String() {
-		response.Status = "error"
-		response.Message = "Origin and destination cannot be the same stop"
-		response.SearchDetails.SearchType = "failed"
-		s.logSearch(req, response, userID, &ipAddress, time.Since(startTime))
-		return response, nil
-	}
-
-	// Step 4: Get search datetime (default to now if not provided)
+	// Step 2: Get search datetime (default to now if not provided)
 	searchTime := req.GetSearchDateTime()
 
-	// Step 5: Find available trips
+	// Step 3: Find available trips
 	s.logger.WithFields(logrus.Fields{
-		"from_stop_id": fromStopID.String(),
-		"to_stop_id":   toStopID.String(),
+		"from_stop_id": stopPair.FromID.String(),
+		"to_stop_id":   stopPair.ToID.String(),
 		"search_time":  searchTime,
 		"limit":        req.Limit,
 	}).Info("Querying database for trips...")
 
-	trips, err := s.repo.FindDirectTrips(*fromStopID, *toStopID, searchTime, req.Limit)
+	trips, err := s.repo.FindDirectTrips(stopPair.FromID, stopPair.ToID, searchTime, req.Limit)
 	if err != nil {
 		s.logger.WithError(err).Error("Error finding trips from database")
 		return nil, fmt.Errorf("error searching for trips: %w", err)
@@ -124,21 +125,21 @@ func (s *SearchService) SearchTrips(
 
 	response.Results = trips
 
-	// Step 6: Build appropriate message
+	// Step 4: Build appropriate message
 	if len(trips) == 0 {
 		response.Status = "success"
 		response.Message = fmt.Sprintf(
 			"No direct trips found from %s to %s. Try searching for a different date or nearby stops.",
-			fromStopInfo.Name,
-			toStopInfo.Name,
+			stopPair.FromStop.Name,
+			stopPair.ToStop.Name,
 		)
 	} else {
 		response.Status = "success"
 		response.Message = fmt.Sprintf(
 			"Found %d trip(s) from %s to %s",
 			len(trips),
-			fromStopInfo.Name,
-			toStopInfo.Name,
+			stopPair.FromStop.Name,
+			stopPair.ToStop.Name,
 		)
 	}
 
