@@ -241,7 +241,7 @@ func (r *SearchRepository) FindDirectTrips(
 		TripID           uuid.UUID  `db:"trip_id"`
 		RouteName        string     `db:"route_name"`
 		RouteNumber      *string    `db:"route_number"`
-		BusType          string     `db:"bus_type"`
+		BusType          *string    `db:"bus_type"` // Nullable - bus might not have type set
 		DepartureTime    time.Time  `db:"departure_time"`
 		EstimatedArrival time.Time  `db:"estimated_arrival"`
 		DurationMinutes  int        `db:"duration_minutes"`
@@ -278,11 +278,17 @@ func (r *SearchRepository) FindDirectTrips(
 	// Map to TripResult with nested BusFeatures
 	trips := make([]models.TripResult, len(tempTrips))
 	for i, temp := range tempTrips {
+		// Handle nullable BusType - default to "Standard" if NULL
+		busType := "Standard"
+		if temp.BusType != nil {
+			busType = *temp.BusType
+		}
+
 		trips[i] = models.TripResult{
 			TripID:           temp.TripID,
 			RouteName:        temp.RouteName,
 			RouteNumber:      temp.RouteNumber,
-			BusType:          temp.BusType,
+			BusType:          busType,
 			DepartureTime:    temp.DepartureTime,
 			EstimatedArrival: temp.EstimatedArrival,
 			DurationMinutes:  temp.DurationMinutes,
