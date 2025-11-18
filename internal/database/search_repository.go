@@ -238,23 +238,23 @@ func (r *SearchRepository) FindDirectTrips(
 
 	// Use intermediate struct to scan flat SQL results
 	type tripWithFeatures struct {
-		TripID           uuid.UUID  `db:"trip_id"`
-		RouteName        string     `db:"route_name"`
-		RouteNumber      *string    `db:"route_number"`
-		BusType          *string    `db:"bus_type"` // Nullable - bus might not have type set
-		DepartureTime    time.Time  `db:"departure_time"`
-		EstimatedArrival time.Time  `db:"estimated_arrival"`
-		DurationMinutes  int        `db:"duration_minutes"`
-		TotalSeats       int        `db:"total_seats"`
-		Fare             float64    `db:"fare"`
-		BoardingPoint    string     `db:"boarding_point"`
-		DroppingPoint    string     `db:"dropping_point"`
-		HasWiFi          bool       `db:"has_wifi"`
-		HasAC            bool       `db:"has_ac"`
-		HasChargingPorts bool       `db:"has_charging_ports"`
-		HasEntertainment bool       `db:"has_entertainment"`
-		HasRefreshments  bool       `db:"has_refreshments"`
-		IsBookable       bool       `db:"is_bookable"`
+		TripID           uuid.UUID `db:"trip_id"`
+		RouteName        string    `db:"route_name"`
+		RouteNumber      *string   `db:"route_number"`
+		BusType          *string   `db:"bus_type"` // Nullable - bus might not have type set
+		DepartureTime    time.Time `db:"departure_time"`
+		EstimatedArrival time.Time `db:"estimated_arrival"`
+		DurationMinutes  int       `db:"duration_minutes"`
+		TotalSeats       int       `db:"total_seats"`
+		Fare             float64   `db:"fare"`
+		BoardingPoint    string    `db:"boarding_point"`
+		DroppingPoint    string    `db:"dropping_point"`
+		HasWiFi          bool      `db:"has_wifi"`
+		HasAC            bool      `db:"has_ac"`
+		HasChargingPorts bool      `db:"has_charging_ports"`
+		HasEntertainment bool      `db:"has_entertainment"`
+		HasRefreshments  bool      `db:"has_refreshments"`
+		IsBookable       bool      `db:"is_bookable"`
 	}
 
 	var tempTrips []tripWithFeatures

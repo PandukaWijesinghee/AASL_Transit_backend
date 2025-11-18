@@ -705,10 +705,10 @@ func (h *ScheduledTripHandler) CreateSpecialTrip(c *gin.Context) {
 		IsBookable:               req.IsBookable,
 		TotalSeats:               req.MaxBookableSeats,
 		// AvailableSeats and BookedSeats removed - managed in separate booking table
-		BaseFare:                 req.BaseFare,
-		BookingAdvanceHours:      bookingAdvanceHours,
-		AssignmentDeadline:       &assignmentDeadline,
-		Status:                   models.ScheduledTripStatusScheduled,
+		BaseFare:            req.BaseFare,
+		BookingAdvanceHours: bookingAdvanceHours,
+		AssignmentDeadline:  &assignmentDeadline,
+		Status:              models.ScheduledTripStatusScheduled,
 	}
 
 	if err := h.tripRepo.Create(trip); err != nil {

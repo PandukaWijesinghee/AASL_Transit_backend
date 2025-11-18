@@ -18,29 +18,29 @@ const (
 
 // ScheduledTrip represents a specific trip instance generated from a schedule or created as a special trip
 type ScheduledTrip struct {
-	ID                       string              `json:"id" db:"id"`
-	TripScheduleID           *string             `json:"trip_schedule_id,omitempty" db:"trip_schedule_id"`     // Nullable for special trips
-	BusOwnerRouteID          *string             `json:"bus_owner_route_id,omitempty" db:"bus_owner_route_id"` // Optional route override - inherits from schedule if NULL
-	PermitID                 *string             `json:"permit_id,omitempty" db:"permit_id"`                   // Nullable - assigned later
-	BusID                    *string             `json:"bus_id,omitempty" db:"bus_id"`
-	DepartureDatetime        time.Time           `json:"departure_datetime" db:"departure_datetime"`                           // Specific departure date and time (e.g., 2025-11-20 22:00:00)
-	EstimatedDurationMinutes *int                `json:"estimated_duration_minutes,omitempty" db:"estimated_duration_minutes"` // Duration in minutes (industry standard - calculate arrival on-the-fly)
-	AssignedDriverID         *string             `json:"assigned_driver_id,omitempty" db:"assigned_driver_id"`
-	AssignedConductorID      *string             `json:"assigned_conductor_id,omitempty" db:"assigned_conductor_id"`
-	SeatLayoutID             *string             `json:"seat_layout_id,omitempty" db:"seat_layout_id"` // Required before trip can be published for booking
-	IsBookable               bool                `json:"is_bookable" db:"is_bookable"`                 // Controls if trip is available for passenger booking
-	EverPublished            bool                `json:"ever_published" db:"ever_published"`           // Tracks if trip was ever made bookable (stays true once set)
-	TotalSeats               int                 `json:"total_seats" db:"total_seats"`
+	ID                       string    `json:"id" db:"id"`
+	TripScheduleID           *string   `json:"trip_schedule_id,omitempty" db:"trip_schedule_id"`     // Nullable for special trips
+	BusOwnerRouteID          *string   `json:"bus_owner_route_id,omitempty" db:"bus_owner_route_id"` // Optional route override - inherits from schedule if NULL
+	PermitID                 *string   `json:"permit_id,omitempty" db:"permit_id"`                   // Nullable - assigned later
+	BusID                    *string   `json:"bus_id,omitempty" db:"bus_id"`
+	DepartureDatetime        time.Time `json:"departure_datetime" db:"departure_datetime"`                           // Specific departure date and time (e.g., 2025-11-20 22:00:00)
+	EstimatedDurationMinutes *int      `json:"estimated_duration_minutes,omitempty" db:"estimated_duration_minutes"` // Duration in minutes (industry standard - calculate arrival on-the-fly)
+	AssignedDriverID         *string   `json:"assigned_driver_id,omitempty" db:"assigned_driver_id"`
+	AssignedConductorID      *string   `json:"assigned_conductor_id,omitempty" db:"assigned_conductor_id"`
+	SeatLayoutID             *string   `json:"seat_layout_id,omitempty" db:"seat_layout_id"` // Required before trip can be published for booking
+	IsBookable               bool      `json:"is_bookable" db:"is_bookable"`                 // Controls if trip is available for passenger booking
+	EverPublished            bool      `json:"ever_published" db:"ever_published"`           // Tracks if trip was ever made bookable (stays true once set)
+	TotalSeats               int       `json:"total_seats" db:"total_seats"`
 	// AvailableSeats and BookedSeats removed - will be calculated from separate booking tables
-	BaseFare                 float64             `json:"base_fare" db:"base_fare"`
-	BookingAdvanceHours      int                 `json:"booking_advance_hours" db:"booking_advance_hours"`       // NEW: Hours before trip that booking opens
-	AssignmentDeadline       *time.Time          `json:"assignment_deadline,omitempty" db:"assignment_deadline"` // NEW: Deadline to assign resources
-	Status                   ScheduledTripStatus `json:"status" db:"status"`
-	CancellationReason       *string             `json:"cancellation_reason,omitempty" db:"cancellation_reason"`
-	CancelledAt              *time.Time          `json:"cancelled_at,omitempty" db:"cancelled_at"`
-	SelectedStopIDs          UUIDArray           `json:"selected_stop_ids,omitempty" db:"selected_stop_ids"`
-	CreatedAt                time.Time           `json:"created_at" db:"created_at"`
-	UpdatedAt                time.Time           `json:"updated_at" db:"updated_at"`
+	BaseFare            float64             `json:"base_fare" db:"base_fare"`
+	BookingAdvanceHours int                 `json:"booking_advance_hours" db:"booking_advance_hours"`       // NEW: Hours before trip that booking opens
+	AssignmentDeadline  *time.Time          `json:"assignment_deadline,omitempty" db:"assignment_deadline"` // NEW: Deadline to assign resources
+	Status              ScheduledTripStatus `json:"status" db:"status"`
+	CancellationReason  *string             `json:"cancellation_reason,omitempty" db:"cancellation_reason"`
+	CancelledAt         *time.Time          `json:"cancelled_at,omitempty" db:"cancelled_at"`
+	SelectedStopIDs     UUIDArray           `json:"selected_stop_ids,omitempty" db:"selected_stop_ids"`
+	CreatedAt           time.Time           `json:"created_at" db:"created_at"`
+	UpdatedAt           time.Time           `json:"updated_at" db:"updated_at"`
 }
 
 // GetArrivalDatetime calculates arrival datetime (industry standard approach)

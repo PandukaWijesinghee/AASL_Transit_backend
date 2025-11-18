@@ -69,14 +69,21 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 			// Calculate assignment deadline from system settings
 			assignmentDeadlineHours := s.settingsRepo.GetIntValue("assignment_deadline_hours", 2)
 
+			// Load Asia/Colombo timezone for Sri Lankan local time
+			loc, err := time.LoadLocation("Asia/Colombo")
+			if err != nil {
+				// Fallback to fixed offset if timezone data not available
+				loc = time.FixedZone("Asia/Colombo", 5*3600+30*60) // UTC+5:30
+			}
+
 			// Parse departure time from schedule and combine with current date to create departure_datetime
 			var departureDatetime time.Time
 			var parseErr error
 
 			if t, err := time.Parse("15:04", schedule.DepartureTime); err == nil {
-				departureDatetime = time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), t.Hour(), t.Minute(), 0, 0, time.UTC)
+				departureDatetime = time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), t.Hour(), t.Minute(), 0, 0, loc)
 			} else if t, err := time.Parse("15:04:05", schedule.DepartureTime); err == nil {
-				departureDatetime = time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), t.Hour(), t.Minute(), t.Second(), 0, time.UTC)
+				departureDatetime = time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), t.Hour(), t.Minute(), t.Second(), 0, loc)
 			} else {
 				parseErr = fmt.Errorf("failed to parse departure time '%s' for schedule %s", schedule.DepartureTime, schedule.ID)
 				fmt.Printf("ERROR: %v\n", parseErr)
@@ -101,11 +108,11 @@ func (s *TripGeneratorService) GenerateTripsForSchedule(schedule *models.TripSch
 				BusOwnerRouteID:          schedule.BusOwnerRouteID, // Inherit route from schedule (can be updated later)
 				PermitID:                 schedule.PermitID,        // Pass pointer directly (nil if not set)
 				BusID:                    schedule.BusID,
-				DepartureDatetime:        departureDatetime,                                      // Specific departure date and time
+				DepartureDatetime:        departureDatetime,                                       // Specific departure date and time
 				EstimatedDurationMinutes: getEstimatedDuration(schedule.EstimatedDurationMinutes), // Required field - use default 60 if nil
 				AssignedDriverID:         schedule.DefaultDriverID,
 				AssignedConductorID:      schedule.DefaultConductorID,
-				SeatLayoutID:             seatLayoutID, // Use bus's seat layout if available
+				SeatLayoutID:             seatLayoutID,                               // Use bus's seat layout if available
 				IsBookable:               schedule.IsBookable && seatLayoutID != nil, // Only bookable if we have a seat layout
 				BaseFare:                 schedule.BaseFare,
 				AssignmentDeadline:       &assignmentDeadline,
@@ -218,12 +225,19 @@ func (s *TripGeneratorService) GenerateFutureTrips() (int, error) {
 			// Calculate assignment deadline from system settings
 			assignmentDeadlineHours := s.settingsRepo.GetIntValue("assignment_deadline_hours", 2)
 
+			// Load Asia/Colombo timezone for Sri Lankan local time
+			loc, err := time.LoadLocation("Asia/Colombo")
+			if err != nil {
+				// Fallback to fixed offset if timezone data not available
+				loc = time.FixedZone("Asia/Colombo", 5*3600+30*60) // UTC+5:30
+			}
+
 			// Parse departure time from timetable and combine with date to create departure_datetime
 			var departureDatetime time.Time
 			if t, err := time.Parse("15:04", timetable.DepartureTime); err == nil {
-				departureDatetime = time.Date(date.Year(), date.Month(), date.Day(), t.Hour(), t.Minute(), 0, 0, date.Location())
+				departureDatetime = time.Date(date.Year(), date.Month(), date.Day(), t.Hour(), t.Minute(), 0, 0, loc)
 			} else if t, err := time.Parse("15:04:05", timetable.DepartureTime); err == nil {
-				departureDatetime = time.Date(date.Year(), date.Month(), date.Day(), t.Hour(), t.Minute(), t.Second(), 0, date.Location())
+				departureDatetime = time.Date(date.Year(), date.Month(), date.Day(), t.Hour(), t.Minute(), t.Second(), 0, loc)
 			}
 
 			assignmentDeadline := departureDatetime.Add(-time.Duration(assignmentDeadlineHours) * time.Hour)
@@ -249,15 +263,15 @@ func (s *TripGeneratorService) GenerateFutureTrips() (int, error) {
 				EstimatedDurationMinutes: timetable.EstimatedDurationMinutes, // Copy duration from template (arrival calculated on-the-fly)
 				AssignedDriverID:         timetable.DefaultDriverID,
 				AssignedConductorID:      timetable.DefaultConductorID,
-				SeatLayoutID:             seatLayoutID,                               // Use bus's seat layout if available
+				SeatLayoutID:             seatLayoutID,                                // Use bus's seat layout if available
 				IsBookable:               timetable.IsBookable && seatLayoutID != nil, // Only bookable if we have a seat layout
 				TotalSeats:               totalSeats,
 				// AvailableSeats and BookedSeats removed - managed in separate booking table
-				BaseFare:                 timetable.BaseFare,
-				BookingAdvanceHours:      bookingAdvanceHours,
-				AssignmentDeadline:       &assignmentDeadline,
-				Status:                   models.ScheduledTripStatusScheduled,
-				SelectedStopIDs:          timetable.SelectedStopIDs,
+				BaseFare:            timetable.BaseFare,
+				BookingAdvanceHours: bookingAdvanceHours,
+				AssignmentDeadline:  &assignmentDeadline,
+				Status:              models.ScheduledTripStatusScheduled,
+				SelectedStopIDs:     timetable.SelectedStopIDs,
 			}
 
 			if err := s.scheduledTripRepo.Create(trip); err != nil {

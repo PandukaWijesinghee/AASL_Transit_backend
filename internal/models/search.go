@@ -9,52 +9,52 @@ import (
 
 // SearchRequest represents a passenger's search query
 type SearchRequest struct {
-	From     string     `json:"from" binding:"required"`      // Origin stop name (e.g., "Colombo Fort")
-	To       string     `json:"to" binding:"required"`        // Destination stop name (e.g., "Kandy")
-	DateTime *time.Time `json:"datetime,omitempty"`           // Optional: Departure date/time filter
-	Limit    int        `json:"limit,omitempty"`              // Optional: Max results (default: 20)
+	From     string     `json:"from" binding:"required"` // Origin stop name (e.g., "Colombo Fort")
+	To       string     `json:"to" binding:"required"`   // Destination stop name (e.g., "Kandy")
+	DateTime *time.Time `json:"datetime,omitempty"`      // Optional: Departure date/time filter
+	Limit    int        `json:"limit,omitempty"`         // Optional: Max results (default: 20)
 }
 
 // SearchResponse represents the search results returned to passenger
 type SearchResponse struct {
-	Status        string        `json:"status"`                   // "success", "partial", "error"
-	Message       string        `json:"message"`                  // Human-readable message
-	SearchDetails SearchDetails `json:"search_details"`           // Details about the search
-	Results       []TripResult  `json:"results"`                  // List of matching trips
-	SearchTimeMs  int64         `json:"search_time_ms"`           // Search execution time
+	Status        string        `json:"status"`         // "success", "partial", "error"
+	Message       string        `json:"message"`        // Human-readable message
+	SearchDetails SearchDetails `json:"search_details"` // Details about the search
+	Results       []TripResult  `json:"results"`        // List of matching trips
+	SearchTimeMs  int64         `json:"search_time_ms"` // Search execution time
 }
 
 // SearchDetails provides information about how the search was performed
 type SearchDetails struct {
-	FromStop   StopInfo `json:"from_stop"`    // Origin stop details
-	ToStop     StopInfo `json:"to_stop"`      // Destination stop details
-	SearchType string   `json:"search_type"`  // "exact", "fuzzy", "failed"
+	FromStop   StopInfo `json:"from_stop"`   // Origin stop details
+	ToStop     StopInfo `json:"to_stop"`     // Destination stop details
+	SearchType string   `json:"search_type"` // "exact", "fuzzy", "failed"
 }
 
 // StopInfo represents a bus stop with matching details
 type StopInfo struct {
-	ID            *uuid.UUID `json:"id,omitempty"`       // Stop ID (NULL if not found)
-	Name          string     `json:"name,omitempty"`     // Matched stop name
-	Matched       bool       `json:"matched"`            // Whether stop was found
-	OriginalInput string     `json:"original_input"`     // What user typed
+	ID            *uuid.UUID `json:"id,omitempty"`   // Stop ID (NULL if not found)
+	Name          string     `json:"name,omitempty"` // Matched stop name
+	Matched       bool       `json:"matched"`        // Whether stop was found
+	OriginalInput string     `json:"original_input"` // What user typed
 }
 
 // TripResult represents a single trip in search results
 type TripResult struct {
-	TripID              uuid.UUID  `json:"trip_id" db:"trip_id"`
-	RouteName           string     `json:"route_name" db:"route_name"`
-	RouteNumber         *string    `json:"route_number,omitempty" db:"route_number"`
-	BusType             string     `json:"bus_type" db:"bus_type"`
-	DepartureTime       time.Time  `json:"-" db:"departure_time"`
-	EstimatedArrival    time.Time  `json:"-" db:"estimated_arrival"`
-	DurationMinutes     int        `json:"duration_minutes" db:"duration_minutes"`
+	TripID           uuid.UUID `json:"trip_id" db:"trip_id"`
+	RouteName        string    `json:"route_name" db:"route_name"`
+	RouteNumber      *string   `json:"route_number,omitempty" db:"route_number"`
+	BusType          string    `json:"bus_type" db:"bus_type"`
+	DepartureTime    time.Time `json:"-" db:"departure_time"`
+	EstimatedArrival time.Time `json:"-" db:"estimated_arrival"`
+	DurationMinutes  int       `json:"duration_minutes" db:"duration_minutes"`
 	// AvailableSeats removed - will be calculated from booking table in separate query
-	TotalSeats          int        `json:"total_seats" db:"total_seats"`
-	Fare                float64    `json:"fare" db:"fare"`
-	BoardingPoint       string     `json:"boarding_point" db:"boarding_point"`
-	DroppingPoint       string     `json:"dropping_point" db:"dropping_point"`
-	BusFeatures         BusFeatures `json:"bus_features"`
-	IsBookable          bool       `json:"is_bookable" db:"is_bookable"`
+	TotalSeats    int         `json:"total_seats" db:"total_seats"`
+	Fare          float64     `json:"fare" db:"fare"`
+	BoardingPoint string      `json:"boarding_point" db:"boarding_point"`
+	DroppingPoint string      `json:"dropping_point" db:"dropping_point"`
+	BusFeatures   BusFeatures `json:"bus_features"`
+	IsBookable    bool        `json:"is_bookable" db:"is_bookable"`
 }
 
 // MarshalJSON implements custom JSON marshaling to handle timestamps without timezone
@@ -105,7 +105,7 @@ type BusFeatures struct {
 type PopularRoute struct {
 	FromStopName string `json:"from_stop_name"`
 	ToStopName   string `json:"to_stop_name"`
-	RouteCount   int    `json:"route_count"`   // Number of routes available
+	RouteCount   int    `json:"route_count"`            // Number of routes available
 	SearchCount  *int   `json:"search_count,omitempty"` // How many times searched (from analytics)
 }
 
