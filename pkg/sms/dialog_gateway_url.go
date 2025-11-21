@@ -28,16 +28,10 @@ func NewDialogURLGateway(apiKey, mask, driverHash, passengerHash string) *Dialog
 	}
 }
 
-// SendOTP sends an OTP via Dialog's URL-based SMS API with BOTH app hashes
-// This allows both Driver and Passenger apps to auto-read the same SMS
-func (d *DialogURLGateway) SendOTP(phone, otpCode string) (int64, error) {
-	return d.SendOTPWithHash(phone, otpCode, "")
-}
-
-// SendOTPWithHash sends an OTP - hash parameter is ignored as we always send both hashes
-// Kept for backward compatibility
-func (d *DialogURLGateway) SendOTPWithHash(phone, otpCode, appHash string) (int64, error) {
-	fmt.Printf("📱 SendOTP (URL method) called - Phone: %s, OTP: %s\n", phone, otpCode)
+// SendOTP sends an OTP via Dialog's URL-based SMS API
+// Uses the appropriate app hash based on the appType parameter
+func (d *DialogURLGateway) SendOTP(phone, otpCode, appType string) (int64, error) {
+	fmt.Printf("📱 SendOTP (URL method) called - Phone: %s, OTP: %s, AppType: %s\n", phone, otpCode, appType)
 
 	// Format phone number for Dialog
 	formattedPhone, err := FormatPhoneForDialog(phone)
@@ -48,15 +42,30 @@ func (d *DialogURLGateway) SendOTPWithHash(phone, otpCode, appHash string) (int6
 
 	fmt.Printf("📞 Formatted phone: %s\n", formattedPhone)
 
-	// Create the message with BOTH app hashes for Android SMS auto-read
-	// This allows both Driver and Passenger apps to auto-read from the same SMS
-	// Android SMS Retriever API will automatically match the correct hash
-	message := fmt.Sprintf("Your SmartTransit OTP is: %s\n\nPlease use the above OTP to complete your action.\n\nRegards,\nSmartTransit\n%s\n%s",
-		otpCode,
-		d.driverAppHash,    // For Driver/Conductor app
-		d.passengerAppHash) // For Passenger app
+	// Determine which app hash to use based on appType
+	var appHash string
+	switch appType {
+	case "driver", "conductor":
+		appHash = d.driverAppHash
+	case "passenger":
+		appHash = d.passengerAppHash
+	default:
+		// Default to passenger hash if not specified or unknown
+		appHash = d.passengerAppHash
+	}
 
-	fmt.Printf("📱 Using BOTH app hashes - Driver: %s, Passenger: %s\n", d.driverAppHash, d.passengerAppHash)
+	// Create the message with the specific app hash for Android SMS auto-read
+	var message string
+	if appHash != "" {
+		message = fmt.Sprintf("Your SmartTransit OTP is: %s\n\nPlease use the above OTP to complete your action.\n\nRegards,\nSmartTransit\n%s",
+			otpCode,
+			appHash)
+	} else {
+		message = fmt.Sprintf("Your SmartTransit OTP is: %s\n\nPlease use the above OTP to complete your action.\n\nRegards,\nSmartTransit",
+			otpCode)
+	}
+
+	fmt.Printf("📱 Using app hash: %s (Type: %s)\n", appHash, appType)
 	fmt.Printf("💬 Message: %s\n", message)
 
 	// Build the URL with query parameters
@@ -113,6 +122,15 @@ func (d *DialogURLGateway) SendOTPWithHash(phone, otpCode, appHash string) (int6
 	// Failed - response is an error ID
 	fmt.Printf("❌ SMS sending failed with error code: %s\n", responseStr)
 	return 0, fmt.Errorf("SMS sending failed with error code: %s", responseStr)
+}
+
+// SendOTPWithHash sends an OTP - kept for backward compatibility but now just calls SendOTP
+// Note: This method is deprecated and should be removed in future versions
+func (d *DialogURLGateway) SendOTPWithHash(phone, otpCode, appHash string) (int64, error) {
+	// We can't easily map hash back to type, so we'll try to guess or just use the hash directly if we could
+	// But since we changed the logic to use stored hashes, let's just default to passenger
+	// Ideally this method shouldn't be used anymore
+	return d.SendOTP(phone, otpCode, "passenger")
 }
 
 // GetName returns the name of this SMS gateway

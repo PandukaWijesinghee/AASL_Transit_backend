@@ -26,26 +26,29 @@ type DialogGateway struct {
 	tokenExpiry time.Time
 
 	// SMS Auto-read (Android)
-	appHash string // 11-character hash for SMS auto-read feature
+	driverAppHash    string // Driver/Conductor app signature hash
+	passengerAppHash string // Passenger app signature hash
 }
 
 // DialogConfig holds configuration for Dialog SMS Gateway
 type DialogConfig struct {
-	APIURL   string
-	Username string
-	Password string
-	Mask     string
-	AppHash  string // Optional: App signature hash for SMS auto-read (Android)
+	APIURL           string
+	Username         string
+	Password         string
+	Mask             string
+	DriverAppHash    string // Driver/Conductor app signature hash
+	PassengerAppHash string // Passenger app signature hash
 }
 
 // NewDialogGateway creates a new Dialog SMS Gateway client
 func NewDialogGateway(config DialogConfig) *DialogGateway {
 	return &DialogGateway{
-		apiURL:   config.APIURL,
-		username: config.Username,
-		password: config.Password,
-		mask:     config.Mask,
-		appHash:  config.AppHash,
+		apiURL:           config.APIURL,
+		username:         config.Username,
+		password:         config.Password,
+		mask:             config.Mask,
+		driverAppHash:    config.DriverAppHash,
+		passengerAppHash: config.PassengerAppHash,
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -227,8 +230,8 @@ func FormatPhoneForDialog(phone string) (string, error) {
 }
 
 // SendOTP sends an OTP to a single phone number
-func (d *DialogGateway) SendOTP(phone string, otpCode string) (int64, error) {
-	fmt.Printf("📱 SendOTP called - Phone: %s, OTP: %s\n", phone, otpCode)
+func (d *DialogGateway) SendOTP(phone, otpCode, appType string) (int64, error) {
+	fmt.Printf("📱 SendOTP called - Phone: %s, OTP: %s, AppType: %s\n", phone, otpCode, appType)
 
 	// Ensure we have a valid token
 	fmt.Println("🔑 Checking access token...")
@@ -250,12 +253,25 @@ func (d *DialogGateway) SendOTP(phone string, otpCode string) (int64, error) {
 	// Generate unique transaction ID (timestamp in microseconds)
 	transactionID := time.Now().UnixMicro()
 
+	// Determine which app hash to use based on appType
+	var appHash string
+	switch appType {
+	case "driver", "conductor":
+		appHash = d.driverAppHash
+	case "passenger":
+		appHash = d.passengerAppHash
+	default:
+		// Default to passenger hash if not specified or unknown
+		// This covers the case where appType is empty (legacy calls)
+		appHash = d.passengerAppHash
+	}
+
 	// Prepare SMS message with app hash for Android SMS auto-read
 	var message string
-	if d.appHash != "" {
+	if appHash != "" {
 		// Format for Android SMS auto-read:
 		// OTP code followed by message and app hash on a new line
-		message = fmt.Sprintf("Your SmartTransit OTP is: %s\n\nPlease use the above OTP to complete your action.\n\nRegards,\nSmartTransit\n%s", otpCode, d.appHash)
+		message = fmt.Sprintf("Your SmartTransit OTP is: %s\n\nPlease use the above OTP to complete your action.\n\nRegards,\nSmartTransit\n%s", otpCode, appHash)
 	} else {
 		// Fallback message without app hash
 		message = fmt.Sprintf("Your OTP is %s. Valid for 5 minutes. Do not share this code with anyone.", otpCode)

@@ -159,11 +159,12 @@ func main() {
 		} else {
 			logger.Info("Using Dialog API v2 method (POST with authentication)")
 			apiGateway := sms.NewDialogGateway(sms.DialogConfig{
-				APIURL:   cfg.SMS.APIURL,
-				Username: cfg.SMS.Username,
-				Password: cfg.SMS.Password,
-				Mask:     cfg.SMS.Mask,
-				AppHash:  passengerAppHash, // Use passenger hash as default
+				APIURL:           cfg.SMS.APIURL,
+				Username:         cfg.SMS.Username,
+				Password:         cfg.SMS.Password,
+				Mask:             cfg.SMS.Mask,
+				DriverAppHash:    driverAppHash,
+				PassengerAppHash: passengerAppHash,
 			})
 			smsGateway = apiGateway
 		}
@@ -173,11 +174,12 @@ func main() {
 		logger.Info("SMS Gateway in development mode (no actual SMS will be sent)")
 		// Still initialize but won't be used in dev mode
 		smsGateway = sms.NewDialogGateway(sms.DialogConfig{
-			APIURL:   cfg.SMS.APIURL,
-			Username: cfg.SMS.Username,
-			Password: cfg.SMS.Password,
-			Mask:     cfg.SMS.Mask,
-			AppHash:  passengerAppHash,
+			APIURL:           cfg.SMS.APIURL,
+			Username:         cfg.SMS.Username,
+			Password:         cfg.SMS.Password,
+			Mask:             cfg.SMS.Mask,
+			DriverAppHash:    driverAppHash,
+			PassengerAppHash: passengerAppHash,
 		})
 	}
 

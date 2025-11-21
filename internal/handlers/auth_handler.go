@@ -60,7 +60,8 @@ func NewAuthHandler(
 
 // SendOTPRequest represents the request to send OTP
 type SendOTPRequest struct {
-	Phone string `json:"phone_number" binding:"required"`
+	Phone   string `json:"phone_number" binding:"required"`
+	AppType string `json:"app_type"` // "passenger", "driver", "conductor", "lounge_owner"
 }
 
 // SendOTPResponse represents the response after sending OTP
@@ -174,8 +175,8 @@ func (h *AuthHandler) SendOTP(c *gin.Context) {
 	// Send SMS based on mode
 	if h.config.SMS.Mode == "production" {
 		// Production mode: Send actual SMS via Dialog gateway
-		log.Printf("🔵 Attempting to send SMS to %s via Dialog gateway...", phone)
-		transactionID, err := h.smsGateway.SendOTP(phone, otp)
+		log.Printf("🔵 Attempting to send SMS to %s via Dialog gateway (App: %s)...", phone, req.AppType)
+		transactionID, err := h.smsGateway.SendOTP(phone, otp, req.AppType)
 		if err != nil {
 			log.Printf("❌ ERROR: Failed to send SMS to %s: %v", phone, err)
 			log.Printf("❌ Error type: %T", err)
