@@ -12,7 +12,7 @@ var (
 	ErrInvalidLength = errors.New("phone number must be exactly 10 digits")
 
 	// ErrInvalidPrefix indicates phone number doesn't start with valid Sri Lankan prefix
-	ErrInvalidPrefix = errors.New("phone number must start with 070, 071, 072, 075, 076, 077, or 078")
+	ErrInvalidPrefix = errors.New("phone number must start with 070, 071, 072, 074, 075, 076, 077, 078, or 079")
 
 	// ErrInvalidFormat indicates phone number contains invalid characters
 	ErrInvalidFormat = errors.New("phone number can only contain digits")
@@ -26,11 +26,12 @@ var validPrefixes = []string{
 	"070", // Mobitel
 	"071", // Mobitel
 	"072", // Hutch
+	"074", // Dialog
 	"075", // Airtel
 	"076", // Dialog
 	"077", // Dialog
 	"078", // Hutch
-	"074", // Dialog
+	"079", // Dialog
 	"067", // test
 }
 
