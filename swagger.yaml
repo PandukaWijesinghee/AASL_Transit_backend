@@ -273,12 +273,12 @@ paths:
         **Auto-Registration:** If phone number doesn't exist:
         1. Creates new user in `users` table with role=['passenger']
         2. Creates new passenger record in `passengers` table with `profile_completed=false`
-        
+
         **Multi-Role Architecture:**
         - User authentication data is stored in `users` table
         - Passenger profile data is stored in `passengers` table
         - This allows the same phone to have multiple roles (e.g., passenger + driver)
-        
+
         **Response includes `profile_completed`:**
         - `false`: User needs to call `/api/v1/user/complete-basic-profile` with first_name and last_name
         - `true`: User can proceed to full app functionality
@@ -648,16 +648,16 @@ paths:
       summary: Get user profile (Passenger)
       description: |
         Retrieve the authenticated passenger's profile information.
-        
+
         **Multi-Role Architecture:**
         - For users with 'passenger' role, returns data from the `passengers` table
         - The `users` table only stores authentication info (phone, roles[], status)
         - Each role has its own profile table with role-specific data
-        
+
         **Response includes:**
         - User authentication data from `users` table
         - Passenger profile data from `passengers` table (first_name, last_name, email, profile_completed, etc.)
-        
+
         **Note:** Bus owners, staff, and lounge owners have their own profile endpoints.
       operationId: getUserProfile
       tags:
@@ -729,18 +729,18 @@ paths:
       summary: Complete basic passenger profile
       description: |
         Complete the basic profile for a passenger user by providing first name and last name.
-        
+
         **Multi-Role Architecture:**
         - This endpoint stores data in the `passengers` table (not `users` table)
         - Each role has its own profile table: `bus_owners`, `bus_staff`, `lounge_owners`, `passengers`
         - The `users` table only handles authentication (phone, roles[], status)
-        
+
         **Flow:**
         1. User registers via OTP → creates record in `users` and `passengers` tables
         2. User calls this endpoint with first_name and last_name
         3. `passengers.profile_completed` is set to `true`
         4. App can now proceed to full functionality
-        
+
         **Required for:** Passengers who have `profile_completed: false` after registration
       operationId: completeBasicProfile
       tags:
