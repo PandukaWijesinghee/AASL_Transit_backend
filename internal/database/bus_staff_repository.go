@@ -241,6 +241,62 @@ func (r *BusStaffRepository) Delete(staffID string) error {
 	return err
 }
 
+// GetByPhoneNumber retrieves staff record by phone number (via users table)
+func (r *BusStaffRepository) GetByPhoneNumber(phoneNumber string) (*models.BusStaff, error) {
+	query := `
+		SELECT 
+			bs.id, bs.user_id, bs.bus_owner_id, bs.staff_type, bs.license_number, 
+			bs.license_expiry_date, bs.license_document_url, bs.experience_years,
+			bs.emergency_contact, bs.emergency_contact_name, 
+			bs.medical_certificate_expiry, bs.medical_certificate_url,
+			bs.background_check_status, bs.background_check_document_url,
+			bs.employment_status, bs.hire_date, bs.termination_date, bs.salary_amount,
+			bs.performance_rating, bs.total_trips_completed, bs.profile_completed,
+			bs.verification_notes, bs.verified_at, bs.verified_by, bs.created_at, bs.updated_at
+		FROM bus_staff bs
+		INNER JOIN users u ON bs.user_id = u.id
+		WHERE u.phone = $1
+	`
+
+	staff := &models.BusStaff{}
+	err := r.db.QueryRow(query, phoneNumber).Scan(
+		&staff.ID, &staff.UserID, &staff.BusOwnerID, &staff.StaffType,
+		&staff.LicenseNumber, &staff.LicenseExpiryDate, &staff.LicenseDocumentURL,
+		&staff.ExperienceYears, &staff.EmergencyContact, &staff.EmergencyContactName,
+		&staff.MedicalCertificateExpiry, &staff.MedicalCertificateURL,
+		&staff.BackgroundCheckStatus, &staff.BackgroundCheckDocumentURL,
+		&staff.EmploymentStatus, &staff.HireDate, &staff.TerminationDate,
+		&staff.SalaryAmount, &staff.PerformanceRating, &staff.TotalTripsCompleted,
+		&staff.ProfileCompleted, &staff.VerificationNotes, &staff.VerifiedAt,
+		&staff.VerifiedBy, &staff.CreatedAt, &staff.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Return nil, nil to indicate not found (not an error)
+		}
+		return nil, err
+	}
+
+	return staff, nil
+}
+
+// LinkStaffToBusOwner links an existing staff member to a bus owner
+func (r *BusStaffRepository) LinkStaffToBusOwner(staffID string, busOwnerID string) error {
+	query := `
+		UPDATE bus_staff
+		SET bus_owner_id = $2,
+		    employment_status = 'active',
+		    hire_date = NOW(),
+		    updated_at = NOW()
+		WHERE id = $1
+		RETURNING updated_at
+	`
+
+	var updatedAt time.Time
+	return r.db.QueryRow(query, staffID, busOwnerID).Scan(&updatedAt)
+}
+
 // GetAllByBusOwner retrieves all staff for a bus owner
 func (r *BusStaffRepository) GetAllByBusOwner(busOwnerID string) ([]*models.BusStaff, error) {
 	query := `

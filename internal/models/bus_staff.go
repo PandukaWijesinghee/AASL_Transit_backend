@@ -99,9 +99,35 @@ type AddStaffRequest struct {
 	FirstName            string    `json:"first_name" binding:"required"`
 	LastName             string    `json:"last_name" binding:"required"`
 	StaffType            StaffType `json:"staff_type" binding:"required"`
-	NTCLicenseNumber     string    `json:"ntc_license_number" binding:"required"` // MANDATORY for both driver and conductor
+	NTCLicenseNumber     string    `json:"ntc_license_number" binding:"required"`  // MANDATORY for both driver and conductor
 	LicenseExpiryDate    string    `json:"license_expiry_date" binding:"required"` // MANDATORY
 	ExperienceYears      int       `json:"experience_years"`
 	EmergencyContact     string    `json:"emergency_contact"`
 	EmergencyContactName string    `json:"emergency_contact_name"`
+}
+
+// VerifyStaffRequest represents request to verify if a staff can be added
+type VerifyStaffRequest struct {
+	PhoneNumber string `json:"phone_number" binding:"required"`
+}
+
+// VerifyStaffResponse represents response for staff verification
+type VerifyStaffResponse struct {
+	Found            bool       `json:"found"`
+	Eligible         bool       `json:"eligible"`
+	StaffID          string     `json:"staff_id,omitempty"`
+	StaffType        *StaffType `json:"staff_type,omitempty"`
+	FirstName        string     `json:"first_name,omitempty"`
+	LastName         string     `json:"last_name,omitempty"`
+	ProfileCompleted bool       `json:"profile_completed"`
+	IsVerified       bool       `json:"is_verified"`
+	AlreadyLinked    bool       `json:"already_linked"`
+	CurrentOwnerID   *string    `json:"current_owner_id,omitempty"`
+	Message          string     `json:"message"`
+	Reason           string     `json:"reason,omitempty"`
+}
+
+// LinkStaffRequest represents request to link verified staff to bus owner
+type LinkStaffRequest struct {
+	StaffID string `json:"staff_id" binding:"required"`
 }

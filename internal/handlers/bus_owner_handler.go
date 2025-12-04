@@ -224,6 +224,246 @@ func (h *BusOwnerHandler) CompleteOnboarding(c *gin.Context) {
 	})
 }
 
+// VerifyStaff checks if a staff member can be added by bus owner
+// POST /api/v1/bus-owner/staff/verify
+func (h *BusOwnerHandler) VerifyStaff(c *gin.Context) {
+	// Get user context from JWT middleware
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// Get bus owner record
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found. Please complete onboarding first."})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get bus owner profile"})
+		return
+	}
+
+	// Parse request
+	var req models.VerifyStaffRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	fmt.Printf("DEBUG: VerifyStaff - Checking phone: %s\n", req.PhoneNumber)
+
+	// Check if user exists by phone number
+	existingUser, err := h.userRepo.GetUserByPhone(req.PhoneNumber)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check user existence"})
+		return
+	}
+
+	if existingUser == nil {
+		// User not found in database
+		c.JSON(http.StatusOK, &models.VerifyStaffResponse{
+			Found:            false,
+			Eligible:         false,
+			ProfileCompleted: false,
+			IsVerified:       false,
+			AlreadyLinked:    false,
+			Message:          "This phone number is not registered in our system",
+			Reason:           "not_registered",
+		})
+		return
+	}
+
+	// Check if user is registered as staff
+	staff, err := h.staffRepo.GetByUserID(existingUser.ID.String())
+	if err != nil || staff == nil {
+		// User exists but not registered as staff
+		c.JSON(http.StatusOK, &models.VerifyStaffResponse{
+			Found:            true,
+			Eligible:         false,
+			FirstName:        existingUser.FirstName.String,
+			LastName:         existingUser.LastName.String,
+			ProfileCompleted: false,
+			IsVerified:       false,
+			AlreadyLinked:    false,
+			Message:          "This user has not registered as a driver or conductor",
+			Reason:           "not_staff",
+		})
+		return
+	}
+
+	// Check if profile is completed
+	if !staff.ProfileCompleted {
+		c.JSON(http.StatusOK, &models.VerifyStaffResponse{
+			Found:            true,
+			Eligible:         false,
+			StaffID:          staff.ID,
+			StaffType:        &staff.StaffType,
+			FirstName:        existingUser.FirstName.String,
+			LastName:         existingUser.LastName.String,
+			ProfileCompleted: false,
+			IsVerified:       false,
+			AlreadyLinked:    staff.BusOwnerID != nil,
+			Message:          "This staff member has not completed their profile",
+			Reason:           "profile_incomplete",
+		})
+		return
+	}
+
+	// Check if verified by admin (verified_at is not null)
+	isVerified := staff.VerifiedAt != nil
+	if !isVerified {
+		c.JSON(http.StatusOK, &models.VerifyStaffResponse{
+			Found:            true,
+			Eligible:         false,
+			StaffID:          staff.ID,
+			StaffType:        &staff.StaffType,
+			FirstName:        existingUser.FirstName.String,
+			LastName:         existingUser.LastName.String,
+			ProfileCompleted: true,
+			IsVerified:       false,
+			AlreadyLinked:    staff.BusOwnerID != nil,
+			Message:          "This staff member is pending admin verification",
+			Reason:           "not_verified",
+		})
+		return
+	}
+
+	// Check if already linked to another bus owner
+	if staff.BusOwnerID != nil && *staff.BusOwnerID != busOwner.ID {
+		c.JSON(http.StatusOK, &models.VerifyStaffResponse{
+			Found:            true,
+			Eligible:         false,
+			StaffID:          staff.ID,
+			StaffType:        &staff.StaffType,
+			FirstName:        existingUser.FirstName.String,
+			LastName:         existingUser.LastName.String,
+			ProfileCompleted: true,
+			IsVerified:       true,
+			AlreadyLinked:    true,
+			CurrentOwnerID:   staff.BusOwnerID,
+			Message:          "This staff member is already linked to another bus owner",
+			Reason:           "already_linked_other",
+		})
+		return
+	}
+
+	// Check if already linked to this bus owner
+	if staff.BusOwnerID != nil && *staff.BusOwnerID == busOwner.ID {
+		c.JSON(http.StatusOK, &models.VerifyStaffResponse{
+			Found:            true,
+			Eligible:         false,
+			StaffID:          staff.ID,
+			StaffType:        &staff.StaffType,
+			FirstName:        existingUser.FirstName.String,
+			LastName:         existingUser.LastName.String,
+			ProfileCompleted: true,
+			IsVerified:       true,
+			AlreadyLinked:    true,
+			CurrentOwnerID:   staff.BusOwnerID,
+			Message:          "This staff member is already part of your organization",
+			Reason:           "already_yours",
+		})
+		return
+	}
+
+	// Staff is eligible to be added
+	c.JSON(http.StatusOK, &models.VerifyStaffResponse{
+		Found:            true,
+		Eligible:         true,
+		StaffID:          staff.ID,
+		StaffType:        &staff.StaffType,
+		FirstName:        existingUser.FirstName.String,
+		LastName:         existingUser.LastName.String,
+		ProfileCompleted: true,
+		IsVerified:       true,
+		AlreadyLinked:    false,
+		Message:          fmt.Sprintf("Staff member %s %s is verified and can be added to your organization", existingUser.FirstName.String, existingUser.LastName.String),
+	})
+}
+
+// LinkStaff links a verified staff member to the bus owner's organization
+// POST /api/v1/bus-owner/staff/link
+func (h *BusOwnerHandler) LinkStaff(c *gin.Context) {
+	// Get user context from JWT middleware
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// Get bus owner record
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found. Please complete onboarding first."})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get bus owner profile"})
+		return
+	}
+
+	// Parse request
+	var req models.LinkStaffRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	fmt.Printf("DEBUG: LinkStaff - Linking staff %s to bus owner %s\n", req.StaffID, busOwner.ID)
+
+	// Get staff by ID
+	staff, err := h.staffRepo.GetByID(req.StaffID)
+	if err != nil || staff == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Staff member not found"})
+		return
+	}
+
+	// Verify staff is eligible (re-check for security)
+	if !staff.ProfileCompleted {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Staff member has not completed their profile"})
+		return
+	}
+
+	if staff.VerifiedAt == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Staff member is not verified by admin"})
+		return
+	}
+
+	if staff.BusOwnerID != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Staff member is already linked to a bus owner"})
+		return
+	}
+
+	// Link staff to bus owner
+	err = h.staffRepo.LinkStaffToBusOwner(staff.ID, busOwner.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to link staff: %v", err)})
+		return
+	}
+
+	// Get user info for response
+	user, _ := h.userRepo.GetUserByID(uuid.MustParse(staff.UserID))
+	firstName := ""
+	lastName := ""
+	phone := ""
+	if user != nil {
+		firstName = user.FirstName.String
+		lastName = user.LastName.String
+		phone = user.Phone
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":    fmt.Sprintf("%s %s has been added to your organization", firstName, lastName),
+		"staff_id":   staff.ID,
+		"staff_type": staff.StaffType,
+		"first_name": firstName,
+		"last_name":  lastName,
+		"phone":      phone,
+	})
+}
+
 // AddStaff allows bus owner to add driver or conductor to their organization
 // POST /api/v1/bus-owner/staff
 func (h *BusOwnerHandler) AddStaff(c *gin.Context) {

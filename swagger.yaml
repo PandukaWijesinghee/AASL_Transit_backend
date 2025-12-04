@@ -1725,6 +1725,204 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/bus-owner/staff/verify:
+    post:
+      summary: Verify staff member eligibility by phone number
+      description: |
+        Verifies if a staff member can be added to the bus owner's organization.
+        Checks:
+        - If the phone number exists in the system
+        - If the user is registered as staff (driver/conductor)
+        - If the staff profile is completed
+        - If the staff is verified by admin
+        - If the staff is already linked to another bus owner
+
+        Use this endpoint before linking a staff member to your organization.
+      operationId: verifyStaffMember
+      tags:
+        - Bus Owner
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone_number
+              properties:
+                phone_number:
+                  type: string
+                  description: Staff member's phone number
+                  example: "+94712345678"
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  found:
+                    type: boolean
+                    description: Whether the phone number exists in the system
+                    example: true
+                  eligible:
+                    type: boolean
+                    description: Whether the staff member can be added
+                    example: true
+                  staff_id:
+                    type: string
+                    format: uuid
+                    description: Staff member's ID (if found and is staff)
+                    example: "123e4567-e89b-12d3-a456-426614174000"
+                  staff_type:
+                    type: string
+                    enum: [driver, conductor]
+                    description: Type of staff member
+                    example: "driver"
+                  first_name:
+                    type: string
+                    description: Staff member's first name
+                    example: "Kamal"
+                  last_name:
+                    type: string
+                    description: Staff member's last name
+                    example: "Perera"
+                  profile_completed:
+                    type: boolean
+                    description: Whether staff has completed their profile
+                    example: true
+                  is_verified:
+                    type: boolean
+                    description: Whether staff is verified by admin
+                    example: true
+                  already_linked:
+                    type: boolean
+                    description: Whether staff is already linked to a bus owner
+                    example: false
+                  message:
+                    type: string
+                    description: Human-readable status message
+                    example: "Staff member is eligible to be added to your organization"
+                  reason:
+                    type: string
+                    enum:
+                      [
+                        not_staff,
+                        profile_incomplete,
+                        not_verified,
+                        already_linked_other,
+                        already_yours,
+                      ]
+                    description: Reason code if not eligible
+                    example: null
+        "400":
+          description: Bad request - invalid phone number
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Phone number is required"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/bus-owner/staff/link:
+    post:
+      summary: Link verified staff member to bus owner organization
+      description: |
+        Links a verified staff member to the authenticated bus owner's organization.
+        The staff member must have been verified using the /staff/verify endpoint first.
+
+        Prerequisites:
+        - Staff must exist and be a driver/conductor
+        - Staff profile must be completed
+        - Staff must be verified by admin
+        - Staff must not be linked to another bus owner
+      operationId: linkStaffMember
+      tags:
+        - Bus Owner
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - staff_id
+              properties:
+                staff_id:
+                  type: string
+                  format: uuid
+                  description: Staff member's ID (from verify response)
+                  example: "123e4567-e89b-12d3-a456-426614174000"
+      responses:
+        "200":
+          description: Staff member linked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Staff member linked successfully"
+                  staff_id:
+                    type: string
+                    format: uuid
+                    example: "123e4567-e89b-12d3-a456-426614174000"
+                  staff_type:
+                    type: string
+                    example: "driver"
+                  first_name:
+                    type: string
+                    example: "Kamal"
+                  last_name:
+                    type: string
+                    example: "Perera"
+        "400":
+          description: Bad request - staff not eligible
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Staff profile is not completed"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Staff or bus owner not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Staff member not found"
+        "409":
+          description: Staff already linked to another bus owner
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Staff is already linked to another bus owner"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   # ============================================================================
   # Bus Owner Routes (Custom Route Configurations)
   # ============================================================================
