@@ -25,6 +25,7 @@ type AuthHandler struct {
 	rateLimitService       *services.RateLimitService
 	auditService           *services.AuditService
 	userRepository         *database.UserRepository
+	passengerRepository    *database.PassengerRepository
 	refreshTokenRepository *database.RefreshTokenRepository
 	userSessionRepository  *database.UserSessionRepository
 	smsGateway             sms.SMSGateway
@@ -39,6 +40,7 @@ func NewAuthHandler(
 	rateLimitService *services.RateLimitService,
 	auditService *services.AuditService,
 	userRepository *database.UserRepository,
+	passengerRepository *database.PassengerRepository,
 	refreshTokenRepository *database.RefreshTokenRepository,
 	userSessionRepository *database.UserSessionRepository,
 	smsGateway sms.SMSGateway,
@@ -51,6 +53,7 @@ func NewAuthHandler(
 		rateLimitService:       rateLimitService,
 		auditService:           auditService,
 		userRepository:         userRepository,
+		passengerRepository:    passengerRepository,
 		refreshTokenRepository: refreshTokenRepository,
 		userSessionRepository:  userSessionRepository,
 		smsGateway:             smsGateway,
@@ -313,12 +316,28 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 		return
 	}
 
-	// Generate JWT tokens with user's actual data
+	// For users with passenger role, ensure passenger record exists
+	// This creates the passenger profile record in the passengers table
+	if h.userRepository.HasRole(user, "passenger") {
+		_, _, err := h.passengerRepository.GetOrCreatePassenger(user.ID)
+		if err != nil {
+			log.Printf("WARNING: Failed to create passenger record for user %s: %v", user.ID, err)
+			// Don't fail login, just log warning
+		}
+	}
+
+	// Get passenger profile completion status (if passenger role)
+	profileCompleted := false
+	if h.userRepository.HasRole(user, "passenger") {
+		profileCompleted, _ = h.passengerRepository.IsPassengerProfileComplete(user.ID)
+	}
+
+	// Generate JWT tokens with user's actual data (use passenger profile completion status)
 	accessToken, err := h.jwtService.GenerateAccessToken(
 		user.ID,
 		user.Phone,
 		user.Roles,
-		user.ProfileCompleted,
+		profileCompleted, // Use passenger table's profile_completed
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -391,8 +410,8 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 		RefreshToken:    refreshToken,
 		ExpiresIn:       3600, // 1 hour
 		IsNewUser:       isNew,
-		ProfileComplete: user.ProfileCompleted,
-		Roles:           user.Roles, // Include user roles in response
+		ProfileComplete: profileCompleted, // Use passenger table's profile_completed
+		Roles:           user.Roles,       // Include user roles in response
 	})
 }
 
@@ -923,7 +942,118 @@ type UpdateProfileRequest struct {
 	PostalCode string `json:"postal_code"`
 }
 
+// CompleteBasicProfileRequest represents request for completing basic profile (first_name + last_name only)
+// Used by passenger app after OTP verification for new users
+type CompleteBasicProfileRequest struct {
+	FirstName string `json:"first_name" binding:"required,min=1,max=100"`
+	LastName  string `json:"last_name" binding:"required,min=1,max=100"`
+}
+
+// CompleteBasicProfile handles POST /api/v1/auth/complete-basic-profile
+// This is a simplified endpoint for passengers that only requires first_name and last_name
+// Data is stored in the passengers table (not users table)
+func (h *AuthHandler) CompleteBasicProfile(c *gin.Context) {
+	// Get user context from middleware
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{
+			Error:   "unauthorized",
+			Message: "User context not found",
+		})
+		return
+	}
+
+	// Parse request body
+	var req CompleteBasicProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid_request",
+			Message: "First name and last name are required",
+		})
+		return
+	}
+
+	// Ensure passenger record exists
+	_, _, err := h.passengerRepository.GetOrCreatePassenger(userCtx.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "passenger_creation_failed",
+			Message: "Failed to create passenger record",
+		})
+		return
+	}
+
+	// Update first_name and last_name in passengers table
+	err = h.passengerRepository.UpdatePassengerNames(userCtx.UserID, req.FirstName, req.LastName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "profile_update_failed",
+			Message: "Failed to update profile",
+		})
+		return
+	}
+
+	// Set profile as completed in passengers table
+	err = h.passengerRepository.SetPassengerProfileCompleted(userCtx.UserID, true)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "profile_completion_failed",
+			Message: "Failed to mark profile as completed",
+		})
+		return
+	}
+
+	// Get user data for response
+	user, err := h.userRepository.GetUserByID(userCtx.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "profile_retrieval_failed",
+			Message: "Failed to retrieve user profile",
+		})
+		return
+	}
+
+	// Get passenger profile
+	passenger, err := h.passengerRepository.GetPassengerByUserID(userCtx.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "profile_retrieval_failed",
+			Message: "Failed to retrieve passenger profile",
+		})
+		return
+	}
+
+	// Convert to response format
+	response := ProfileResponse{
+		ID:               user.ID.String(),
+		Phone:            user.Phone,
+		Roles:            user.Roles,
+		ProfileCompleted: passenger.ProfileCompleted, // Use passenger's profile_completed
+		Status:           user.Status,
+		PhoneVerified:    user.PhoneVerified,
+		EmailVerified:    false, // Passengers don't have email verification in users table anymore
+	}
+
+	// Handle nullable fields from passenger table
+	if passenger.FirstName.Valid {
+		response.FirstName = &passenger.FirstName.String
+	}
+	if passenger.LastName.Valid {
+		response.LastName = &passenger.LastName.String
+	}
+	if passenger.Email.Valid {
+		response.Email = &passenger.Email.String
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Profile completed successfully",
+		"profile": response,
+	})
+}
+
 // GetProfile handles GET /api/v1/auth/profile
+// For passengers, profile data comes from passengers table
+// For other roles, profile data comes from their respective tables (bus_owners, bus_staff, etc.)
 func (h *AuthHandler) GetProfile(c *gin.Context) {
 	// Get user context from middleware
 	userCtx, exists := middleware.GetUserContext(c)
@@ -953,45 +1083,97 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 		return
 	}
 
-	// Convert to response format
+	// Initialize response with user data
 	response := ProfileResponse{
-		ID:               user.ID.String(),
-		Phone:            user.Phone,
-		Roles:            user.Roles,
-		ProfileCompleted: user.ProfileCompleted,
-		Status:           user.Status,
-		PhoneVerified:    user.PhoneVerified,
-		EmailVerified:    user.EmailVerified,
+		ID:            user.ID.String(),
+		Phone:         user.Phone,
+		Roles:         user.Roles,
+		Status:        user.Status,
+		PhoneVerified: user.PhoneVerified,
+		EmailVerified: false, // Will be updated based on role
 	}
 
-	// Handle nullable fields
-	if user.Email.Valid {
-		response.Email = &user.Email.String
-	}
-	if user.FirstName.Valid {
-		response.FirstName = &user.FirstName.String
-	}
-	if user.LastName.Valid {
-		response.LastName = &user.LastName.String
-	}
-	if user.NIC.Valid {
-		response.NIC = &user.NIC.String
-	}
-	if user.DateOfBirth.Valid {
-		dob := user.DateOfBirth.Time.Format("2006-01-02")
-		response.DateOfBirth = &dob
-	}
-	if user.Address.Valid {
-		response.Address = &user.Address.String
-	}
-	if user.City.Valid {
-		response.City = &user.City.String
-	}
-	if user.PostalCode.Valid {
-		response.PostalCode = &user.PostalCode.String
-	}
-	if user.ProfilePhotoURL.Valid {
-		response.ProfilePhotoURL = &user.ProfilePhotoURL.String
+	// For passengers, get profile data from passengers table
+	if h.userRepository.HasRole(user, "passenger") {
+		passenger, err := h.passengerRepository.GetPassengerByUserID(user.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "profile_retrieval_failed",
+				Message: "Failed to retrieve passenger profile",
+			})
+			return
+		}
+
+		if passenger != nil {
+			response.ProfileCompleted = passenger.ProfileCompleted
+
+			// Handle nullable fields from passenger table
+			if passenger.Email.Valid {
+				response.Email = &passenger.Email.String
+			}
+			if passenger.FirstName.Valid {
+				response.FirstName = &passenger.FirstName.String
+			}
+			if passenger.LastName.Valid {
+				response.LastName = &passenger.LastName.String
+			}
+			if passenger.NIC.Valid {
+				response.NIC = &passenger.NIC.String
+			}
+			if passenger.DateOfBirth.Valid {
+				dob := passenger.DateOfBirth.Time.Format("2006-01-02")
+				response.DateOfBirth = &dob
+			}
+			if passenger.Address.Valid {
+				response.Address = &passenger.Address.String
+			}
+			if passenger.City.Valid {
+				response.City = &passenger.City.String
+			}
+			if passenger.PostalCode.Valid {
+				response.PostalCode = &passenger.PostalCode.String
+			}
+			if passenger.ProfilePhotoURL.Valid {
+				response.ProfilePhotoURL = &passenger.ProfilePhotoURL.String
+			}
+		} else {
+			// No passenger record yet, profile not completed
+			response.ProfileCompleted = false
+		}
+	} else {
+		// For non-passenger roles, use legacy user table data (will be migrated later)
+		response.ProfileCompleted = user.ProfileCompleted
+		response.EmailVerified = user.EmailVerified
+
+		// Handle nullable fields from users table (legacy)
+		if user.Email.Valid {
+			response.Email = &user.Email.String
+		}
+		if user.FirstName.Valid {
+			response.FirstName = &user.FirstName.String
+		}
+		if user.LastName.Valid {
+			response.LastName = &user.LastName.String
+		}
+		if user.NIC.Valid {
+			response.NIC = &user.NIC.String
+		}
+		if user.DateOfBirth.Valid {
+			dob := user.DateOfBirth.Time.Format("2006-01-02")
+			response.DateOfBirth = &dob
+		}
+		if user.Address.Valid {
+			response.Address = &user.Address.String
+		}
+		if user.City.Valid {
+			response.City = &user.City.String
+		}
+		if user.PostalCode.Valid {
+			response.PostalCode = &user.PostalCode.String
+		}
+		if user.ProfilePhotoURL.Valid {
+			response.ProfilePhotoURL = &user.ProfilePhotoURL.String
+		}
 	}
 
 	c.JSON(http.StatusOK, response)

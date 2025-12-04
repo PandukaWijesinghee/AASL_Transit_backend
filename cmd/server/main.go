@@ -89,6 +89,9 @@ func main() {
 	refreshTokenRepository := database.NewRefreshTokenRepository(db)
 	userSessionRepository := database.NewUserSessionRepository(db)
 
+	// Initialize passenger repository
+	passengerRepository := database.NewPassengerRepository(db)
+
 	// Initialize staff-related repositories
 	staffRepository := database.NewBusStaffRepository(db)
 	ownerRepository := database.NewBusOwnerRepository(db)
@@ -193,6 +196,7 @@ func main() {
 		rateLimitService,
 		auditService,
 		userRepository,
+		passengerRepository,
 		refreshTokenRepository,
 		userSessionRepository,
 		smsGateway,
@@ -394,6 +398,7 @@ func main() {
 		{
 			user.GET("/profile", authHandler.GetProfile)
 			user.PUT("/profile", authHandler.UpdateProfile)
+			user.POST("/complete-basic-profile", authHandler.CompleteBasicProfile) // Simple first_name + last_name for passengers
 		}
 
 		// Staff routes

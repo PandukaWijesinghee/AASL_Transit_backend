@@ -270,7 +270,18 @@ paths:
 
         **OTP Expiry:** 5 minutes from generation.
 
-        **Auto-Registration:** If phone number doesn't exist, creates new passenger account.
+        **Auto-Registration:** If phone number doesn't exist:
+        1. Creates new user in `users` table with role=['passenger']
+        2. Creates new passenger record in `passengers` table with `profile_completed=false`
+        
+        **Multi-Role Architecture:**
+        - User authentication data is stored in `users` table
+        - Passenger profile data is stored in `passengers` table
+        - This allows the same phone to have multiple roles (e.g., passenger + driver)
+        
+        **Response includes `profile_completed`:**
+        - `false`: User needs to call `/api/v1/user/complete-basic-profile` with first_name and last_name
+        - `true`: User can proceed to full app functionality
       operationId: verifyOtp
       tags:
         - Authentication
@@ -634,8 +645,20 @@ paths:
   # ============================================================================
   /api/v1/user/profile:
     get:
-      summary: Get user profile
-      description: Retrieve the authenticated user's profile information
+      summary: Get user profile (Passenger)
+      description: |
+        Retrieve the authenticated passenger's profile information.
+        
+        **Multi-Role Architecture:**
+        - For users with 'passenger' role, returns data from the `passengers` table
+        - The `users` table only stores authentication info (phone, roles[], status)
+        - Each role has its own profile table with role-specific data
+        
+        **Response includes:**
+        - User authentication data from `users` table
+        - Passenger profile data from `passengers` table (first_name, last_name, email, profile_completed, etc.)
+        
+        **Note:** Bus owners, staff, and lounge owners have their own profile endpoints.
       operationId: getUserProfile
       tags:
         - User
@@ -647,7 +670,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/PassengerProfile"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
@@ -698,6 +721,92 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/user/complete-basic-profile:
+    post:
+      summary: Complete basic passenger profile
+      description: |
+        Complete the basic profile for a passenger user by providing first name and last name.
+        
+        **Multi-Role Architecture:**
+        - This endpoint stores data in the `passengers` table (not `users` table)
+        - Each role has its own profile table: `bus_owners`, `bus_staff`, `lounge_owners`, `passengers`
+        - The `users` table only handles authentication (phone, roles[], status)
+        
+        **Flow:**
+        1. User registers via OTP → creates record in `users` and `passengers` tables
+        2. User calls this endpoint with first_name and last_name
+        3. `passengers.profile_completed` is set to `true`
+        4. App can now proceed to full functionality
+        
+        **Required for:** Passengers who have `profile_completed: false` after registration
+      operationId: completeBasicProfile
+      tags:
+        - User
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - first_name
+                - last_name
+              properties:
+                first_name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                  example: "John"
+                  description: User's first name
+                last_name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                  example: "Doe"
+                  description: User's last name
+      responses:
+        "200":
+          description: Profile completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Basic profile completed successfully"
+                  profile_completed:
+                    type: boolean
+                    example: true
+                  passenger:
+                    $ref: "#/components/schemas/Passenger"
+        "400":
+          description: Invalid request - missing or invalid first_name/last_name
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "first_name and last_name are required"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: User is not a passenger
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "This endpoint is only for passengers"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -5227,6 +5336,174 @@ components:
           format: date-time
           example: "2025-10-19T07:00:00Z"
 
+    Passenger:
+      type: object
+      description: |
+        Passenger profile data stored in the `passengers` table.
+        This is separate from the `users` table which only handles authentication.
+        Supports multi-role architecture where the same phone can have multiple roles.
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        user_id:
+          type: string
+          format: uuid
+          description: Foreign key to users table
+          example: "660e8400-e29b-41d4-a716-446655440001"
+        first_name:
+          type: string
+          nullable: true
+          maxLength: 100
+          example: "John"
+        last_name:
+          type: string
+          nullable: true
+          maxLength: 100
+          example: "Doe"
+        email:
+          type: string
+          format: email
+          nullable: true
+          example: "john.doe@example.com"
+        date_of_birth:
+          type: string
+          format: date
+          nullable: true
+          example: "1995-05-15"
+        nic:
+          type: string
+          nullable: true
+          maxLength: 50
+          example: "199512345678"
+        address:
+          type: string
+          nullable: true
+          example: "123 Main St, Colombo"
+        city:
+          type: string
+          nullable: true
+          maxLength: 100
+          example: "Colombo"
+        postal_code:
+          type: string
+          nullable: true
+          maxLength: 20
+          example: "10200"
+        profile_photo_url:
+          type: string
+          nullable: true
+          example: "https://storage.example.com/photos/user123.jpg"
+        profile_completed:
+          type: boolean
+          description: Whether basic profile (first_name, last_name) has been completed
+          example: true
+        emergency_contact_name:
+          type: string
+          nullable: true
+          maxLength: 200
+          example: "Jane Doe"
+        emergency_contact_phone:
+          type: string
+          nullable: true
+          maxLength: 20
+          example: "+94771234568"
+        preferred_seat_type:
+          type: string
+          nullable: true
+          maxLength: 50
+          example: "window"
+        special_requirements:
+          type: string
+          nullable: true
+          example: "Wheelchair accessible"
+        total_trips:
+          type: integer
+          default: 0
+          example: 15
+        loyalty_points:
+          type: integer
+          default: 0
+          example: 150
+        verification_status:
+          type: string
+          enum: [pending, verified, rejected]
+          default: pending
+          example: "verified"
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2025-10-25T10:00:00Z"
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-10-19T07:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2025-10-19T07:00:00Z"
+
+    PassengerProfile:
+      type: object
+      description: Combined user and passenger profile response
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: User ID from users table
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        phone:
+          type: string
+          example: "+94771234567"
+        roles:
+          type: array
+          items:
+            type: string
+          example: ["passenger"]
+        phone_verified:
+          type: boolean
+          example: true
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+          example: "active"
+        first_name:
+          type: string
+          nullable: true
+          description: From passengers table
+          example: "John"
+        last_name:
+          type: string
+          nullable: true
+          description: From passengers table
+          example: "Doe"
+        email:
+          type: string
+          format: email
+          nullable: true
+          description: From passengers table
+          example: "john.doe@example.com"
+        profile_completed:
+          type: boolean
+          description: From passengers table - true when first_name and last_name are set
+          example: true
+        profile_photo_url:
+          type: string
+          nullable: true
+          example: "https://storage.example.com/photos/user123.jpg"
+        total_trips:
+          type: integer
+          example: 15
+        loyalty_points:
+          type: integer
+          example: 150
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-10-19T07:00:00Z"
+
     AdminUser:
       type: object
       properties:
@@ -5554,6 +5831,9 @@ components:
 
     AuthResponse:
       type: object
+      description: |
+        Response from passenger OTP verification.
+        Includes `profile_completed` flag to indicate if profile setup is needed.
       properties:
         message:
           type: string
@@ -5568,6 +5848,13 @@ components:
           type: integer
           description: Access token expiry in seconds
           example: 3600
+        profile_completed:
+          type: boolean
+          description: |
+            Whether the passenger has completed basic profile (first_name, last_name).
+            - `false`: App should redirect to profile completion screen
+            - `true`: App can proceed to main functionality
+          example: false
         user:
           $ref: "#/components/schemas/User"
 
