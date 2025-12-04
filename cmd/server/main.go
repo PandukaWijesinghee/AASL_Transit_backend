@@ -127,13 +127,6 @@ func main() {
 		systemSettingRepo,
 	)
 
-	// Initialize and start cron service
-	cronService := services.NewCronService(tripGeneratorSvc)
-	if err := cronService.Start(); err != nil {
-		logger.Fatalf("Failed to start cron service: %v", err)
-	}
-	logger.Info("✓ Cron service started - Trip auto-generation enabled")
-
 	// Initialize SMS Gateway (Dialog)
 	var smsGateway sms.SMSGateway
 
@@ -627,26 +620,10 @@ func main() {
 			systemSettings.PUT("/:key", systemSettingHandler.UpdateSetting)
 		}
 
-		// Admin cron management routes (optional - for testing)
+		// Admin routes
 		admin := v1.Group("/admin")
 		// TODO: Add admin auth middleware
 		{
-			// Cron management
-			admin.POST("/cron/generate-trips", func(c *gin.Context) {
-				cronService.RunGenerateFutureTripsNow()
-				c.JSON(200, gin.H{"message": "Trip generation triggered"})
-			})
-
-			admin.POST("/cron/fill-missing", func(c *gin.Context) {
-				cronService.RunFillMissingTripsNow()
-				c.JSON(200, gin.H{"message": "Fill missing trips triggered"})
-			})
-
-			admin.GET("/cron/status", func(c *gin.Context) {
-				status := cronService.GetJobStatus()
-				c.JSON(200, status)
-			})
-
 			// Lounge Owner approval (TODO: Implement)
 			admin.GET("/lounge-owners/pending", adminHandler.GetPendingLoungeOwners)
 			admin.GET("/lounge-owners/:id", adminHandler.GetLoungeOwnerDetails)
@@ -697,10 +674,6 @@ func main() {
 	<-quit
 
 	logger.Info("Shutting down server...")
-
-	// Stop cron service
-	logger.Info("Stopping cron service...")
-	cronService.Stop()
 
 	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

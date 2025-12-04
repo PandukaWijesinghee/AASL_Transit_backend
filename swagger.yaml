@@ -20,7 +20,7 @@ info:
     5. Refresh token when access token expires
 
     ## Trip Generation System
-    - **Automatic Generation**: When a schedule/timetable is created, trips are automatically generated for the next 7 days
+    - **On-Demand Generation**: When a schedule/timetable is created, trips are generated for the specified date range
     - **Date Range**: Configurable via `system_settings.trip_generation_days_ahead` (default: 7 days)
     - **Validation**: Trips are only created if:
       - Schedule is active (`is_active=true`)
@@ -2280,9 +2280,9 @@ paths:
         - Values like is_bookable, max_bookable_seats, booking_advance_hours are applied to each generated trip
         - Generated trips use the valid_from/until dates to determine which dates to create trips for
 
-        **Automatic Generation:**
-        - Trips are generated immediately upon timetable creation
-        - A daily cron job (runs at 2 AM) maintains a rolling 7-day window by generating new trips for upcoming dates
+        **Trip Generation:**
+        - Trips are generated immediately upon timetable creation for the configured date range
+        - Additional trips can be generated manually via admin endpoints if needed
 
         After creation, use the publish endpoints to make trips available for passenger booking.
       operationId: createTimetable
