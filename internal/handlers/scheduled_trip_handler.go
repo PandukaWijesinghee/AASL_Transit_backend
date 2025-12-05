@@ -712,7 +712,11 @@ func (h *ScheduledTripHandler) CreateSpecialTrip(c *gin.Context) {
 	}
 
 	if err := h.tripRepo.Create(trip); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create special trip"})
+		fmt.Printf("ERROR: Failed to create special trip: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to create special trip",
+			"details": err.Error(),
+		})
 		return
 	}
 
