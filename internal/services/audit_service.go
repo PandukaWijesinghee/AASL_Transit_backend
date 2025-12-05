@@ -206,18 +206,19 @@ func (s *AuditService) logEvent(event AuditEvent) error {
 		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
 	`
 
-	// Marshal details map to JSON bytes for JSONB column
-	// lib/pq driver requires JSON bytes for JSONB fields, not raw map[string]interface{}
-	var detailsJSON []byte
-	var err error
+	// Marshal details map to JSON string for JSONB column
+	// pgx driver with simple protocol requires JSON as string, not []byte
+	var detailsJSON *string
 	if event.Details != nil {
-		detailsJSON, err = json.Marshal(event.Details)
+		jsonBytes, err := json.Marshal(event.Details)
 		if err != nil {
 			return fmt.Errorf("failed to marshal audit details to JSON: %w", err)
 		}
+		jsonStr := string(jsonBytes)
+		detailsJSON = &jsonStr
 	}
 
-	_, err = s.db.Exec(
+	_, err := s.db.Exec(
 		query,
 		event.UserID,
 		event.Action,
@@ -225,7 +226,7 @@ func (s *AuditService) logEvent(event AuditEvent) error {
 		event.EntityID,
 		event.IPAddress,
 		event.UserAgent,
-		detailsJSON, // Pass JSON bytes instead of raw map
+		detailsJSON, // Pass JSON as string pointer for JSONB column
 	)
 
 	if err != nil {

@@ -19,11 +19,16 @@ const (
 type JSONB map[string]interface{}
 
 // Value implements the driver.Valuer interface
+// Returns JSON as string for compatibility with pgx simple protocol mode
 func (j JSONB) Value() (driver.Value, error) {
 	if j == nil {
 		return nil, nil
 	}
-	return json.Marshal(j)
+	bytes, err := json.Marshal(j)
+	if err != nil {
+		return nil, err
+	}
+	return string(bytes), nil
 }
 
 // Scan implements the sql.Scanner interface
