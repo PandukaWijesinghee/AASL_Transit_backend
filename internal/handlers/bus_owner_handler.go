@@ -311,9 +311,8 @@ func (h *BusOwnerHandler) VerifyStaff(c *gin.Context) {
 		return
 	}
 
-	// Check if verified by admin (verified_at is not null)
-	isVerified := staff.VerifiedAt != nil
-	if !isVerified {
+	// Check if verified by admin (is_verified = true and verification_status = 'approved')
+	if !staff.IsVerified || staff.VerificationStatus != models.StaffVerificationApproved {
 		c.JSON(http.StatusOK, &models.VerifyStaffResponse{
 			Found:            true,
 			Eligible:         false,
