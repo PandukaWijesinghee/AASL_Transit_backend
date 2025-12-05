@@ -1280,19 +1280,28 @@ func (h *ScheduledTripHandler) AssignSeatLayout(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("✅ Trip found: %s, Schedule ID: %v\n", trip.ID, trip.TripScheduleID) // Verify ownership through trip schedule
-	if trip.TripScheduleID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot determine trip ownership - no schedule linked"})
-		return
+	fmt.Printf("✅ Trip found: %s, Schedule ID: %v, Route ID: %v\n", trip.ID, trip.TripScheduleID, trip.BusOwnerRouteID)
+
+	// Verify ownership - either through trip_schedule or bus_owner_route (for special trips)
+	var ownerVerified bool
+
+	// Method 1: Through trip schedule (recurring trips)
+	if trip.TripScheduleID != nil {
+		schedule, err := h.scheduleRepo.GetByID(*trip.TripScheduleID)
+		if err == nil && schedule.BusOwnerID == busOwner.ID {
+			ownerVerified = true
+		}
 	}
 
-	schedule, err := h.scheduleRepo.GetByID(*trip.TripScheduleID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify ownership"})
-		return
+	// Method 2: Through bus_owner_route (special trips without schedule)
+	if !ownerVerified && trip.BusOwnerRouteID != nil {
+		route, err := h.routeRepo.GetByID(*trip.BusOwnerRouteID)
+		if err == nil && route.BusOwnerID == busOwner.ID {
+			ownerVerified = true
+		}
 	}
 
-	if schedule.BusOwnerID != busOwner.ID {
+	if !ownerVerified {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized to modify this trip"})
 		return
 	}
