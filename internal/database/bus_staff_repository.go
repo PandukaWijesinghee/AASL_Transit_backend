@@ -456,4 +456,3 @@ func (r *BusStaffRepository) UpdateEmploymentFields(employmentID string, fields 
 	_, err := r.db.Exec(query, args...)
 	return err
 }
-

@@ -1891,7 +1891,7 @@ paths:
       summary: Verify staff member eligibility by phone number
       description: |
         Verifies if a staff member can be linked to the bus owner's organization.
-        
+
         **Checks performed:**
         - If the phone number exists in the system
         - If the user is registered as staff (driver/conductor)
