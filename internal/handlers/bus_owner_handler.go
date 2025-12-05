@@ -279,11 +279,20 @@ func (h *BusOwnerHandler) VerifyStaff(c *gin.Context) {
 	staff, err := h.staffRepo.GetByUserID(existingUser.ID.String())
 	if err != nil || staff == nil {
 		// User exists but not registered as staff
+		// Get name from user table since staff record doesn't exist
+		userFirstName := ""
+		userLastName := ""
+		if existingUser.FirstName.Valid {
+			userFirstName = existingUser.FirstName.String
+		}
+		if existingUser.LastName.Valid {
+			userLastName = existingUser.LastName.String
+		}
 		c.JSON(http.StatusOK, &models.VerifyStaffResponse{
 			Found:            true,
 			Eligible:         false,
-			FirstName:        existingUser.FirstName.String,
-			LastName:         existingUser.LastName.String,
+			FirstName:        userFirstName,
+			LastName:         userLastName,
 			ProfileCompleted: false,
 			IsVerified:       false,
 			AlreadyLinked:    false,
@@ -293,6 +302,16 @@ func (h *BusOwnerHandler) VerifyStaff(c *gin.Context) {
 		return
 	}
 
+	// Helper function to get staff name
+	staffFirstName := ""
+	staffLastName := ""
+	if staff.FirstName != nil {
+		staffFirstName = *staff.FirstName
+	}
+	if staff.LastName != nil {
+		staffLastName = *staff.LastName
+	}
+
 	// Check if profile is completed
 	if !staff.ProfileCompleted {
 		c.JSON(http.StatusOK, &models.VerifyStaffResponse{
@@ -300,8 +319,8 @@ func (h *BusOwnerHandler) VerifyStaff(c *gin.Context) {
 			Eligible:         false,
 			StaffID:          staff.ID,
 			StaffType:        &staff.StaffType,
-			FirstName:        existingUser.FirstName.String,
-			LastName:         existingUser.LastName.String,
+			FirstName:        staffFirstName,
+			LastName:         staffLastName,
 			ProfileCompleted: false,
 			IsVerified:       false,
 			AlreadyLinked:    false,
@@ -318,8 +337,8 @@ func (h *BusOwnerHandler) VerifyStaff(c *gin.Context) {
 			Eligible:         false,
 			StaffID:          staff.ID,
 			StaffType:        &staff.StaffType,
-			FirstName:        existingUser.FirstName.String,
-			LastName:         existingUser.LastName.String,
+			FirstName:        staffFirstName,
+			LastName:         staffLastName,
 			ProfileCompleted: true,
 			IsVerified:       false,
 			AlreadyLinked:    false,
@@ -338,8 +357,8 @@ func (h *BusOwnerHandler) VerifyStaff(c *gin.Context) {
 				Eligible:         false,
 				StaffID:          staff.ID,
 				StaffType:        &staff.StaffType,
-				FirstName:        existingUser.FirstName.String,
-				LastName:         existingUser.LastName.String,
+				FirstName:        staffFirstName,
+				LastName:         staffLastName,
 				ProfileCompleted: true,
 				IsVerified:       true,
 				AlreadyLinked:    true,
@@ -355,8 +374,8 @@ func (h *BusOwnerHandler) VerifyStaff(c *gin.Context) {
 				Eligible:         false,
 				StaffID:          staff.ID,
 				StaffType:        &staff.StaffType,
-				FirstName:        existingUser.FirstName.String,
-				LastName:         existingUser.LastName.String,
+				FirstName:        staffFirstName,
+				LastName:         staffLastName,
 				ProfileCompleted: true,
 				IsVerified:       true,
 				AlreadyLinked:    true,
@@ -374,12 +393,12 @@ func (h *BusOwnerHandler) VerifyStaff(c *gin.Context) {
 		Eligible:         true,
 		StaffID:          staff.ID,
 		StaffType:        &staff.StaffType,
-		FirstName:        existingUser.FirstName.String,
-		LastName:         existingUser.LastName.String,
+		FirstName:        staffFirstName,
+		LastName:         staffLastName,
 		ProfileCompleted: true,
 		IsVerified:       true,
 		AlreadyLinked:    false,
-		Message:          fmt.Sprintf("Staff member %s %s is verified and can be added to your organization", existingUser.FirstName.String, existingUser.LastName.String),
+		Message:          fmt.Sprintf("Staff member %s %s is verified and can be added to your organization", staffFirstName, staffLastName),
 	})
 }
 
@@ -426,7 +445,8 @@ func (h *BusOwnerHandler) LinkStaff(c *gin.Context) {
 		return
 	}
 
-	if staff.VerifiedAt == nil {
+	// Check verification using IsVerified and VerificationStatus (consistent with VerifyStaff)
+	if !staff.IsVerified || staff.VerificationStatus != models.StaffVerificationApproved {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Staff member is not verified by admin"})
 		return
 	}
@@ -454,14 +474,20 @@ func (h *BusOwnerHandler) LinkStaff(c *gin.Context) {
 		return
 	}
 
-	// Get user info for response
-	user, _ := h.userRepo.GetUserByID(uuid.MustParse(staff.UserID))
+	// Get staff name from bus_staff table (primary source)
 	firstName := ""
 	lastName := ""
+	if staff.FirstName != nil {
+		firstName = *staff.FirstName
+	}
+	if staff.LastName != nil {
+		lastName = *staff.LastName
+	}
+
+	// Get phone from user table (still needed for phone number)
 	phone := ""
+	user, _ := h.userRepo.GetUserByID(uuid.MustParse(staff.UserID))
 	if user != nil {
-		firstName = user.FirstName.String
-		lastName = user.LastName.String
 		phone = user.Phone
 	}
 
@@ -722,23 +748,35 @@ func (h *BusOwnerHandler) GetStaff(c *gin.Context) {
 		staff := swe.Staff
 		employment := swe.Employment
 
-		// Get user information
+		// Get first name and last name from bus_staff table (primary source)
+		firstName := ""
+		lastName := ""
+		if staff.FirstName != nil {
+			firstName = *staff.FirstName
+		}
+		if staff.LastName != nil {
+			lastName = *staff.LastName
+		}
+
+		// Get phone from user table
+		phone := ""
 		user, err := h.userRepo.GetUserByID(uuid.MustParse(staff.UserID))
 		if err != nil {
 			// Log error but don't fail the whole request
 			fmt.Printf("WARNING: Failed to get user info for staff %s: %v\n", staff.ID, err)
-			continue
+		} else {
+			phone = user.Phone
 		}
 
-		fmt.Printf("DEBUG: GetStaff - User ID: %s, FirstName: '%s', LastName: '%s', Phone: %s\n",
-			user.ID, user.FirstName.String, user.LastName.String, user.Phone)
+		fmt.Printf("DEBUG: GetStaff - Staff ID: %s, FirstName: '%s', LastName: '%s', Phone: %s\n",
+			staff.ID, firstName, lastName, phone)
 
 		enriched := StaffWithUserInfo{
 			ID:                   staff.ID,
 			UserID:               staff.UserID,
-			FirstName:            user.FirstName.String,
-			LastName:             user.LastName.String,
-			Phone:                user.Phone,
+			FirstName:            firstName,
+			LastName:             lastName,
+			Phone:                phone,
 			StaffType:            staff.StaffType,
 			LicenseNumber:        staff.LicenseNumber,
 			LicenseExpiryDate:    staff.LicenseExpiryDate,
