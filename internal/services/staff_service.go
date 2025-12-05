@@ -418,7 +418,8 @@ func (s *StaffService) ApproveStaff(staffID, adminUserID string) error {
 	now := time.Now()
 	staff.VerifiedAt = &now
 	staff.VerifiedBy = &adminUserID
-	staff.BackgroundCheckStatus = models.BackgroundCheckApproved
+	staff.IsVerified = true
+	staff.VerificationStatus = models.StaffVerificationApproved
 
 	err = s.staffRepo.Update(staff)
 	if err != nil {

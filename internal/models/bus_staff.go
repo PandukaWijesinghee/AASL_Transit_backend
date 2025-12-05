@@ -23,13 +23,13 @@ const (
 	EmploymentStatusSuspended  EmploymentStatus = "suspended"
 )
 
-// VerificationStatus represents staff verification status
-type VerificationStatus string
+// StaffVerificationStatus represents staff verification status
+type StaffVerificationStatus string
 
 const (
-	VerificationStatusPending  VerificationStatus = "pending"
-	VerificationStatusApproved VerificationStatus = "approved"
-	VerificationStatusRejected VerificationStatus = "rejected"
+	StaffVerificationPending  StaffVerificationStatus = "pending"
+	StaffVerificationApproved StaffVerificationStatus = "approved"
+	StaffVerificationRejected StaffVerificationStatus = "rejected"
 )
 
 // BusStaff represents a driver or conductor (profile only, no employment details)
@@ -42,14 +42,14 @@ type BusStaff struct {
 	LicenseNumber            *string               `json:"license_number,omitempty" db:"license_number"`
 	LicenseExpiryDate        *time.Time            `json:"license_expiry_date,omitempty" db:"license_expiry_date"`
 	ExperienceYears          int                   `json:"experience_years" db:"experience_years"`
-	EmergencyContact         *string            `json:"emergency_contact,omitempty" db:"emergency_contact"`
-	EmergencyContactName     *string            `json:"emergency_contact_name,omitempty" db:"emergency_contact_name"`
-	ProfileCompleted         bool               `json:"profile_completed" db:"profile_completed"`
-	IsVerified               bool               `json:"is_verified" db:"is_verified"`
-	VerificationStatus       VerificationStatus `json:"verification_status" db:"verification_status"`
-	VerificationNotes        *string            `json:"verification_notes,omitempty" db:"verification_notes"``
-	VerifiedAt               *time.Time            `json:"verified_at,omitempty" db:"verified_at"`
-	VerifiedBy               *string               `json:"verified_by,omitempty" db:"verified_by"`
+	EmergencyContact         *string                 `json:"emergency_contact,omitempty" db:"emergency_contact"`
+	EmergencyContactName     *string                 `json:"emergency_contact_name,omitempty" db:"emergency_contact_name"`
+	ProfileCompleted         bool                    `json:"profile_completed" db:"profile_completed"`
+	IsVerified               bool                    `json:"is_verified" db:"is_verified"`
+	VerificationStatus       StaffVerificationStatus `json:"verification_status" db:"verification_status"`
+	VerificationNotes        *string                 `json:"verification_notes,omitempty" db:"verification_notes"`
+	VerifiedAt               *time.Time              `json:"verified_at,omitempty" db:"verified_at"`
+	VerifiedBy               *string                 `json:"verified_by,omitempty" db:"verified_by"`
 	CreatedAt                time.Time             `json:"created_at" db:"created_at"`
 	UpdatedAt                time.Time             `json:"updated_at" db:"updated_at"`
 }

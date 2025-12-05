@@ -605,15 +605,16 @@ func (h *BusOwnerHandler) AddStaff(c *gin.Context) {
 
 	// Create bus_staff record (profile only)
 	staff := &models.BusStaff{
-		UserID:                userID.String(),
-		FirstName:             &req.FirstName,
-		LastName:              &req.LastName,
-		StaffType:             req.StaffType,
-		LicenseNumber:         &req.NTCLicenseNumber,
-		LicenseExpiryDate:     &expiryDate,
-		ExperienceYears:       req.ExperienceYears,
-		BackgroundCheckStatus: models.BackgroundCheckPending,
-		ProfileCompleted:      true, // Profile is complete since bus owner provided all info
+		UserID:             userID.String(),
+		FirstName:          &req.FirstName,
+		LastName:           &req.LastName,
+		StaffType:          req.StaffType,
+		LicenseNumber:      &req.NTCLicenseNumber,
+		LicenseExpiryDate:  &expiryDate,
+		ExperienceYears:    req.ExperienceYears,
+		IsVerified:         false,
+		VerificationStatus: models.StaffVerificationPending,
+		ProfileCompleted:   true, // Profile is complete since bus owner provided all info
 	}
 
 	if req.EmergencyContact != "" {
@@ -695,26 +696,26 @@ func (h *BusOwnerHandler) GetStaff(c *gin.Context) {
 
 	// Enrich staff data with user information (name, phone)
 	type StaffWithUserInfo struct {
-		ID                   string                    `json:"id"`
-		UserID               string                    `json:"user_id"`
-		FirstName            string                    `json:"first_name"`
-		LastName             string                    `json:"last_name"`
-		Phone                string                    `json:"phone"`
-		StaffType            models.StaffType          `json:"staff_type"`
-		LicenseNumber        *string                   `json:"license_number,omitempty"`
-		LicenseExpiryDate    *time.Time                `json:"license_expiry_date,omitempty"`
-		ExperienceYears      int                       `json:"experience_years"`
-		EmergencyContact     *string                   `json:"emergency_contact,omitempty"`
-		EmergencyContactName *string                   `json:"emergency_contact_name,omitempty"`
-		EmploymentStatus     models.EmploymentStatus   `json:"employment_status"`
-		IsVerified           bool                      `json:"is_verified"`
-		VerificationStatus   models.VerificationStatus `json:"verification_status"`
-		HireDate             *time.Time                `json:"hire_date,omitempty"`
-		PerformanceRating    float64                   `json:"performance_rating"`
-		TotalTripsCompleted  int                       `json:"total_trips_completed"`
-		ProfileCompleted     bool                      `json:"profile_completed"`
-		EmploymentID         string                    `json:"employment_id"`
-		CreatedAt            time.Time                 `json:"created_at"`
+		ID                   string                         `json:"id"`
+		UserID               string                         `json:"user_id"`
+		FirstName            string                         `json:"first_name"`
+		LastName             string                         `json:"last_name"`
+		Phone                string                         `json:"phone"`
+		StaffType            models.StaffType               `json:"staff_type"`
+		LicenseNumber        *string                        `json:"license_number,omitempty"`
+		LicenseExpiryDate    *time.Time                     `json:"license_expiry_date,omitempty"`
+		ExperienceYears      int                            `json:"experience_years"`
+		EmergencyContact     *string                        `json:"emergency_contact,omitempty"`
+		EmergencyContactName *string                        `json:"emergency_contact_name,omitempty"`
+		EmploymentStatus     models.EmploymentStatus        `json:"employment_status"`
+		IsVerified           bool                           `json:"is_verified"`
+		VerificationStatus   models.StaffVerificationStatus `json:"verification_status"`
+		HireDate             *time.Time                     `json:"hire_date,omitempty"`
+		PerformanceRating    float64                        `json:"performance_rating"`
+		TotalTripsCompleted  int                            `json:"total_trips_completed"`
+		ProfileCompleted     bool                           `json:"profile_completed"`
+		EmploymentID         string                         `json:"employment_id"`
+		CreatedAt            time.Time                      `json:"created_at"`
 	}
 
 	enrichedStaff := []StaffWithUserInfo{}
