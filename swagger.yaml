@@ -1319,7 +1319,7 @@ paths:
         **Requirements:**
         - Valid phone number (not already registered as staff)
         - Staff type (driver or conductor)
-        - Driver-specific: license number and expiry date
+        - NTC license number and expiry date (required for both drivers and conductors)
       operationId: registerStaff
       tags:
         - Staff
@@ -1335,6 +1335,10 @@ paths:
                 - first_name
                 - last_name
                 - staff_type
+                - license_number
+                - license_expiry_date
+                - emergency_contact
+                - emergency_contact_name
               properties:
                 first_name:
                   type: string
@@ -1351,12 +1355,12 @@ paths:
                   example: "driver"
                 license_number:
                   type: string
-                  description: NTC license number (required for drivers)
+                  description: NTC license number (required for both drivers and conductors)
                   example: "NTC1234567"
                 license_expiry_date:
                   type: string
                   format: date
-                  description: License expiry date (required for drivers)
+                  description: NTC license expiry date (required for both drivers and conductors)
                   example: "2026-12-31"
                 experience_years:
                   type: integer

@@ -79,6 +79,20 @@ func (s *StaffService) RegisterStaff(input *models.StaffRegistrationInput) (*mod
 		}
 	}
 
+	// Handle conductor license fields (NTC license)
+	if input.StaffType == models.StaffTypeConductor {
+		if input.LicenseNumber != nil && *input.LicenseNumber != "" {
+			staff.LicenseNumber = input.LicenseNumber
+		}
+
+		if input.LicenseExpiryDate != nil && *input.LicenseExpiryDate != "" {
+			expiryDate, err := time.Parse("2006-01-02", *input.LicenseExpiryDate)
+			if err == nil {
+				staff.LicenseExpiryDate = &expiryDate
+			}
+		}
+	}
+
 	// Create staff record
 	err = s.staffRepo.Create(staff)
 	if err != nil {
