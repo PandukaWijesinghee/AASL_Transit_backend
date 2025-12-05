@@ -2623,7 +2623,11 @@ paths:
                   description: Must be ≤ permit approved_seating_capacity
                 is_bookable:
                   type: boolean
-                  default: true
+                  default: false
+                  description: |
+                    Whether the trip is open for passenger bookings. Defaults to false because a seat_layout_id 
+                    is required for bookable trips (DB constraint). Create trip with is_bookable=false, then 
+                    assign seat layout, then use PUT /scheduled-trips/{id}/publish to make it bookable.
                 booking_advance_hours:
                   type: integer
                   minimum: 72
