@@ -25,9 +25,7 @@ func (r *BusStaffRepository) GetByUserID(userID string) (*models.BusStaff, error
 			id, user_id, first_name, last_name, staff_type, license_number, 
 			license_expiry_date, experience_years,
 			emergency_contact, emergency_contact_name, 
-			medical_certificate_expiry,
-			background_check_status,
-			profile_completed,
+			profile_completed, is_verified, verification_status,
 			verification_notes, verified_at, verified_by, created_at, updated_at
 		FROM bus_staff
 		WHERE user_id = $1
@@ -38,9 +36,8 @@ func (r *BusStaffRepository) GetByUserID(userID string) (*models.BusStaff, error
 		&staff.ID, &staff.UserID, &staff.FirstName, &staff.LastName, &staff.StaffType,
 		&staff.LicenseNumber, &staff.LicenseExpiryDate,
 		&staff.ExperienceYears, &staff.EmergencyContact, &staff.EmergencyContactName,
-		&staff.MedicalCertificateExpiry,
-		&staff.BackgroundCheckStatus,
-		&staff.ProfileCompleted, &staff.VerificationNotes, &staff.VerifiedAt,
+		&staff.ProfileCompleted, &staff.IsVerified, &staff.VerificationStatus,
+		&staff.VerificationNotes, &staff.VerifiedAt,
 		&staff.VerifiedBy, &staff.CreatedAt, &staff.UpdatedAt,
 	)
 
@@ -61,9 +58,7 @@ func (r *BusStaffRepository) GetByID(staffID string) (*models.BusStaff, error) {
 			id, user_id, first_name, last_name, staff_type, license_number, 
 			license_expiry_date, experience_years,
 			emergency_contact, emergency_contact_name, 
-			medical_certificate_expiry,
-			background_check_status,
-			profile_completed,
+			profile_completed, is_verified, verification_status,
 			verification_notes, verified_at, verified_by, created_at, updated_at
 		FROM bus_staff
 		WHERE id = $1
@@ -74,9 +69,8 @@ func (r *BusStaffRepository) GetByID(staffID string) (*models.BusStaff, error) {
 		&staff.ID, &staff.UserID, &staff.FirstName, &staff.LastName, &staff.StaffType,
 		&staff.LicenseNumber, &staff.LicenseExpiryDate,
 		&staff.ExperienceYears, &staff.EmergencyContact, &staff.EmergencyContactName,
-		&staff.MedicalCertificateExpiry,
-		&staff.BackgroundCheckStatus,
-		&staff.ProfileCompleted, &staff.VerificationNotes, &staff.VerifiedAt,
+		&staff.ProfileCompleted, &staff.IsVerified, &staff.VerificationStatus,
+		&staff.VerificationNotes, &staff.VerifiedAt,
 		&staff.VerifiedBy, &staff.CreatedAt, &staff.UpdatedAt,
 	)
 
@@ -98,7 +92,7 @@ func (r *BusStaffRepository) Create(staff *models.BusStaff) error {
 			license_expiry_date, experience_years, emergency_contact, 
 			emergency_contact_name, profile_completed
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		RETURNING id, created_at, updated_at, background_check_status
+		RETURNING id, created_at, updated_at, is_verified, verification_status
 	`
 
 	err := r.db.QueryRow(
@@ -117,7 +111,8 @@ func (r *BusStaffRepository) Create(staff *models.BusStaff) error {
 		&staff.ID,
 		&staff.CreatedAt,
 		&staff.UpdatedAt,
-		&staff.BackgroundCheckStatus,
+		&staff.IsVerified,
+		&staff.VerificationStatus,
 	)
 
 	return err
@@ -136,9 +131,9 @@ func (r *BusStaffRepository) Update(staff *models.BusStaff) error {
 			experience_years = $7,
 			emergency_contact = $8,
 			emergency_contact_name = $9,
-			medical_certificate_expiry = $10,
-			background_check_status = $11,
-			profile_completed = $12,
+			profile_completed = $10,
+			is_verified = $11,
+			verification_status = $12,
 			verification_notes = $13,
 			verified_at = $14,
 			verified_by = $15,
@@ -158,9 +153,9 @@ func (r *BusStaffRepository) Update(staff *models.BusStaff) error {
 		staff.ExperienceYears,
 		staff.EmergencyContact,
 		staff.EmergencyContactName,
-		staff.MedicalCertificateExpiry,
-		staff.BackgroundCheckStatus,
 		staff.ProfileCompleted,
+		staff.IsVerified,
+		staff.VerificationStatus,
 		staff.VerificationNotes,
 		staff.VerifiedAt,
 		staff.VerifiedBy,
@@ -209,9 +204,7 @@ func (r *BusStaffRepository) GetByPhoneNumber(phoneNumber string) (*models.BusSt
 			bs.id, bs.user_id, bs.first_name, bs.last_name, bs.staff_type, bs.license_number, 
 			bs.license_expiry_date, bs.experience_years,
 			bs.emergency_contact, bs.emergency_contact_name, 
-			bs.medical_certificate_expiry,
-			bs.background_check_status,
-			bs.profile_completed,
+			bs.profile_completed, bs.is_verified, bs.verification_status,
 			bs.verification_notes, bs.verified_at, bs.verified_by, bs.created_at, bs.updated_at
 		FROM bus_staff bs
 		INNER JOIN users u ON bs.user_id = u.id
@@ -223,9 +216,8 @@ func (r *BusStaffRepository) GetByPhoneNumber(phoneNumber string) (*models.BusSt
 		&staff.ID, &staff.UserID, &staff.FirstName, &staff.LastName, &staff.StaffType,
 		&staff.LicenseNumber, &staff.LicenseExpiryDate,
 		&staff.ExperienceYears, &staff.EmergencyContact, &staff.EmergencyContactName,
-		&staff.MedicalCertificateExpiry,
-		&staff.BackgroundCheckStatus,
-		&staff.ProfileCompleted, &staff.VerificationNotes, &staff.VerifiedAt,
+		&staff.ProfileCompleted, &staff.IsVerified, &staff.VerificationStatus,
+		&staff.VerificationNotes, &staff.VerifiedAt,
 		&staff.VerifiedBy, &staff.CreatedAt, &staff.UpdatedAt,
 	)
 
@@ -373,9 +365,7 @@ func (r *BusStaffRepository) GetAllByBusOwner(busOwnerID string) ([]*models.Staf
 			bs.id, bs.user_id, bs.first_name, bs.last_name, bs.staff_type, bs.license_number, 
 			bs.license_expiry_date, bs.experience_years,
 			bs.emergency_contact, bs.emergency_contact_name, 
-			bs.medical_certificate_expiry,
-			bs.background_check_status,
-			bs.profile_completed,
+			bs.profile_completed, bs.is_verified, bs.verification_status,
 			bs.verification_notes, bs.verified_at, bs.verified_by, bs.created_at, bs.updated_at,
 			bse.id, bse.staff_id, bse.bus_owner_id, bse.employment_status, bse.hire_date,
 			bse.termination_date, bse.termination_reason, bse.salary_amount,
@@ -402,9 +392,8 @@ func (r *BusStaffRepository) GetAllByBusOwner(busOwnerID string) ([]*models.Staf
 			&staff.ID, &staff.UserID, &staff.FirstName, &staff.LastName, &staff.StaffType,
 			&staff.LicenseNumber, &staff.LicenseExpiryDate,
 			&staff.ExperienceYears, &staff.EmergencyContact, &staff.EmergencyContactName,
-			&staff.MedicalCertificateExpiry,
-			&staff.BackgroundCheckStatus,
-			&staff.ProfileCompleted, &staff.VerificationNotes, &staff.VerifiedAt,
+			&staff.ProfileCompleted, &staff.IsVerified, &staff.VerificationStatus,
+			&staff.VerificationNotes, &staff.VerifiedAt,
 			&staff.VerifiedBy, &staff.CreatedAt, &staff.UpdatedAt,
 			&emp.ID, &emp.StaffID, &emp.BusOwnerID, &emp.EmploymentStatus, &emp.HireDate,
 			&emp.TerminationDate, &emp.TerminationReason, &emp.SalaryAmount,

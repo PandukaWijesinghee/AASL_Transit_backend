@@ -697,23 +697,24 @@ func (h *BusOwnerHandler) GetStaff(c *gin.Context) {
 	type StaffWithUserInfo struct {
 		ID                    string                       `json:"id"`
 		UserID                string                       `json:"user_id"`
-		FirstName             string                       `json:"first_name"`
-		LastName              string                       `json:"last_name"`
-		Phone                 string                       `json:"phone"`
-		StaffType             models.StaffType             `json:"staff_type"`
-		LicenseNumber         *string                      `json:"license_number,omitempty"`
-		LicenseExpiryDate     *time.Time                   `json:"license_expiry_date,omitempty"`
-		ExperienceYears       int                          `json:"experience_years"`
-		EmergencyContact      *string                      `json:"emergency_contact,omitempty"`
-		EmergencyContactName  *string                      `json:"emergency_contact_name,omitempty"`
-		EmploymentStatus      models.EmploymentStatus      `json:"employment_status"`
-		BackgroundCheckStatus models.BackgroundCheckStatus `json:"background_check_status"`
-		HireDate              *time.Time                   `json:"hire_date,omitempty"`
-		PerformanceRating     float64                      `json:"performance_rating"`
-		TotalTripsCompleted   int                          `json:"total_trips_completed"`
-		ProfileCompleted      bool                         `json:"profile_completed"`
-		EmploymentID          string                       `json:"employment_id"`
-		CreatedAt             time.Time                    `json:"created_at"`
+		FirstName             string                     `json:"first_name"`
+		LastName              string                     `json:"last_name"`
+		Phone                 string                     `json:"phone"`
+		StaffType             models.StaffType           `json:"staff_type"`
+		LicenseNumber         *string                    `json:"license_number,omitempty"`
+		LicenseExpiryDate     *time.Time                 `json:"license_expiry_date,omitempty"`
+		ExperienceYears       int                        `json:"experience_years"`
+		EmergencyContact      *string                    `json:"emergency_contact,omitempty"`
+		EmergencyContactName  *string                    `json:"emergency_contact_name,omitempty"`
+		EmploymentStatus      models.EmploymentStatus    `json:"employment_status"`
+		IsVerified            bool                       `json:"is_verified"`
+		VerificationStatus    models.VerificationStatus  `json:"verification_status"`
+		HireDate              *time.Time                 `json:"hire_date,omitempty"`
+		PerformanceRating     float64                    `json:"performance_rating"`
+		TotalTripsCompleted   int                        `json:"total_trips_completed"`
+		ProfileCompleted      bool                       `json:"profile_completed"`
+		EmploymentID          string                     `json:"employment_id"`
+		CreatedAt             time.Time                  `json:"created_at"`
 	}
 
 	enrichedStaff := []StaffWithUserInfo{}
@@ -745,7 +746,8 @@ func (h *BusOwnerHandler) GetStaff(c *gin.Context) {
 			EmergencyContact:      staff.EmergencyContact,
 			EmergencyContactName:  staff.EmergencyContactName,
 			EmploymentStatus:      employment.EmploymentStatus,
-			BackgroundCheckStatus: staff.BackgroundCheckStatus,
+			IsVerified:            staff.IsVerified,
+			VerificationStatus:    staff.VerificationStatus,
 			HireDate:              employment.HireDate,
 			PerformanceRating:     employment.PerformanceRating,
 			TotalTripsCompleted:   employment.TotalTripsCompleted,

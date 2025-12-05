@@ -1717,9 +1717,14 @@ paths:
                         experience_years:
                           type: integer
                           example: 5
-                        background_check_status:
+                        is_verified:
+                          type: boolean
+                          description: Whether staff has been verified/approved
+                          example: true
+                        verification_status:
                           type: string
-                          enum: [pending, in_progress, approved, rejected]
+                          enum: [pending, approved, rejected]
+                          description: Staff verification status
                           example: "approved"
                         employment_id:
                           type: string
@@ -5786,18 +5791,18 @@ components:
         emergency_contact_name:
           type: string
           example: "Nimal Perera"
-        medical_certificate_expiry:
-          type: string
-          format: date
-          nullable: true
-          example: "2025-06-30"
-        background_check_status:
-          type: string
-          enum: [pending, in_progress, approved, rejected]
-          example: "pending"
         profile_completed:
           type: boolean
           example: true
+        is_verified:
+          type: boolean
+          description: Whether staff has been verified/approved by admin
+          example: false
+        verification_status:
+          type: string
+          enum: [pending, approved, rejected]
+          description: Staff verification status
+          example: "pending"
         verification_notes:
           type: string
           nullable: true

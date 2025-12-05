@@ -23,14 +23,13 @@ const (
 	EmploymentStatusSuspended  EmploymentStatus = "suspended"
 )
 
-// BackgroundCheckStatus represents background check status
-type BackgroundCheckStatus string
+// VerificationStatus represents staff verification status
+type VerificationStatus string
 
 const (
-	BackgroundCheckPending  BackgroundCheckStatus = "pending"
-	BackgroundCheckApproved BackgroundCheckStatus = "approved"
-	BackgroundCheckRejected BackgroundCheckStatus = "rejected"
-	BackgroundCheckExpired  BackgroundCheckStatus = "expired"
+	VerificationStatusPending  VerificationStatus = "pending"
+	VerificationStatusApproved VerificationStatus = "approved"
+	VerificationStatusRejected VerificationStatus = "rejected"
 )
 
 // BusStaff represents a driver or conductor (profile only, no employment details)
@@ -43,12 +42,12 @@ type BusStaff struct {
 	LicenseNumber            *string               `json:"license_number,omitempty" db:"license_number"`
 	LicenseExpiryDate        *time.Time            `json:"license_expiry_date,omitempty" db:"license_expiry_date"`
 	ExperienceYears          int                   `json:"experience_years" db:"experience_years"`
-	EmergencyContact         *string               `json:"emergency_contact,omitempty" db:"emergency_contact"`
-	EmergencyContactName     *string               `json:"emergency_contact_name,omitempty" db:"emergency_contact_name"`
-	MedicalCertificateExpiry *time.Time            `json:"medical_certificate_expiry,omitempty" db:"medical_certificate_expiry"`
-	BackgroundCheckStatus    BackgroundCheckStatus `json:"background_check_status" db:"background_check_status"`
-	ProfileCompleted         bool                  `json:"profile_completed" db:"profile_completed"`
-	VerificationNotes        *string               `json:"verification_notes,omitempty" db:"verification_notes"`
+	EmergencyContact         *string            `json:"emergency_contact,omitempty" db:"emergency_contact"`
+	EmergencyContactName     *string            `json:"emergency_contact_name,omitempty" db:"emergency_contact_name"`
+	ProfileCompleted         bool               `json:"profile_completed" db:"profile_completed"`
+	IsVerified               bool               `json:"is_verified" db:"is_verified"`
+	VerificationStatus       VerificationStatus `json:"verification_status" db:"verification_status"`
+	VerificationNotes        *string            `json:"verification_notes,omitempty" db:"verification_notes"``
 	VerifiedAt               *time.Time            `json:"verified_at,omitempty" db:"verified_at"`
 	VerifiedBy               *string               `json:"verified_by,omitempty" db:"verified_by"`
 	CreatedAt                time.Time             `json:"created_at" db:"created_at"`
@@ -94,14 +93,13 @@ type StaffRegistrationInput struct {
 
 // StaffProfileUpdate represents input for profile updates
 type StaffProfileUpdate struct {
-	FirstName                *string `json:"first_name"`
-	LastName                 *string `json:"last_name"`
-	LicenseNumber            *string `json:"license_number"`
-	LicenseExpiryDate        *string `json:"license_expiry_date"`
-	ExperienceYears          *int    `json:"experience_years"`
-	EmergencyContact         *string `json:"emergency_contact"`
-	EmergencyContactName     *string `json:"emergency_contact_name"`
-	MedicalCertificateExpiry *string `json:"medical_certificate_expiry"`
+	FirstName            *string `json:"first_name"`
+	LastName             *string `json:"last_name"`
+	LicenseNumber        *string `json:"license_number"`
+	LicenseExpiryDate    *string `json:"license_expiry_date"`
+	ExperienceYears      *int    `json:"experience_years"`
+	EmergencyContact     *string `json:"emergency_contact"`
+	EmergencyContactName *string `json:"emergency_contact_name"`
 }
 
 // CompleteStaffProfile represents complete profile with user, staff, and employment info

@@ -162,13 +162,6 @@ func (s *StaffService) UpdateStaffProfile(userID string, updates map[string]inte
 		}
 	}
 
-	if medCertExpiry, ok := updates["medical_certificate_expiry"].(string); ok {
-		parsedDate, err := time.Parse("2006-01-02", medCertExpiry)
-		if err == nil {
-			fields["medical_certificate_expiry"] = parsedDate
-		}
-	}
-
 	// Handle name fields
 	if firstName, ok := updates["first_name"].(string); ok {
 		fields["first_name"] = firstName
