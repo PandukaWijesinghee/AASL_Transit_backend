@@ -1068,8 +1068,9 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 			return
 		}
 
-		// Verify driver belongs to this bus owner
-		if staff.BusOwnerID == nil || *staff.BusOwnerID != busOwner.ID {
+		// Verify driver belongs to this bus owner via employment
+		employment, err := h.staffRepo.GetCurrentEmployment(*req.DriverID)
+		if err != nil || employment == nil || employment.BusOwnerID != busOwner.ID {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Driver does not belong to your organization"})
 			return
 		}
@@ -1081,7 +1082,7 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 		}
 
 		// Verify employment status
-		if staff.EmploymentStatus != "active" {
+		if employment.EmploymentStatus != "active" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Driver is not actively employed"})
 			return
 		}
@@ -1106,8 +1107,9 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 			return
 		}
 
-		// Verify conductor belongs to this bus owner
-		if staff.BusOwnerID == nil || *staff.BusOwnerID != busOwner.ID {
+		// Verify conductor belongs to this bus owner via employment
+		employment, err := h.staffRepo.GetCurrentEmployment(*req.ConductorID)
+		if err != nil || employment == nil || employment.BusOwnerID != busOwner.ID {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Conductor does not belong to your organization"})
 			return
 		}
@@ -1119,7 +1121,7 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 		}
 
 		// Verify employment status
-		if staff.EmploymentStatus != "active" {
+		if employment.EmploymentStatus != "active" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Conductor is not actively employed"})
 			return
 		}

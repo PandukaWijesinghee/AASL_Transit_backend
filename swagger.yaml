@@ -19,6 +19,24 @@ info:
     4. Use access token for protected endpoints
     5. Refresh token when access token expires
 
+    ## Staff Employment Model
+    Staff members (drivers/conductors) have a separated profile and employment structure:
+    - **Staff Profile (`bus_staff`)**: Personal information, license details, verification status
+    - **Employment Records (`bus_staff_employment`)**: Employment history with bus owners
+
+    **Employment Lifecycle:**
+    1. Staff registers profile (no bus owner link initially)
+    2. Bus owner verifies staff via phone number
+    3. Bus owner links staff (creates employment record)
+    4. Employment can be terminated (record preserved for history)
+    5. Staff can be linked to new bus owner (new employment record)
+
+    **Benefits:**
+    - Complete employment history tracking
+    - Staff can move between companies
+    - Performance metrics per employment period
+    - Proper audit trail
+
     ## Trip Generation System
     - **On-Demand Generation**: When a schedule/timetable is created, trips are generated for the specified date range
     - **Date Range**: Configurable via `system_settings.trip_generation_days_ahead` (default: 7 days)
@@ -1290,17 +1308,23 @@ paths:
     post:
       summary: Register new staff member
       description: |
-        Register a new driver or conductor.
+        Register a new driver or conductor profile.
+
+        **New Registration Flow:**
+        - Staff registers their profile (driver or conductor)
+        - Profile is created without any bus owner link
+        - Staff waits for a bus owner to link them to their organization
+        - Employment details (hire date, status, performance) are managed separately
 
         **Requirements:**
-        - Valid phone number (not already registered)
-        - Valid bus owner ID
-        - Staff role (driver or conductor)
-        - Initial employment status will be 'pending'
+        - Valid phone number (not already registered as staff)
+        - Staff type (driver or conductor)
+        - Driver-specific: license number and expiry date
       operationId: registerStaff
       tags:
         - Staff
-      security: []
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -1308,32 +1332,44 @@ paths:
             schema:
               type: object
               required:
-                - phone
-                - name
-                - role
-                - bus_owner_id
+                - first_name
+                - last_name
+                - staff_type
               properties:
-                phone:
+                first_name:
                   type: string
-                  pattern: '^\+94[0-9]{9}$'
-                  example: "+94771234567"
-                name:
+                  description: Staff member's first name
+                  example: "Kamal"
+                last_name:
                   type: string
-                  example: "John Driver"
-                nic:
-                  type: string
-                  example: "199512345678"
-                role:
+                  description: Staff member's last name
+                  example: "Perera"
+                staff_type:
                   type: string
                   enum: [driver, conductor]
-                  example: driver
-                bus_owner_id:
-                  type: integer
-                  example: 1
+                  description: Type of staff - driver or conductor
+                  example: "driver"
                 license_number:
                   type: string
-                  description: Required for drivers
-                  example: "B1234567"
+                  description: NTC license number (required for drivers)
+                  example: "NTC1234567"
+                license_expiry_date:
+                  type: string
+                  format: date
+                  description: License expiry date (required for drivers)
+                  example: "2026-12-31"
+                experience_years:
+                  type: integer
+                  description: Years of experience
+                  example: 5
+                emergency_contact:
+                  type: string
+                  description: Emergency contact phone number
+                  example: "+94777654321"
+                emergency_contact_name:
+                  type: string
+                  description: Emergency contact person name
+                  example: "Nimal Perera"
       responses:
         "201":
           description: Staff registered successfully
@@ -1623,8 +1659,13 @@ paths:
     get:
       summary: Get all staff members (drivers and conductors)
       description: |
-        Retrieves all drivers and conductors for the authenticated bus owner.
-        Returns enriched staff data including user information (name, phone).
+        Retrieves all drivers and conductors currently employed by the authenticated bus owner.
+        Returns staff profiles combined with their current employment information.
+
+        **Data Structure:**
+        - Staff profile information (name, license, etc.)
+        - Current employment record (hire date, status, performance)
+        - User contact info (phone number)
       operationId: getStaffMembers
       tags:
         - Bus Owner
@@ -1646,6 +1687,7 @@ paths:
                         id:
                           type: string
                           format: uuid
+                          description: Staff profile ID
                           example: "d581c281-ba77-49d2-8f68-5f7377417bf8"
                         user_id:
                           type: string
@@ -1659,6 +1701,7 @@ paths:
                           example: "Perera"
                         phone:
                           type: string
+                          description: Phone number from user profile
                           example: "+94712345678"
                         staff_type:
                           type: string
@@ -1669,19 +1712,28 @@ paths:
                           example: "NTC1234567"
                         license_expiry_date:
                           type: string
-                          format: date-time
-                          example: "2026-12-31T00:00:00Z"
+                          format: date
+                          example: "2026-12-31"
                         experience_years:
                           type: integer
                           example: 5
+                        background_check_status:
+                          type: string
+                          enum: [pending, in_progress, approved, rejected]
+                          example: "approved"
+                        employment_id:
+                          type: string
+                          format: uuid
+                          description: Current employment record ID
+                          example: "e692d392-cb88-50e3-9f79-6f8488528cf9"
                         employment_status:
                           type: string
                           enum: [active, inactive, suspended, terminated]
                           example: "active"
-                        background_check_status:
+                        hire_date:
                           type: string
-                          enum: [pending, in_progress, cleared, failed]
-                          example: "pending"
+                          format: date
+                          example: "2024-01-15"
                         performance_rating:
                           type: number
                           format: double
@@ -1838,13 +1890,18 @@ paths:
     post:
       summary: Verify staff member eligibility by phone number
       description: |
-        Verifies if a staff member can be added to the bus owner's organization.
-        Checks:
+        Verifies if a staff member can be linked to the bus owner's organization.
+        
+        **Checks performed:**
         - If the phone number exists in the system
         - If the user is registered as staff (driver/conductor)
         - If the staff profile is completed
-        - If the staff is verified by admin
-        - If the staff is already linked to another bus owner
+        - If the staff is verified by admin (background check approved)
+        - If the staff has an active employment with another bus owner
+
+        **New Employment Model:**
+        Staff can have employment history with multiple bus owners over time.
+        This endpoint checks if staff currently has an active employment elsewhere.
 
         Use this endpoint before linking a staff member to your organization.
       operationId: verifyStaffMember
@@ -1947,13 +2004,19 @@ paths:
       summary: Link verified staff member to bus owner organization
       description: |
         Links a verified staff member to the authenticated bus owner's organization.
-        The staff member must have been verified using the /staff/verify endpoint first.
+        Creates a new employment record for the staff member.
 
-        Prerequisites:
+        **Prerequisites:**
         - Staff must exist and be a driver/conductor
         - Staff profile must be completed
         - Staff must be verified by admin
-        - Staff must not be linked to another bus owner
+        - Staff must not have an active employment with another bus owner
+
+        **Effects:**
+        - Creates a new employment record in `bus_staff_employment` table
+        - Sets `is_current` to true
+        - Sets `employment_status` to 'active'
+        - Sets `hire_date` to current date
       operationId: linkStaffMember
       tags:
         - Bus Owner
@@ -1988,6 +2051,11 @@ paths:
                     type: string
                     format: uuid
                     example: "123e4567-e89b-12d3-a456-426614174000"
+                  employment_id:
+                    type: string
+                    format: uuid
+                    description: The new employment record ID
+                    example: "e692d392-cb88-50e3-9f79-6f8488528cf9"
                   staff_type:
                     type: string
                     example: "driver"
@@ -1997,6 +2065,10 @@ paths:
                   last_name:
                     type: string
                     example: "Perera"
+                  hire_date:
+                    type: string
+                    format: date
+                    example: "2024-12-05"
         "400":
           description: Bad request - staff not eligible
           content:
@@ -2029,6 +2101,87 @@ paths:
                   error:
                     type: string
                     example: "Staff is already linked to another bus owner"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/bus-owner/staff/unlink:
+    post:
+      summary: Unlink staff member from bus owner organization
+      description: |
+        Ends the employment relationship between a staff member and the bus owner.
+        The employment record is preserved for history, but marked as terminated.
+
+        **Effects:**
+        - Sets `is_current` to false on the employment record
+        - Sets `termination_date` to current date
+        - Sets `employment_status` to 'terminated'
+        - Staff can be linked to another bus owner after this
+
+        **Note:** This does not delete the staff profile or user account.
+      operationId: unlinkStaffMember
+      tags:
+        - Bus Owner
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - staff_id
+              properties:
+                staff_id:
+                  type: string
+                  format: uuid
+                  description: Staff member's ID to unlink
+                  example: "123e4567-e89b-12d3-a456-426614174000"
+                termination_reason:
+                  type: string
+                  description: Optional reason for termination
+                  example: "Contract ended"
+      responses:
+        "200":
+          description: Staff member unlinked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Staff member unlinked successfully"
+                  staff_id:
+                    type: string
+                    format: uuid
+                    example: "123e4567-e89b-12d3-a456-426614174000"
+                  termination_date:
+                    type: string
+                    format: date
+                    example: "2024-12-05"
+        "400":
+          description: Bad request - staff not linked to this bus owner
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Staff is not currently employed by you"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Staff or bus owner not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Staff member not found"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -5595,36 +5748,152 @@ components:
 
     BusStaff:
       type: object
+      description: |
+        Staff member profile (driver or conductor).
+        Contains profile information only - employment details are in BusStaffEmployment.
       properties:
         id:
-          type: integer
-          example: 1
+          type: string
+          format: uuid
+          example: "d581c281-ba77-49d2-8f68-5f7377417bf8"
         user_id:
-          type: integer
-          example: 1
-        bus_owner_id:
-          type: integer
-          example: 1
-        role:
+          type: string
+          format: uuid
+          example: "3edeb9af-51c3-4c24-a5d0-76c9dee2d4ea"
+        first_name:
+          type: string
+          example: "Kamal"
+        last_name:
+          type: string
+          example: "Perera"
+        staff_type:
           type: string
           enum: [driver, conductor]
-          example: driver
+          example: "driver"
         license_number:
           type: string
-          example: "B1234567"
-        employment_status:
+          example: "NTC1234567"
+        license_expiry_date:
           type: string
-          enum: [pending, active, inactive, suspended]
-          example: active
+          format: date
+          example: "2026-12-31"
+        experience_years:
+          type: integer
+          example: 5
+        emergency_contact:
+          type: string
+          example: "+94777654321"
+        emergency_contact_name:
+          type: string
+          example: "Nimal Perera"
+        medical_certificate_expiry:
+          type: string
+          format: date
+          nullable: true
+          example: "2025-06-30"
+        background_check_status:
+          type: string
+          enum: [pending, in_progress, approved, rejected]
+          example: "pending"
         profile_completed:
           type: boolean
           example: true
+        verification_notes:
+          type: string
+          nullable: true
+          example: "Documents verified"
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-01-15T10:30:00Z"
+        verified_by:
+          type: string
+          format: uuid
+          nullable: true
+          description: Admin user ID who verified this staff
         created_at:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
+
+    BusStaffEmployment:
+      type: object
+      description: |
+        Employment record for a staff member.
+        Tracks employment history when staff moves between bus owners.
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "e692d392-cb88-50e3-9f79-6f8488528cf9"
+        staff_id:
+          type: string
+          format: uuid
+          example: "d581c281-ba77-49d2-8f68-5f7377417bf8"
+        bus_owner_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        employment_status:
+          type: string
+          enum: [active, inactive, suspended, terminated]
+          example: "active"
+        hire_date:
+          type: string
+          format: date
+          example: "2024-01-15"
+        termination_date:
+          type: string
+          format: date
+          nullable: true
+          example: null
+        termination_reason:
+          type: string
+          nullable: true
+          example: null
+        salary_amount:
+          type: number
+          format: decimal
+          nullable: true
+          example: 75000.00
+        performance_rating:
+          type: number
+          format: double
+          nullable: true
+          example: 4.5
+        total_trips_completed:
+          type: integer
+          example: 150
+        is_current:
+          type: boolean
+          description: Whether this is the current active employment
+          example: true
+        notes:
+          type: string
+          nullable: true
+          example: "Excellent performance"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    StaffWithEmployment:
+      type: object
+      description: Staff profile combined with current employment information
+      properties:
+        staff:
+          $ref: "#/components/schemas/BusStaff"
+        employment:
+          $ref: "#/components/schemas/BusStaffEmployment"
+        phone:
+          type: string
+          description: Phone number from user profile
+          example: "+94712345678"
 
     BusOwner:
       type: object
@@ -5821,13 +6090,21 @@ components:
 
     StaffProfile:
       type: object
+      description: |
+        Complete staff profile including user info, staff details, and current employment.
       properties:
         user:
           $ref: "#/components/schemas/User"
         staff:
           $ref: "#/components/schemas/BusStaff"
+        employment:
+          $ref: "#/components/schemas/BusStaffEmployment"
+          nullable: true
+          description: Current employment record (null if not linked to any bus owner)
         bus_owner:
           $ref: "#/components/schemas/BusOwner"
+          nullable: true
+          description: Current employer's bus owner profile (null if not employed)
 
     AuthResponse:
       type: object

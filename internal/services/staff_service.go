@@ -29,7 +29,7 @@ func NewStaffService(
 	}
 }
 
-// RegisterStaff registers a new driver or conductor
+// RegisterStaff registers a new driver or conductor (profile only, no employment)
 func (s *StaffService) RegisterStaff(input *models.StaffRegistrationInput) (*models.BusStaff, error) {
 	// Validate staff type
 	if input.StaffType != models.StaffTypeDriver && input.StaffType != models.StaffTypeConductor {
@@ -37,7 +37,6 @@ func (s *StaffService) RegisterStaff(input *models.StaffRegistrationInput) (*mod
 	}
 
 	// Check if user exists
-	// Convert string ID to UUID
 	userUUID, err := uuid.Parse(input.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid user ID: %v", err)
@@ -54,14 +53,15 @@ func (s *StaffService) RegisterStaff(input *models.StaffRegistrationInput) (*mod
 		return nil, fmt.Errorf("user already registered as staff")
 	}
 
-	// Build staff record
+	// Build staff record (profile only - no employment fields)
 	staff := &models.BusStaff{
 		UserID:               input.UserID,
+		FirstName:            &input.FirstName,
+		LastName:             &input.LastName,
 		StaffType:            input.StaffType,
 		ExperienceYears:      input.ExperienceYears,
 		EmergencyContact:     &input.EmergencyContact,
 		EmergencyContactName: &input.EmergencyContactName,
-		EmploymentStatus:     models.EmploymentStatusPending,
 		ProfileCompleted:     true, // Mark as completed after initial registration
 	}
 
@@ -77,17 +77,6 @@ func (s *StaffService) RegisterStaff(input *models.StaffRegistrationInput) (*mod
 				staff.LicenseExpiryDate = &expiryDate
 			}
 		}
-	}
-
-	// Handle bus owner assignment (optional)
-	if input.BusOwnerCode != nil && *input.BusOwnerCode != "" {
-		owner, err := s.ownerRepo.GetByLicenseNumber(*input.BusOwnerCode)
-		if err == nil {
-			staff.BusOwnerID = &owner.ID
-		}
-	} else if input.BusRegistrationNumber != nil && *input.BusRegistrationNumber != "" {
-		// TODO: Implement bus search by registration number if needed
-		// For now, bus_owner_id will remain NULL
 	}
 
 	// Create staff record
@@ -115,7 +104,7 @@ func (s *StaffService) RegisterStaff(input *models.StaffRegistrationInput) (*mod
 	return staff, nil
 }
 
-// GetCompleteProfile retrieves complete staff profile with user and bus owner info
+// GetCompleteProfile retrieves complete staff profile with user and current employment info
 func (s *StaffService) GetCompleteProfile(userID string) (*models.CompleteStaffProfile, error) {
 	// Get user
 	userUUID, err := uuid.Parse(userID)
@@ -139,9 +128,13 @@ func (s *StaffService) GetCompleteProfile(userID string) (*models.CompleteStaffP
 		Staff: staff,
 	}
 
-	// Get bus owner if assigned
-	if staff.BusOwnerID != nil {
-		owner, err := s.ownerRepo.GetByID(*staff.BusOwnerID)
+	// Get current employment if any
+	employment, err := s.staffRepo.GetCurrentEmployment(staff.ID)
+	if err == nil && employment != nil {
+		profile.Employment = employment
+
+		// Get bus owner info for current employment
+		owner, err := s.ownerRepo.GetByID(employment.BusOwnerID)
 		if err == nil {
 			profile.BusOwner = owner
 		}
@@ -153,7 +146,7 @@ func (s *StaffService) GetCompleteProfile(userID string) (*models.CompleteStaffP
 // UpdateStaffProfile updates staff profile fields
 func (s *StaffService) UpdateStaffProfile(userID string, updates map[string]interface{}) error {
 	// Get existing staff record
-	staff, err := s.staffRepo.GetByUserID(userID)
+	_, err := s.staffRepo.GetByUserID(userID)
 	if err != nil {
 		return fmt.Errorf("staff not found: %v", err)
 	}
@@ -174,6 +167,15 @@ func (s *StaffService) UpdateStaffProfile(userID string, updates map[string]inte
 		if err == nil {
 			fields["medical_certificate_expiry"] = parsedDate
 		}
+	}
+
+	// Handle name fields
+	if firstName, ok := updates["first_name"].(string); ok {
+		fields["first_name"] = firstName
+	}
+
+	if lastName, ok := updates["last_name"].(string); ok {
+		fields["last_name"] = lastName
 	}
 
 	// Handle other fields
@@ -198,7 +200,7 @@ func (s *StaffService) UpdateStaffProfile(userID string, updates map[string]inte
 	}
 
 	// Update staff record
-	err = s.staffRepo.UpdateFields(staff.UserID, fields)
+	err = s.staffRepo.UpdateFields(userID, fields)
 	if err != nil {
 		return fmt.Errorf("failed to update staff profile: %v", err)
 	}
@@ -228,25 +230,34 @@ func (s *StaffService) CheckStaffRegistration(phoneNumber string) (map[string]in
 		}, nil
 	}
 
-	// User is registered as staff
+	// User is registered as staff - check current employment
 	result := map[string]interface{}{
 		"is_registered":     true,
 		"user_id":           user.ID.String(),
 		"staff_id":          staff.ID,
 		"staff_type":        staff.StaffType,
 		"profile_completed": staff.ProfileCompleted,
-		"employment_status": staff.EmploymentStatus,
+		"first_name":        staff.FirstName,
+		"last_name":         staff.LastName,
 	}
 
-	// Add bus owner info if assigned
-	if staff.BusOwnerID != nil {
-		owner, err := s.ownerRepo.GetByID(*staff.BusOwnerID)
+	// Add current employment info if assigned
+	employment, err := s.staffRepo.GetCurrentEmployment(staff.ID)
+	if err == nil && employment != nil {
+		result["employment_status"] = employment.EmploymentStatus
+		result["is_employed"] = true
+		result["hire_date"] = employment.HireDate
+
+		owner, err := s.ownerRepo.GetByID(employment.BusOwnerID)
 		if err == nil {
 			result["bus_owner"] = map[string]interface{}{
 				"id":           owner.ID,
 				"company_name": owner.CompanyName,
 			}
 		}
+	} else {
+		result["is_employed"] = false
+		result["employment_status"] = "unassigned"
 	}
 
 	if !staff.ProfileCompleted {
@@ -285,7 +296,7 @@ func (s *StaffService) FindBusOwnerByBusNumber(busNumber string) (*models.BusOwn
 	return nil, fmt.Errorf("bus number search not yet implemented")
 }
 
-// AssignBusOwner assigns a bus owner to a staff member
+// AssignBusOwner assigns a bus owner to a staff member (creates new employment record)
 func (s *StaffService) AssignBusOwner(userID, busOwnerID string) error {
 	// Verify staff exists
 	staff, err := s.staffRepo.GetByUserID(userID)
@@ -303,33 +314,118 @@ func (s *StaffService) AssignBusOwner(userID, busOwnerID string) error {
 		return fmt.Errorf("bus owner is not verified")
 	}
 
-	// Update staff record
-	staff.BusOwnerID = &busOwnerID
-	err = s.staffRepo.Update(staff)
+	// Check if staff already has current employment
+	existingEmployment, _ := s.staffRepo.GetCurrentEmployment(staff.ID)
+	if existingEmployment != nil {
+		return fmt.Errorf("staff already has active employment with another company")
+	}
+
+	// Create new employment record
+	now := time.Now()
+	employment := &models.BusStaffEmployment{
+		StaffID:          staff.ID,
+		BusOwnerID:       busOwnerID,
+		EmploymentStatus: models.EmploymentStatusActive,
+		HireDate:         &now,
+		IsCurrent:        true,
+	}
+
+	err = s.staffRepo.CreateEmployment(employment)
 	if err != nil {
-		return fmt.Errorf("failed to assign bus owner: %v", err)
+		return fmt.Errorf("failed to create employment record: %v", err)
 	}
 
 	return nil
 }
 
-// ApproveStaff approves a pending staff registration
+// LinkStaffToBusOwner links staff to bus owner (used by bus owner to add staff)
+func (s *StaffService) LinkStaffToBusOwner(staffID, busOwnerID string) error {
+	// Verify staff exists
+	staff, err := s.staffRepo.GetByID(staffID)
+	if err != nil {
+		return fmt.Errorf("staff not found: %v", err)
+	}
+
+	// Verify bus owner exists
+	_, err = s.ownerRepo.GetByID(busOwnerID)
+	if err != nil {
+		return fmt.Errorf("bus owner not found: %v", err)
+	}
+
+	// Check if staff already has current employment
+	existingEmployment, _ := s.staffRepo.GetCurrentEmployment(staff.ID)
+	if existingEmployment != nil {
+		return fmt.Errorf("staff already has active employment")
+	}
+
+	// Create new employment record
+	now := time.Now()
+	employment := &models.BusStaffEmployment{
+		StaffID:          staff.ID,
+		BusOwnerID:       busOwnerID,
+		EmploymentStatus: models.EmploymentStatusActive,
+		HireDate:         &now,
+		IsCurrent:        true,
+	}
+
+	err = s.staffRepo.CreateEmployment(employment)
+	if err != nil {
+		return fmt.Errorf("failed to link staff: %v", err)
+	}
+
+	return nil
+}
+
+// UnlinkStaff ends the employment of a staff member with a bus owner
+func (s *StaffService) UnlinkStaff(staffID, busOwnerID, reason string) error {
+	// Verify staff exists
+	_, err := s.staffRepo.GetByID(staffID)
+	if err != nil {
+		return fmt.Errorf("staff not found: %v", err)
+	}
+
+	// Get current employment
+	employment, err := s.staffRepo.GetCurrentEmployment(staffID)
+	if err != nil || employment == nil {
+		return fmt.Errorf("no active employment found")
+	}
+
+	// Verify the employment is with the correct bus owner
+	if employment.BusOwnerID != busOwnerID {
+		return fmt.Errorf("staff is not employed by this bus owner")
+	}
+
+	// End the employment
+	err = s.staffRepo.EndEmployment(staffID, models.EmploymentStatusTerminated, reason)
+	if err != nil {
+		return fmt.Errorf("failed to end employment: %v", err)
+	}
+
+	return nil
+}
+
+// GetEmploymentHistory gets all employment history for a staff member
+func (s *StaffService) GetEmploymentHistory(staffID string) ([]*models.BusStaffEmployment, error) {
+	return s.staffRepo.GetEmploymentHistory(staffID)
+}
+
+// GetStaffByBusOwner gets all current staff for a bus owner
+func (s *StaffService) GetStaffByBusOwner(busOwnerID string) ([]*models.StaffWithEmployment, error) {
+	return s.staffRepo.GetAllByBusOwner(busOwnerID)
+}
+
+// ApproveStaff approves a pending staff registration (admin verification)
 func (s *StaffService) ApproveStaff(staffID, adminUserID string) error {
 	staff, err := s.staffRepo.GetByID(staffID)
 	if err != nil {
 		return fmt.Errorf("staff not found: %v", err)
 	}
 
-	if staff.EmploymentStatus != models.EmploymentStatusPending {
-		return fmt.Errorf("staff is not in pending status")
-	}
-
-	// Update to active status
-	staff.EmploymentStatus = models.EmploymentStatusActive
+	// Update verification fields
 	now := time.Now()
-	staff.HireDate = &now
 	staff.VerifiedAt = &now
 	staff.VerifiedBy = &adminUserID
+	staff.BackgroundCheckStatus = models.BackgroundCheckApproved
 
 	err = s.staffRepo.Update(staff)
 	if err != nil {
@@ -337,4 +433,9 @@ func (s *StaffService) ApproveStaff(staffID, adminUserID string) error {
 	}
 
 	return nil
+}
+
+// stringPtr is a helper to create a pointer to a string
+func stringPtr(s string) *string {
+	return &s
 }

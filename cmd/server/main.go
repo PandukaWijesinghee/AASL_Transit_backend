@@ -418,10 +418,11 @@ func main() {
 			busOwner.GET("/profile", busOwnerHandler.GetProfile)
 			busOwner.GET("/profile-status", busOwnerHandler.CheckProfileStatus)
 			busOwner.POST("/complete-onboarding", busOwnerHandler.CompleteOnboarding)
-			busOwner.GET("/staff", busOwnerHandler.GetStaff)            // Get all staff (drivers & conductors)
-			busOwner.POST("/staff", busOwnerHandler.AddStaff)           // Add driver or conductor (legacy - creates new)
-			busOwner.POST("/staff/verify", busOwnerHandler.VerifyStaff) // Verify if staff can be added
-			busOwner.POST("/staff/link", busOwnerHandler.LinkStaff)     // Link verified staff to bus owner
+			busOwner.GET("/staff", busOwnerHandler.GetStaff)              // Get all staff (drivers & conductors)
+			busOwner.POST("/staff", busOwnerHandler.AddStaff)             // Add driver or conductor (legacy - creates new)
+			busOwner.POST("/staff/verify", busOwnerHandler.VerifyStaff)   // Verify if staff can be added
+			busOwner.POST("/staff/link", busOwnerHandler.LinkStaff)       // Link verified staff to bus owner
+			busOwner.POST("/staff/unlink", busOwnerHandler.UnlinkStaff)   // Remove staff from bus owner (end employment)
 		}
 
 		// Bus Owner Routes (custom route configurations)

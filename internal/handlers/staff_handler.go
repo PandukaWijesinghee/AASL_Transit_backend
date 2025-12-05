@@ -91,10 +91,11 @@ func (h *StaffHandler) RegisterStaff(c *gin.Context) {
 		"message":           "Registration successful",
 		"staff_id":          staff.ID,
 		"staff_type":        staff.StaffType,
-		"employment_status": staff.EmploymentStatus,
+		"first_name":        staff.FirstName,
+		"last_name":         staff.LastName,
 		"profile_completed": staff.ProfileCompleted,
-		"requires_approval": true,
-		"approval_message":  "Your registration is pending approval by the bus owner or admin",
+		"is_employed":       false, // New registrations are not yet employed
+		"next_step":         "Wait for a bus owner to link you or search for a bus owner to join",
 	})
 }
 

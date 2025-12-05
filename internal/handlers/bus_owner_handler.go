@@ -304,7 +304,7 @@ func (h *BusOwnerHandler) VerifyStaff(c *gin.Context) {
 			LastName:         existingUser.LastName.String,
 			ProfileCompleted: false,
 			IsVerified:       false,
-			AlreadyLinked:    staff.BusOwnerID != nil,
+			AlreadyLinked:    false,
 			Message:          "This staff member has not completed their profile",
 			Reason:           "profile_incomplete",
 		})
@@ -323,49 +323,50 @@ func (h *BusOwnerHandler) VerifyStaff(c *gin.Context) {
 			LastName:         existingUser.LastName.String,
 			ProfileCompleted: true,
 			IsVerified:       false,
-			AlreadyLinked:    staff.BusOwnerID != nil,
+			AlreadyLinked:    false,
 			Message:          "This staff member is pending admin verification",
 			Reason:           "not_verified",
 		})
 		return
 	}
 
-	// Check if already linked to another bus owner
-	if staff.BusOwnerID != nil && *staff.BusOwnerID != busOwner.ID {
-		c.JSON(http.StatusOK, &models.VerifyStaffResponse{
-			Found:            true,
-			Eligible:         false,
-			StaffID:          staff.ID,
-			StaffType:        &staff.StaffType,
-			FirstName:        existingUser.FirstName.String,
-			LastName:         existingUser.LastName.String,
-			ProfileCompleted: true,
-			IsVerified:       true,
-			AlreadyLinked:    true,
-			CurrentOwnerID:   staff.BusOwnerID,
-			Message:          "This staff member is already linked to another bus owner",
-			Reason:           "already_linked_other",
-		})
-		return
-	}
-
-	// Check if already linked to this bus owner
-	if staff.BusOwnerID != nil && *staff.BusOwnerID == busOwner.ID {
-		c.JSON(http.StatusOK, &models.VerifyStaffResponse{
-			Found:            true,
-			Eligible:         false,
-			StaffID:          staff.ID,
-			StaffType:        &staff.StaffType,
-			FirstName:        existingUser.FirstName.String,
-			LastName:         existingUser.LastName.String,
-			ProfileCompleted: true,
-			IsVerified:       true,
-			AlreadyLinked:    true,
-			CurrentOwnerID:   staff.BusOwnerID,
-			Message:          "This staff member is already part of your organization",
-			Reason:           "already_yours",
-		})
-		return
+	// Check if already has active employment (via bus_staff_employment table)
+	currentEmployment, _ := h.staffRepo.GetCurrentEmployment(staff.ID)
+	if currentEmployment != nil {
+		if currentEmployment.BusOwnerID != busOwner.ID {
+			c.JSON(http.StatusOK, &models.VerifyStaffResponse{
+				Found:            true,
+				Eligible:         false,
+				StaffID:          staff.ID,
+				StaffType:        &staff.StaffType,
+				FirstName:        existingUser.FirstName.String,
+				LastName:         existingUser.LastName.String,
+				ProfileCompleted: true,
+				IsVerified:       true,
+				AlreadyLinked:    true,
+				CurrentOwnerID:   &currentEmployment.BusOwnerID,
+				Message:          "This staff member is already employed by another bus owner",
+				Reason:           "already_linked_other",
+			})
+			return
+		} else {
+			// Already linked to this bus owner
+			c.JSON(http.StatusOK, &models.VerifyStaffResponse{
+				Found:            true,
+				Eligible:         false,
+				StaffID:          staff.ID,
+				StaffType:        &staff.StaffType,
+				FirstName:        existingUser.FirstName.String,
+				LastName:         existingUser.LastName.String,
+				ProfileCompleted: true,
+				IsVerified:       true,
+				AlreadyLinked:    true,
+				CurrentOwnerID:   &currentEmployment.BusOwnerID,
+				Message:          "This staff member is already part of your organization",
+				Reason:           "already_yours",
+			})
+			return
+		}
 	}
 
 	// Staff is eligible to be added
@@ -431,13 +432,24 @@ func (h *BusOwnerHandler) LinkStaff(c *gin.Context) {
 		return
 	}
 
-	if staff.BusOwnerID != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Staff member is already linked to a bus owner"})
+	// Check for existing employment
+	currentEmployment, _ := h.staffRepo.GetCurrentEmployment(staff.ID)
+	if currentEmployment != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Staff member already has active employment"})
 		return
 	}
 
-	// Link staff to bus owner
-	err = h.staffRepo.LinkStaffToBusOwner(staff.ID, busOwner.ID)
+	// Create employment record to link staff to bus owner
+	now := time.Now()
+	employment := &models.BusStaffEmployment{
+		StaffID:          staff.ID,
+		BusOwnerID:       busOwner.ID,
+		EmploymentStatus: models.EmploymentStatusActive,
+		HireDate:         &now,
+		IsCurrent:        true,
+	}
+
+	err = h.staffRepo.CreateEmployment(employment)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to link staff: %v", err)})
 		return
@@ -455,12 +467,14 @@ func (h *BusOwnerHandler) LinkStaff(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":    fmt.Sprintf("%s %s has been added to your organization", firstName, lastName),
-		"staff_id":   staff.ID,
-		"staff_type": staff.StaffType,
-		"first_name": firstName,
-		"last_name":  lastName,
-		"phone":      phone,
+		"message":       fmt.Sprintf("%s %s has been added to your organization", firstName, lastName),
+		"staff_id":      staff.ID,
+		"employment_id": employment.ID,
+		"staff_type":    staff.StaffType,
+		"first_name":    firstName,
+		"last_name":     lastName,
+		"phone":         phone,
+		"hire_date":     employment.HireDate,
 	})
 }
 
@@ -554,9 +568,34 @@ func (h *BusOwnerHandler) AddStaff(c *gin.Context) {
 		// User exists - check if already registered as staff
 		existingStaff, _ := h.staffRepo.GetByUserID(existingUser.ID.String())
 		if existingStaff != nil {
-			c.JSON(http.StatusConflict, gin.H{
-				"error":      fmt.Sprintf("This phone number is already registered as %s", existingStaff.StaffType),
-				"staff_type": existingStaff.StaffType,
+			// Check if they have active employment
+			currentEmployment, _ := h.staffRepo.GetCurrentEmployment(existingStaff.ID)
+			if currentEmployment != nil {
+				c.JSON(http.StatusConflict, gin.H{
+					"error":      fmt.Sprintf("This phone number is already employed as %s", existingStaff.StaffType),
+					"staff_type": existingStaff.StaffType,
+				})
+				return
+			}
+			// Staff exists but not employed - link them instead
+			now := time.Now()
+			employment := &models.BusStaffEmployment{
+				StaffID:          existingStaff.ID,
+				BusOwnerID:       busOwner.ID,
+				EmploymentStatus: models.EmploymentStatusActive,
+				HireDate:         &now,
+				IsCurrent:        true,
+			}
+			err = h.staffRepo.CreateEmployment(employment)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to link existing staff: %v", err)})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"message":       fmt.Sprintf("Existing %s linked to your organization", existingStaff.StaffType),
+				"staff_id":      existingStaff.ID,
+				"employment_id": employment.ID,
+				"staff_type":    existingStaff.StaffType,
 			})
 			return
 		}
@@ -564,18 +603,16 @@ func (h *BusOwnerHandler) AddStaff(c *gin.Context) {
 		userID = existingUser.ID
 	}
 
-	// Create bus_staff record
-	now := time.Now()
+	// Create bus_staff record (profile only)
 	staff := &models.BusStaff{
 		UserID:                userID.String(),
-		BusOwnerID:            &busOwner.ID,
+		FirstName:             &req.FirstName,
+		LastName:              &req.LastName,
 		StaffType:             req.StaffType,
 		LicenseNumber:         &req.NTCLicenseNumber,
 		LicenseExpiryDate:     &expiryDate,
 		ExperienceYears:       req.ExperienceYears,
-		EmploymentStatus:      models.EmploymentStatusActive, // Pre-approved by bus owner
 		BackgroundCheckStatus: models.BackgroundCheckPending,
-		HireDate:              &now,
 		ProfileCompleted:      true, // Profile is complete since bus owner provided all info
 	}
 
@@ -593,6 +630,22 @@ func (h *BusOwnerHandler) AddStaff(c *gin.Context) {
 		return
 	}
 
+	// Create employment record to link staff to this bus owner
+	now := time.Now()
+	employment := &models.BusStaffEmployment{
+		StaffID:          staff.ID,
+		BusOwnerID:       busOwner.ID,
+		EmploymentStatus: models.EmploymentStatusActive,
+		HireDate:         &now,
+		IsCurrent:        true,
+	}
+
+	err = h.staffRepo.CreateEmployment(employment)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create employment record: %v", err)})
+		return
+	}
+
 	// Add role to user (driver or conductor)
 	roleToAdd := string(req.StaffType)
 	err = h.userRepo.AddUserRole(userID, roleToAdd)
@@ -602,11 +655,13 @@ func (h *BusOwnerHandler) AddStaff(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message":      fmt.Sprintf("%s added successfully", req.StaffType),
-		"user_id":      userID.String(),
-		"staff_id":     staff.ID,
-		"staff_type":   staff.StaffType,
-		"instructions": fmt.Sprintf("Staff member can now login using phone number %s", req.PhoneNumber),
+		"message":       fmt.Sprintf("%s added successfully", req.StaffType),
+		"user_id":       userID.String(),
+		"staff_id":      staff.ID,
+		"employment_id": employment.ID,
+		"staff_type":    staff.StaffType,
+		"hire_date":     employment.HireDate,
+		"instructions":  fmt.Sprintf("Staff member can now login using phone number %s", req.PhoneNumber),
 	})
 }
 
@@ -631,8 +686,8 @@ func (h *BusOwnerHandler) GetStaff(c *gin.Context) {
 		return
 	}
 
-	// Get all staff for this bus owner
-	staffList, err := h.staffRepo.GetAllByBusOwner(busOwner.ID)
+	// Get all current staff for this bus owner (via employment table)
+	staffWithEmployment, err := h.staffRepo.GetAllByBusOwner(busOwner.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get staff: %v", err)})
 		return
@@ -640,28 +695,32 @@ func (h *BusOwnerHandler) GetStaff(c *gin.Context) {
 
 	// Enrich staff data with user information (name, phone)
 	type StaffWithUserInfo struct {
-		ID                    string                       `json:"id"`
-		UserID                string                       `json:"user_id"`
-		FirstName             string                       `json:"first_name"`
-		LastName              string                       `json:"last_name"`
-		Phone                 string                       `json:"phone"`
-		StaffType             models.StaffType             `json:"staff_type"`
-		LicenseNumber         *string                      `json:"license_number,omitempty"`
-		LicenseExpiryDate     *time.Time                   `json:"license_expiry_date,omitempty"`
-		ExperienceYears       int                          `json:"experience_years"`
-		EmergencyContact      *string                      `json:"emergency_contact,omitempty"`
-		EmergencyContactName  *string                      `json:"emergency_contact_name,omitempty"`
-		EmploymentStatus      models.EmploymentStatus      `json:"employment_status"`
-		BackgroundCheckStatus models.BackgroundCheckStatus `json:"background_check_status"`
-		HireDate              *time.Time                   `json:"hire_date,omitempty"`
-		PerformanceRating     float64                      `json:"performance_rating"`
-		TotalTripsCompleted   int                          `json:"total_trips_completed"`
-		ProfileCompleted      bool                         `json:"profile_completed"`
-		CreatedAt             time.Time                    `json:"created_at"`
+		ID                    string                  `json:"id"`
+		UserID                string                  `json:"user_id"`
+		FirstName             string                  `json:"first_name"`
+		LastName              string                        `json:"last_name"`
+		Phone                 string                        `json:"phone"`
+		StaffType             models.StaffType              `json:"staff_type"`
+		LicenseNumber         *string                       `json:"license_number,omitempty"`
+		LicenseExpiryDate     *time.Time                    `json:"license_expiry_date,omitempty"`
+		ExperienceYears       int                           `json:"experience_years"`
+		EmergencyContact      *string                       `json:"emergency_contact,omitempty"`
+		EmergencyContactName  *string                       `json:"emergency_contact_name,omitempty"`
+		EmploymentStatus      models.EmploymentStatus       `json:"employment_status"`
+		BackgroundCheckStatus models.BackgroundCheckStatus  `json:"background_check_status"`
+		HireDate              *time.Time                    `json:"hire_date,omitempty"`
+		PerformanceRating     float64                       `json:"performance_rating"`
+		TotalTripsCompleted   int                           `json:"total_trips_completed"`
+		ProfileCompleted      bool                          `json:"profile_completed"`
+		EmploymentID          string                        `json:"employment_id"`
+		CreatedAt             time.Time                     `json:"created_at"`
 	}
 
 	enrichedStaff := []StaffWithUserInfo{}
-	for _, staff := range staffList {
+	for _, swe := range staffWithEmployment {
+		staff := swe.Staff
+		employment := swe.Employment
+
 		// Get user information
 		user, err := h.userRepo.GetUserByID(uuid.MustParse(staff.UserID))
 		if err != nil {
@@ -685,12 +744,13 @@ func (h *BusOwnerHandler) GetStaff(c *gin.Context) {
 			ExperienceYears:       staff.ExperienceYears,
 			EmergencyContact:      staff.EmergencyContact,
 			EmergencyContactName:  staff.EmergencyContactName,
-			EmploymentStatus:      staff.EmploymentStatus,
+			EmploymentStatus:      employment.EmploymentStatus,
 			BackgroundCheckStatus: staff.BackgroundCheckStatus,
-			HireDate:              staff.HireDate,
-			PerformanceRating:     staff.PerformanceRating,
-			TotalTripsCompleted:   staff.TotalTripsCompleted,
+			HireDate:              employment.HireDate,
+			PerformanceRating:     employment.PerformanceRating,
+			TotalTripsCompleted:   employment.TotalTripsCompleted,
 			ProfileCompleted:      staff.ProfileCompleted,
+			EmploymentID:          employment.ID,
 			CreatedAt:             staff.CreatedAt,
 		}
 
@@ -700,5 +760,64 @@ func (h *BusOwnerHandler) GetStaff(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"staff": enrichedStaff,
 		"total": len(enrichedStaff),
+	})
+}
+
+// UnlinkStaff removes a staff member from the bus owner's organization
+// POST /api/v1/bus-owner/staff/unlink
+func (h *BusOwnerHandler) UnlinkStaff(c *gin.Context) {
+	// Get user context from JWT middleware
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// Get bus owner record
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get bus owner profile"})
+		return
+	}
+
+	// Parse request
+	var req models.UnlinkStaffRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Verify staff exists and is employed by this bus owner
+	currentEmployment, err := h.staffRepo.GetCurrentEmployment(req.StaffID)
+	if err != nil || currentEmployment == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No active employment found for this staff member"})
+		return
+	}
+
+	if currentEmployment.BusOwnerID != busOwner.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "This staff member is not employed by your organization"})
+		return
+	}
+
+	// Determine status based on request (default to terminated)
+	status := models.EmploymentStatusTerminated
+	if req.Status == "resigned" {
+		status = models.EmploymentStatusResigned
+	}
+
+	// End the employment
+	err = h.staffRepo.EndEmployment(req.StaffID, status, req.TerminationReason)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to unlink staff: %v", err)})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "Staff member has been removed from your organization",
+		"staff_id": req.StaffID,
 	})
 }
