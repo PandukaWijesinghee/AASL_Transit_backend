@@ -643,13 +643,16 @@ func (r *ScheduledTripRepository) scanTripsWithRouteInfo(rows *sql.Rows) ([]mode
 func (r *ScheduledTripRepository) PublishTrip(tripID string, busOwnerID string) error {
 	log.Printf("PublishTrip: Setting is_bookable=true for trip %s, bus owner %s", tripID, busOwnerID)
 
-	// First, check if trip has seat_layout_id assigned
+	// First, check if trip has seat_layout_id assigned and verify ownership
+	// Supports both: trips with trip_schedule (recurring) and trips with bus_owner_route only (special trips)
 	var seatLayoutID sql.NullString
 	checkQuery := `
 		SELECT st.seat_layout_id
 		FROM scheduled_trips st
-		JOIN trip_schedules ts ON st.trip_schedule_id = ts.id
-		WHERE st.id = $1 AND ts.bus_owner_id = $2
+		LEFT JOIN trip_schedules ts ON st.trip_schedule_id = ts.id
+		LEFT JOIN bus_owner_routes bor ON st.bus_owner_route_id = bor.id
+		WHERE st.id = $1 
+		  AND (ts.bus_owner_id = $2 OR bor.bus_owner_id = $2)
 	`
 	err := r.db.QueryRow(checkQuery, tripID, busOwnerID).Scan(&seatLayoutID)
 	if err != nil {
@@ -665,13 +668,19 @@ func (r *ScheduledTripRepository) PublishTrip(tripID string, busOwnerID string) 
 		return fmt.Errorf("cannot publish trip: seat layout must be assigned before publishing")
 	}
 
+	// Update query also needs to support both ownership paths
 	query := `
 		UPDATE scheduled_trips st
 		SET is_bookable = true, ever_published = true, updated_at = NOW()
-		FROM trip_schedules ts
-		WHERE st.id = $1
-		  AND st.trip_schedule_id = ts.id
-		  AND ts.bus_owner_id = $2
+		FROM (
+			SELECT st2.id
+			FROM scheduled_trips st2
+			LEFT JOIN trip_schedules ts ON st2.trip_schedule_id = ts.id
+			LEFT JOIN bus_owner_routes bor ON st2.bus_owner_route_id = bor.id
+			WHERE st2.id = $1
+			  AND (ts.bus_owner_id = $2 OR bor.bus_owner_id = $2)
+		) AS authorized
+		WHERE st.id = authorized.id
 	`
 
 	result, err := r.db.Exec(query, tripID, busOwnerID)
@@ -697,13 +706,19 @@ func (r *ScheduledTripRepository) PublishTrip(tripID string, busOwnerID string) 
 func (r *ScheduledTripRepository) UnpublishTrip(tripID string, busOwnerID string) error {
 	log.Printf("UnpublishTrip: Setting is_bookable=false for trip %s, bus owner %s", tripID, busOwnerID)
 
+	// Update query supports both ownership paths (trip_schedule or bus_owner_route)
 	query := `
 		UPDATE scheduled_trips st
 		SET is_bookable = false, updated_at = NOW()
-		FROM trip_schedules ts
-		WHERE st.id = $1
-		  AND st.trip_schedule_id = ts.id
-		  AND ts.bus_owner_id = $2
+		FROM (
+			SELECT st2.id
+			FROM scheduled_trips st2
+			LEFT JOIN trip_schedules ts ON st2.trip_schedule_id = ts.id
+			LEFT JOIN bus_owner_routes bor ON st2.bus_owner_route_id = bor.id
+			WHERE st2.id = $1
+			  AND (ts.bus_owner_id = $2 OR bor.bus_owner_id = $2)
+		) AS authorized
+		WHERE st.id = authorized.id
 	`
 
 	result, err := r.db.Exec(query, tripID, busOwnerID)
