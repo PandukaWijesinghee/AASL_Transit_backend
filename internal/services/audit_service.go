@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-	
+
 	"github.com/google/uuid"
 	"github.com/smarttransit/sms-auth-backend/internal/database"
 	"github.com/smarttransit/sms-auth-backend/internal/utils"
@@ -24,13 +24,13 @@ func NewAuditService(db database.DB) *AuditService {
 
 // AuditEvent represents a security event to be logged
 type AuditEvent struct {
-	UserID      *uuid.UUID             // Can be nil for pre-authentication events
-	Action      string                 // Action type (e.g., "otp_request", "otp_verify", "login", "logout")
-	EntityType  string                 // Type of entity affected (e.g., "otp", "user", "session")
-	EntityID    *uuid.UUID             // ID of the affected entity (can be nil)
-	IPAddress   string                 // Client IP address
-	UserAgent   string                 // Client user agent
-	Details     map[string]interface{} // Additional details as JSONB
+	UserID     *uuid.UUID             // Can be nil for pre-authentication events
+	Action     string                 // Action type (e.g., "otp_request", "otp_verify", "login", "logout")
+	EntityType string                 // Type of entity affected (e.g., "otp", "user", "session")
+	EntityID   *uuid.UUID             // ID of the affected entity (can be nil)
+	IPAddress  string                 // Client IP address
+	UserAgent  string                 // Client user agent
+	Details    map[string]interface{} // Additional details as JSONB
 }
 
 // LogOTPRequest logs an OTP generation request
