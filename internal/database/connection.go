@@ -6,8 +6,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/smarttransit/sms-auth-backend/internal/config"
 )
 
@@ -41,11 +42,7 @@ func NewConnection(cfg config.DatabaseConfig) (DB, error) {
 		return nil, fmt.Errorf("database URL is required")
 	}
 
-	// Add connection pooler compatibility parameters
-	// For lib/pq driver with Supavisor/PgBouncer, we need binary_parameters=no
-	// This disables binary encoding which causes "bind message" errors with pooled connections
 	connectionURL := cfg.URL
-
 	fmt.Printf("INFO: Original database URL: %s\n", maskPassword(cfg.URL))
 
 	// Add sslmode if not present (required for Supabase)
@@ -58,21 +55,33 @@ func NewConnection(cfg config.DatabaseConfig) (DB, error) {
 		fmt.Printf("INFO: Added sslmode=require\n")
 	}
 
-	// Disable binary parameters to fix bind message errors with connection poolers
-	// binary_parameters=no forces text protocol which doesn't have prepared statement issues
-	if !strings.Contains(connectionURL, "binary_parameters") {
-		separator := "?"
-		if strings.Contains(connectionURL, "?") {
-			separator = "&"
-		}
-		connectionURL = connectionURL + separator + "binary_parameters=no"
-		fmt.Printf("INFO: Added binary_parameters=no (fixes connection pooler issues)\n")
+	// Check if using transaction mode pooler (port 6543)
+	usingPooler := strings.Contains(connectionURL, ":6543")
+	if usingPooler {
+		fmt.Printf("INFO: Detected Supabase Transaction Mode (port 6543) - enabling simple protocol\n")
 	}
 
 	fmt.Printf("INFO: Final connection URL: %s\n", maskPassword(connectionURL))
 
-	// Connect to database
-	db, err := sqlx.Connect("postgres", connectionURL)
+	// Parse pgx config from connection URL
+	pgxConfig, err := pgx.ParseConfig(connectionURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse database URL: %w", err)
+	}
+
+	// Enable simple protocol mode for connection poolers (Supavisor/PgBouncer)
+	// This disables prepared statements which cause "unnamed prepared statement does not exist" errors
+	// with transaction-mode pooling
+	if usingPooler {
+		pgxConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+		fmt.Printf("INFO: Using QueryExecModeSimpleProtocol (fixes pooler prepared statement issues)\n")
+	}
+
+	// Register the pgx driver with our config
+	connStr := stdlib.RegisterConnConfig(pgxConfig)
+
+	// Connect using sqlx with the registered pgx driver
+	db, err := sqlx.Connect("pgx", connStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
