@@ -6308,47 +6308,65 @@ components:
       required:
         - permit_number
         - bus_registration_number
-        - route_number
-        - from_city
-        - to_city
+        - master_route_id
         - approved_fare
         - validity_from
         - validity_to
       properties:
         permit_number:
           type: string
+          description: Government-issued permit number
           example: "PERMIT-2025-001"
         bus_registration_number:
           type: string
+          description: Vehicle registration number
           example: "WP CAB-1234"
-        route_number:
+        master_route_id:
           type: string
-          example: "138"
-        from_city:
-          type: string
-          example: "Colombo"
-        to_city:
-          type: string
-          example: "Kandy"
+          format: uuid
+          description: ID of the master route (from GET /master-routes)
+          example: "550e8400-e29b-41d4-a716-446655440000"
         via:
           type: string
+          description: Permit-specific intermediate stops (comma-separated, optional)
           example: "Kadawatha, Kegalle"
         approved_fare:
           type: number
           format: double
+          description: Maximum approved fare for this route
           example: 250.00
         approved_seating_capacity:
           type: integer
+          description: Approved number of seats for this permit
           example: 52
-          description: Approved number of seats (optional)
         validity_from:
           type: string
           format: date
+          description: Permit issue/start date
           example: "2025-01-01"
         validity_to:
           type: string
           format: date
+          description: Permit expiry date
           example: "2025-12-31"
+        permit_type:
+          type: string
+          description: Type of permit (optional)
+          example: "regular"
+        max_trips_per_day:
+          type: integer
+          description: Maximum trips allowed per day (optional)
+          example: 4
+        allowed_bus_types:
+          type: array
+          items:
+            type: string
+          description: List of allowed bus types (optional)
+          example: ["luxury", "semi-luxury"]
+        restrictions:
+          type: string
+          description: Any restrictions on this permit (optional)
+          example: "No night service"
 
     UpdatePermitRequest:
       type: object

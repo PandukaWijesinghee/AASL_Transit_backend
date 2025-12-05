@@ -111,10 +111,11 @@ type CreateRoutePermitRequest struct {
 	Via *string `json:"via,omitempty"`
 
 	// Optional permit details
-	PermitType      *string  `json:"permit_type,omitempty"`
-	MaxTripsPerDay  *int     `json:"max_trips_per_day,omitempty"`
-	AllowedBusTypes []string `json:"allowed_bus_types,omitempty"`
-	Restrictions    *string  `json:"restrictions,omitempty"`
+	PermitType              *string  `json:"permit_type,omitempty"`
+	ApprovedSeatingCapacity *int     `json:"approved_seating_capacity,omitempty"` // Number of seats approved for this permit
+	MaxTripsPerDay          *int     `json:"max_trips_per_day,omitempty"`
+	AllowedBusTypes         []string `json:"allowed_bus_types,omitempty"`
+	Restrictions            *string  `json:"restrictions,omitempty"`
 }
 
 // Validate validates the create permit request
@@ -225,22 +226,23 @@ func NewRoutePermitFromRequest(busOwnerID string, req *CreateRoutePermitRequest)
 
 	// Create permit with only master_route_id (route details come from JOIN)
 	return &RoutePermit{
-		ID:                    uuid.New().String(),
-		BusOwnerID:            busOwnerID,
-		PermitNumber:          req.PermitNumber,
-		BusRegistrationNumber: req.BusRegistrationNumber,
-		MasterRouteID:         req.MasterRouteID, // FK to master_routes
-		Via:                   via,               // Permit-specific stops (optional)
-		ApprovedFare:          req.ApprovedFare,
-		IssueDate:             issueDate,
-		ExpiryDate:            expiryDate,
-		PermitType:            permitType,
-		MaxTripsPerDay:        req.MaxTripsPerDay,
-		AllowedBusTypes:       allowedBusTypes,
-		Restrictions:          req.Restrictions,
-		Status:                VerificationPending,
-		CreatedAt:             time.Now(),
-		UpdatedAt:             time.Now(),
+		ID:                      uuid.New().String(),
+		BusOwnerID:              busOwnerID,
+		PermitNumber:            req.PermitNumber,
+		BusRegistrationNumber:   req.BusRegistrationNumber,
+		MasterRouteID:           req.MasterRouteID, // FK to master_routes
+		Via:                     via,               // Permit-specific stops (optional)
+		ApprovedFare:            req.ApprovedFare,
+		ApprovedSeatingCapacity: req.ApprovedSeatingCapacity, // Seating capacity from form
+		IssueDate:               issueDate,
+		ExpiryDate:              expiryDate,
+		PermitType:              permitType,
+		MaxTripsPerDay:          req.MaxTripsPerDay,
+		AllowedBusTypes:         allowedBusTypes,
+		Restrictions:            req.Restrictions,
+		Status:                  VerificationPending,
+		CreatedAt:               time.Now(),
+		UpdatedAt:               time.Now(),
 	}, nil
 }
 
