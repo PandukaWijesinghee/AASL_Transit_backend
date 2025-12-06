@@ -93,12 +93,12 @@ func (r *ManualBookingRepository) Create(booking *models.ManualSeatBooking, seat
 		INSERT INTO manual_seat_bookings (
 			booking_reference, scheduled_trip_id, created_by_user_id, booking_type,
 			passenger_name, passenger_phone, passenger_nic, passenger_notes,
-			route_name, boarding_stop_id, boarding_stop_name, alighting_stop_id, alighting_stop_name,
+			boarding_stop_id, alighting_stop_id,
 			departure_datetime, number_of_seats, total_fare,
 			payment_status, amount_paid, payment_method, payment_notes,
 			status, confirmed_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
 		) RETURNING id, created_at, updated_at
 	`
 
@@ -112,11 +112,8 @@ func (r *ManualBookingRepository) Create(booking *models.ManualSeatBooking, seat
 		booking.PassengerPhone,
 		booking.PassengerNIC,
 		booking.PassengerNotes,
-		booking.RouteName,
 		booking.BoardingStopID,
-		booking.BoardingStopName,
 		booking.AlightingStopID,
-		booking.AlightingStopName,
 		booking.DepartureDatetime,
 		booking.NumberOfSeats,
 		booking.TotalFare,
@@ -197,18 +194,26 @@ func (r *ManualBookingRepository) Create(booking *models.ManualSeatBooking, seat
 	}, nil
 }
 
-// GetByID returns a manual booking by ID
+// GetByID returns a manual booking by ID with route/stop names joined
 func (r *ManualBookingRepository) GetByID(id string) (*models.ManualSeatBooking, error) {
 	query := `
-		SELECT id, booking_reference, scheduled_trip_id, created_by_user_id, booking_type,
-			   passenger_name, passenger_phone, passenger_nic, passenger_notes,
-			   route_name, boarding_stop_id, boarding_stop_name, alighting_stop_id, alighting_stop_name,
-			   departure_datetime, number_of_seats, total_fare,
-			   payment_status, amount_paid, payment_method, payment_notes,
-			   status, confirmed_at, checked_in_at, boarded_at, completed_at,
-			   cancelled_at, cancellation_reason, created_at, updated_at
-		FROM manual_seat_bookings
-		WHERE id = $1
+		SELECT msb.id, msb.booking_reference, msb.scheduled_trip_id, msb.created_by_user_id, msb.booking_type,
+			   msb.passenger_name, msb.passenger_phone, msb.passenger_nic, msb.passenger_notes,
+			   msb.boarding_stop_id, msb.alighting_stop_id,
+			   msb.departure_datetime, msb.number_of_seats, msb.total_fare,
+			   msb.payment_status, msb.amount_paid, msb.payment_method, msb.payment_notes,
+			   msb.status, msb.confirmed_at, msb.checked_in_at, msb.boarded_at, msb.completed_at,
+			   msb.cancelled_at, msb.cancellation_reason, msb.created_at, msb.updated_at,
+			   COALESCE(bor.custom_route_name, mr.route_name, 'Unknown Route') as route_name,
+			   COALESCE(bs.stop_name, 'Unknown') as boarding_stop_name,
+			   COALESCE(als.stop_name, 'Unknown') as alighting_stop_name
+		FROM manual_seat_bookings msb
+		LEFT JOIN scheduled_trips st ON msb.scheduled_trip_id = st.id
+		LEFT JOIN bus_owner_routes bor ON st.bus_owner_route_id = bor.id
+		LEFT JOIN master_routes mr ON bor.master_route_id = mr.id
+		LEFT JOIN master_route_stops bs ON msb.boarding_stop_id = bs.id
+		LEFT JOIN master_route_stops als ON msb.alighting_stop_id = als.id
+		WHERE msb.id = $1
 	`
 
 	var booking models.ManualSeatBooking
@@ -220,18 +225,26 @@ func (r *ManualBookingRepository) GetByID(id string) (*models.ManualSeatBooking,
 	return &booking, nil
 }
 
-// GetByBookingReference returns a manual booking by reference
+// GetByBookingReference returns a manual booking by reference with route/stop names joined
 func (r *ManualBookingRepository) GetByBookingReference(ref string) (*models.ManualSeatBooking, error) {
 	query := `
-		SELECT id, booking_reference, scheduled_trip_id, created_by_user_id, booking_type,
-			   passenger_name, passenger_phone, passenger_nic, passenger_notes,
-			   route_name, boarding_stop_id, boarding_stop_name, alighting_stop_id, alighting_stop_name,
-			   departure_datetime, number_of_seats, total_fare,
-			   payment_status, amount_paid, payment_method, payment_notes,
-			   status, confirmed_at, checked_in_at, boarded_at, completed_at,
-			   cancelled_at, cancellation_reason, created_at, updated_at
-		FROM manual_seat_bookings
-		WHERE booking_reference = $1
+		SELECT msb.id, msb.booking_reference, msb.scheduled_trip_id, msb.created_by_user_id, msb.booking_type,
+			   msb.passenger_name, msb.passenger_phone, msb.passenger_nic, msb.passenger_notes,
+			   msb.boarding_stop_id, msb.alighting_stop_id,
+			   msb.departure_datetime, msb.number_of_seats, msb.total_fare,
+			   msb.payment_status, msb.amount_paid, msb.payment_method, msb.payment_notes,
+			   msb.status, msb.confirmed_at, msb.checked_in_at, msb.boarded_at, msb.completed_at,
+			   msb.cancelled_at, msb.cancellation_reason, msb.created_at, msb.updated_at,
+			   COALESCE(bor.custom_route_name, mr.route_name, 'Unknown Route') as route_name,
+			   COALESCE(bs.stop_name, 'Unknown') as boarding_stop_name,
+			   COALESCE(als.stop_name, 'Unknown') as alighting_stop_name
+		FROM manual_seat_bookings msb
+		LEFT JOIN scheduled_trips st ON msb.scheduled_trip_id = st.id
+		LEFT JOIN bus_owner_routes bor ON st.bus_owner_route_id = bor.id
+		LEFT JOIN master_routes mr ON bor.master_route_id = mr.id
+		LEFT JOIN master_route_stops bs ON msb.boarding_stop_id = bs.id
+		LEFT JOIN master_route_stops als ON msb.alighting_stop_id = als.id
+		WHERE msb.booking_reference = $1
 	`
 
 	var booking models.ManualSeatBooking
@@ -243,19 +256,27 @@ func (r *ManualBookingRepository) GetByBookingReference(ref string) (*models.Man
 	return &booking, nil
 }
 
-// GetByScheduledTripID returns all manual bookings for a trip
+// GetByScheduledTripID returns all manual bookings for a trip with route/stop names joined
 func (r *ManualBookingRepository) GetByScheduledTripID(scheduledTripID string) ([]models.ManualSeatBooking, error) {
 	query := `
-		SELECT id, booking_reference, scheduled_trip_id, created_by_user_id, booking_type,
-			   passenger_name, passenger_phone, passenger_nic, passenger_notes,
-			   route_name, boarding_stop_id, boarding_stop_name, alighting_stop_id, alighting_stop_name,
-			   departure_datetime, number_of_seats, total_fare,
-			   payment_status, amount_paid, payment_method, payment_notes,
-			   status, confirmed_at, checked_in_at, boarded_at, completed_at,
-			   cancelled_at, cancellation_reason, created_at, updated_at
-		FROM manual_seat_bookings
-		WHERE scheduled_trip_id = $1
-		ORDER BY created_at DESC
+		SELECT msb.id, msb.booking_reference, msb.scheduled_trip_id, msb.created_by_user_id, msb.booking_type,
+			   msb.passenger_name, msb.passenger_phone, msb.passenger_nic, msb.passenger_notes,
+			   msb.boarding_stop_id, msb.alighting_stop_id,
+			   msb.departure_datetime, msb.number_of_seats, msb.total_fare,
+			   msb.payment_status, msb.amount_paid, msb.payment_method, msb.payment_notes,
+			   msb.status, msb.confirmed_at, msb.checked_in_at, msb.boarded_at, msb.completed_at,
+			   msb.cancelled_at, msb.cancellation_reason, msb.created_at, msb.updated_at,
+			   COALESCE(bor.custom_route_name, mr.route_name, 'Unknown Route') as route_name,
+			   COALESCE(bs.stop_name, 'Unknown') as boarding_stop_name,
+			   COALESCE(als.stop_name, 'Unknown') as alighting_stop_name
+		FROM manual_seat_bookings msb
+		LEFT JOIN scheduled_trips st ON msb.scheduled_trip_id = st.id
+		LEFT JOIN bus_owner_routes bor ON st.bus_owner_route_id = bor.id
+		LEFT JOIN master_routes mr ON bor.master_route_id = mr.id
+		LEFT JOIN master_route_stops bs ON msb.boarding_stop_id = bs.id
+		LEFT JOIN master_route_stops als ON msb.alighting_stop_id = als.id
+		WHERE msb.scheduled_trip_id = $1
+		ORDER BY msb.created_at DESC
 	`
 
 	var bookings []models.ManualSeatBooking
@@ -389,19 +410,27 @@ func (r *ManualBookingRepository) Cancel(id, reason string, tripSeatRepo *TripSe
 	return tx.Commit()
 }
 
-// GetByCreatorUserID returns all manual bookings created by a user
+// GetByCreatorUserID returns all manual bookings created by a user with route/stop names joined
 func (r *ManualBookingRepository) GetByCreatorUserID(userID string, limit, offset int) ([]models.ManualSeatBooking, error) {
 	query := `
-		SELECT id, booking_reference, scheduled_trip_id, created_by_user_id, booking_type,
-			   passenger_name, passenger_phone, passenger_nic, passenger_notes,
-			   route_name, boarding_stop_id, boarding_stop_name, alighting_stop_id, alighting_stop_name,
-			   departure_datetime, number_of_seats, total_fare,
-			   payment_status, amount_paid, payment_method, payment_notes,
-			   status, confirmed_at, checked_in_at, boarded_at, completed_at,
-			   cancelled_at, cancellation_reason, created_at, updated_at
-		FROM manual_seat_bookings
-		WHERE created_by_user_id = $1
-		ORDER BY created_at DESC
+		SELECT msb.id, msb.booking_reference, msb.scheduled_trip_id, msb.created_by_user_id, msb.booking_type,
+			   msb.passenger_name, msb.passenger_phone, msb.passenger_nic, msb.passenger_notes,
+			   msb.boarding_stop_id, msb.alighting_stop_id,
+			   msb.departure_datetime, msb.number_of_seats, msb.total_fare,
+			   msb.payment_status, msb.amount_paid, msb.payment_method, msb.payment_notes,
+			   msb.status, msb.confirmed_at, msb.checked_in_at, msb.boarded_at, msb.completed_at,
+			   msb.cancelled_at, msb.cancellation_reason, msb.created_at, msb.updated_at,
+			   COALESCE(bor.custom_route_name, mr.route_name, 'Unknown Route') as route_name,
+			   COALESCE(bs.stop_name, 'Unknown') as boarding_stop_name,
+			   COALESCE(als.stop_name, 'Unknown') as alighting_stop_name
+		FROM manual_seat_bookings msb
+		LEFT JOIN scheduled_trips st ON msb.scheduled_trip_id = st.id
+		LEFT JOIN bus_owner_routes bor ON st.bus_owner_route_id = bor.id
+		LEFT JOIN master_routes mr ON bor.master_route_id = mr.id
+		LEFT JOIN master_route_stops bs ON msb.boarding_stop_id = bs.id
+		LEFT JOIN master_route_stops als ON msb.alighting_stop_id = als.id
+		WHERE msb.created_by_user_id = $1
+		ORDER BY msb.created_at DESC
 		LIMIT $2 OFFSET $3
 	`
 
@@ -414,19 +443,27 @@ func (r *ManualBookingRepository) GetByCreatorUserID(userID string, limit, offse
 	return bookings, nil
 }
 
-// SearchByPassengerPhone searches bookings by passenger phone number
+// SearchByPassengerPhone searches bookings by passenger phone number with route/stop names joined
 func (r *ManualBookingRepository) SearchByPassengerPhone(phone string) ([]models.ManualSeatBooking, error) {
 	query := `
-		SELECT id, booking_reference, scheduled_trip_id, created_by_user_id, booking_type,
-			   passenger_name, passenger_phone, passenger_nic, passenger_notes,
-			   route_name, boarding_stop_id, boarding_stop_name, alighting_stop_id, alighting_stop_name,
-			   departure_datetime, number_of_seats, total_fare,
-			   payment_status, amount_paid, payment_method, payment_notes,
-			   status, confirmed_at, checked_in_at, boarded_at, completed_at,
-			   cancelled_at, cancellation_reason, created_at, updated_at
-		FROM manual_seat_bookings
-		WHERE passenger_phone LIKE $1
-		ORDER BY created_at DESC
+		SELECT msb.id, msb.booking_reference, msb.scheduled_trip_id, msb.created_by_user_id, msb.booking_type,
+			   msb.passenger_name, msb.passenger_phone, msb.passenger_nic, msb.passenger_notes,
+			   msb.boarding_stop_id, msb.alighting_stop_id,
+			   msb.departure_datetime, msb.number_of_seats, msb.total_fare,
+			   msb.payment_status, msb.amount_paid, msb.payment_method, msb.payment_notes,
+			   msb.status, msb.confirmed_at, msb.checked_in_at, msb.boarded_at, msb.completed_at,
+			   msb.cancelled_at, msb.cancellation_reason, msb.created_at, msb.updated_at,
+			   COALESCE(bor.custom_route_name, mr.route_name, 'Unknown Route') as route_name,
+			   COALESCE(bs.stop_name, 'Unknown') as boarding_stop_name,
+			   COALESCE(als.stop_name, 'Unknown') as alighting_stop_name
+		FROM manual_seat_bookings msb
+		LEFT JOIN scheduled_trips st ON msb.scheduled_trip_id = st.id
+		LEFT JOIN bus_owner_routes bor ON st.bus_owner_route_id = bor.id
+		LEFT JOIN master_routes mr ON bor.master_route_id = mr.id
+		LEFT JOIN master_route_stops bs ON msb.boarding_stop_id = bs.id
+		LEFT JOIN master_route_stops als ON msb.alighting_stop_id = als.id
+		WHERE msb.passenger_phone LIKE $1
+		ORDER BY msb.created_at DESC
 		LIMIT 50
 	`
 

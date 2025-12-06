@@ -5594,6 +5594,46 @@ paths:
           $ref: "#/components/responses/InternalServerError"
 
   # ============================================================================
+  # ROUTE STOPS ENDPOINT (For Manual Booking Dropdowns)
+  # ============================================================================
+  /api/v1/scheduled-trips/{id}/route-stops:
+    get:
+      summary: Get route stops for a scheduled trip
+      description: |
+        Returns all stops for the route associated with a scheduled trip.
+        Used to populate boarding/alighting stop dropdowns when creating manual bookings.
+      operationId: getTripRouteStops
+      tags:
+        - Manual Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the scheduled trip
+      responses:
+        "200":
+          description: Route stops retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RouteStopDetail"
+        "400":
+          description: Trip ID is required or invalid
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Trip or route not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================================
   # MANUAL BOOKINGS ENDPOINTS (Phone/Agent/Walk-in Bookings)
   # ============================================================================
   /api/v1/scheduled-trips/{id}/manual-bookings:
@@ -8616,20 +8656,23 @@ components:
           example: "Regular customer"
         route_name:
           type: string
+          description: "Derived from scheduled_trip -> bus_owner_route (not stored)"
           example: "Colombo - Kandy"
         boarding_stop_id:
           type: string
           format: uuid
-          nullable: true
+          description: "References master_route_stops.id"
         boarding_stop_name:
           type: string
+          description: "Derived from boarding_stop_id JOIN (not stored)"
           example: "Colombo Fort"
         alighting_stop_id:
           type: string
           format: uuid
-          nullable: true
+          description: "References master_route_stops.id"
         alighting_stop_name:
           type: string
+          description: "Derived from alighting_stop_id JOIN (not stored)"
           example: "Kandy Town"
         departure_datetime:
           type: string
@@ -8690,6 +8733,22 @@ components:
           type: string
           format: date-time
 
+    RouteStopDetail:
+      type: object
+      description: Route stop information for dropdown selection
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440001"
+        stop_name:
+          type: string
+          example: "Colombo Fort"
+        stop_order:
+          type: integer
+          description: "Order of the stop in the route (1 = first stop)"
+          example: 1
+
     ManualBookingSeat:
       type: object
       description: Seat assigned to a manual booking
@@ -8736,8 +8795,8 @@ components:
       required:
         - booking_type
         - passenger_name
-        - boarding_stop_name
-        - alighting_stop_name
+        - boarding_stop_id
+        - alighting_stop_id
         - seat_ids
         - payment_status
       properties:
@@ -8760,16 +8819,13 @@ components:
         boarding_stop_id:
           type: string
           format: uuid
-          description: "Optional stop ID for analytics"
-        boarding_stop_name:
-          type: string
-          example: "Colombo Fort"
+          description: "ID of the boarding stop (from route-stops endpoint)"
+          example: "550e8400-e29b-41d4-a716-446655440001"
         alighting_stop_id:
           type: string
           format: uuid
-        alighting_stop_name:
-          type: string
-          example: "Kandy Town"
+          description: "ID of the alighting stop (from route-stops endpoint)"
+          example: "550e8400-e29b-41d4-a716-446655440002"
         seat_ids:
           type: array
           items:

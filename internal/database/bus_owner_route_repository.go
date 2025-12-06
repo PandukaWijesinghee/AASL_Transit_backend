@@ -206,3 +206,38 @@ func (r *BusOwnerRouteRepository) ValidateFirstAndLastStops(masterRouteID string
 
 	return hasFirst && hasLast, nil
 }
+
+// RouteStopDetails holds the full details of a route stop for manual booking
+type RouteStopDetails struct {
+	ID                       string   `json:"id" db:"id"`
+	StopName                 string   `json:"stop_name" db:"stop_name"`
+	StopOrder                int      `json:"stop_order" db:"stop_order"`
+	Latitude                 *float64 `json:"latitude,omitempty" db:"latitude"`
+	Longitude                *float64 `json:"longitude,omitempty" db:"longitude"`
+	ArrivalTimeOffsetMinutes *int     `json:"arrival_time_offset_minutes,omitempty" db:"arrival_time_offset_minutes"`
+	IsMajorStop              bool     `json:"is_major_stop" db:"is_major_stop"`
+}
+
+// GetRouteStopsWithDetails returns full stop details for a given set of stop IDs
+// The stops are ordered by their stop_order in the master route
+func (r *BusOwnerRouteRepository) GetRouteStopsWithDetails(masterRouteID string, stopIDs []string) ([]RouteStopDetails, error) {
+	if len(stopIDs) == 0 {
+		return []RouteStopDetails{}, nil
+	}
+
+	// Build the IN clause
+	query := `
+		SELECT id, stop_name, stop_order, latitude, longitude, arrival_time_offset_minutes, is_major_stop
+		FROM master_route_stops
+		WHERE master_route_id = $1 AND id = ANY($2)
+		ORDER BY stop_order ASC
+	`
+
+	var stops []RouteStopDetails
+	err := r.db.Select(&stops, query, masterRouteID, stopIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return stops, nil
+}

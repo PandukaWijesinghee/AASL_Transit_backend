@@ -263,6 +263,52 @@ func (h *TripSeatHandler) UpdateSeatPrices(c *gin.Context) {
 	})
 }
 
+// GetTripRouteStops returns the route stops for a scheduled trip (used for manual booking dropdowns)
+// GET /api/v1/scheduled-trips/:id/route-stops
+func (h *TripSeatHandler) GetTripRouteStops(c *gin.Context) {
+	tripID := c.Param("id")
+	if tripID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Trip ID is required"})
+		return
+	}
+
+	// Get trip to find the bus_owner_route_id
+	trip, err := h.tripRepo.GetByID(tripID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Trip not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get trip"})
+		return
+	}
+
+	if trip.BusOwnerRouteID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Trip has no associated route"})
+		return
+	}
+
+	// Get the bus owner route to get selected_stop_ids
+	route, err := h.routeRepo.GetByID(*trip.BusOwnerRouteID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get route"})
+		return
+	}
+
+	// Get the route stops with full details
+	stops, err := h.routeRepo.GetRouteStopsWithDetails(route.MasterRouteID, route.SelectedStopIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get route stops"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"route_name": route.CustomRouteName,
+		"direction":  route.Direction,
+		"stops":      stops,
+	})
+}
+
 // ===========================================================================
 // MANUAL BOOKINGS ENDPOINTS
 // ===========================================================================
@@ -321,16 +367,19 @@ func (h *TripSeatHandler) CreateManualBooking(c *gin.Context) {
 		return
 	}
 
-	// Get route info
-	var routeName string
+	// Validate that boarding and alighting stop IDs are valid for this trip's route
+	// We verify the stops belong to the route associated with this trip
+	var routeMasterRouteID string
 	if trip.BusOwnerRouteID != nil {
 		route, err := h.routeRepo.GetByID(*trip.BusOwnerRouteID)
 		if err == nil {
-			routeName = route.CustomRouteName
+			routeMasterRouteID = route.MasterRouteID
 		}
 	}
-	if routeName == "" {
-		routeName = "Unknown Route"
+
+	if routeMasterRouteID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Trip has no associated route"})
+		return
 	}
 
 	// Create the booking
@@ -342,11 +391,8 @@ func (h *TripSeatHandler) CreateManualBooking(c *gin.Context) {
 		PassengerPhone:    req.PassengerPhone,
 		PassengerNIC:      req.PassengerNIC,
 		PassengerNotes:    req.PassengerNotes,
-		RouteName:         routeName,
-		BoardingStopID:    req.BoardingStopID,
-		BoardingStopName:  req.BoardingStopName,
-		AlightingStopID:   req.AlightingStopID,
-		AlightingStopName: req.AlightingStopName,
+		BoardingStopID:    &req.BoardingStopID,
+		AlightingStopID:   &req.AlightingStopID,
 		DepartureDatetime: trip.DepartureDatetime,
 		PaymentStatus:     models.ManualBookingPaymentStatus(req.PaymentStatus),
 		AmountPaid:        req.AmountPaid,

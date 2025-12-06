@@ -621,6 +621,9 @@ func main() {
 			scheduledTrips.POST("/:id/seats/unblock", tripSeatHandler.UnblockSeats)
 			scheduledTrips.PUT("/:id/seats/price", tripSeatHandler.UpdateSeatPrices)
 
+			// Route stops for manual booking dropdown
+			scheduledTrips.GET("/:id/route-stops", tripSeatHandler.GetTripRouteStops)
+
 			// ============================================================================
 			// MANUAL BOOKINGS ROUTES (Phone/Agent/Walk-in bookings)
 			// ============================================================================

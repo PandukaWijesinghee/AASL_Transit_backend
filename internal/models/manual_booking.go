@@ -48,11 +48,8 @@ type ManualSeatBooking struct {
 	PassengerPhone     *string                    `json:"passenger_phone,omitempty" db:"passenger_phone"`
 	PassengerNIC       *string                    `json:"passenger_nic,omitempty" db:"passenger_nic"`
 	PassengerNotes     *string                    `json:"passenger_notes,omitempty" db:"passenger_notes"`
-	RouteName          string                     `json:"route_name" db:"route_name"`
 	BoardingStopID     *string                    `json:"boarding_stop_id,omitempty" db:"boarding_stop_id"`
-	BoardingStopName   string                     `json:"boarding_stop_name" db:"boarding_stop_name"`
 	AlightingStopID    *string                    `json:"alighting_stop_id,omitempty" db:"alighting_stop_id"`
-	AlightingStopName  string                     `json:"alighting_stop_name" db:"alighting_stop_name"`
 	DepartureDatetime  time.Time                  `json:"departure_datetime" db:"departure_datetime"`
 	NumberOfSeats      int                        `json:"number_of_seats" db:"number_of_seats"`
 	TotalFare          float64                    `json:"total_fare" db:"total_fare"`
@@ -69,6 +66,10 @@ type ManualSeatBooking struct {
 	CancellationReason *string                    `json:"cancellation_reason,omitempty" db:"cancellation_reason"`
 	CreatedAt          time.Time                  `json:"created_at" db:"created_at"`
 	UpdatedAt          time.Time                  `json:"updated_at" db:"updated_at"`
+	// Populated from joins (not stored in DB)
+	RouteName         string `json:"route_name,omitempty" db:"-"`
+	BoardingStopName  string `json:"boarding_stop_name,omitempty" db:"-"`
+	AlightingStopName string `json:"alighting_stop_name,omitempty" db:"-"`
 }
 
 // ManualBookingSeat represents a seat in a manual booking
@@ -90,21 +91,19 @@ type ManualBookingWithSeats struct {
 
 // CreateManualBookingRequest is the request to create a phone/agent booking
 type CreateManualBookingRequest struct {
-	ScheduledTripID   string   `json:"scheduled_trip_id"` // Set from URL path, not required in body
-	BookingType       string   `json:"booking_type" binding:"required,oneof=phone agent walk_in"`
-	PassengerName     string   `json:"passenger_name" binding:"required"`
-	PassengerPhone    *string  `json:"passenger_phone,omitempty"`
-	PassengerNIC      *string  `json:"passenger_nic,omitempty"`
-	PassengerNotes    *string  `json:"passenger_notes,omitempty"`
-	BoardingStopID    *string  `json:"boarding_stop_id,omitempty"`
-	BoardingStopName  string   `json:"boarding_stop_name" binding:"required"`
-	AlightingStopID   *string  `json:"alighting_stop_id,omitempty"`
-	AlightingStopName string   `json:"alighting_stop_name" binding:"required"`
-	SeatIDs           []string `json:"seat_ids" binding:"required,min=1"` // trip_seat IDs
-	PaymentStatus     string   `json:"payment_status" binding:"required,oneof=pending partial paid collect_on_bus free"`
-	AmountPaid        float64  `json:"amount_paid"`
-	PaymentMethod     *string  `json:"payment_method,omitempty"`
-	PaymentNotes      *string  `json:"payment_notes,omitempty"`
+	ScheduledTripID string   `json:"scheduled_trip_id"` // Set from URL path, not required in body
+	BookingType     string   `json:"booking_type" binding:"required,oneof=phone agent walk_in"`
+	PassengerName   string   `json:"passenger_name" binding:"required"`
+	PassengerPhone  *string  `json:"passenger_phone,omitempty"`
+	PassengerNIC    *string  `json:"passenger_nic,omitempty"`
+	PassengerNotes  *string  `json:"passenger_notes,omitempty"`
+	BoardingStopID  string   `json:"boarding_stop_id" binding:"required,uuid"` // Required - master_route_stops ID
+	AlightingStopID string   `json:"alighting_stop_id" binding:"required,uuid"` // Required - master_route_stops ID
+	SeatIDs         []string `json:"seat_ids" binding:"required,min=1"`         // trip_seat IDs
+	PaymentStatus   string   `json:"payment_status" binding:"required,oneof=pending partial paid collect_on_bus free"`
+	AmountPaid      float64  `json:"amount_paid"`
+	PaymentMethod   *string  `json:"payment_method,omitempty"`
+	PaymentNotes    *string  `json:"payment_notes,omitempty"`
 }
 
 // UpdateManualBookingPaymentRequest updates payment info
