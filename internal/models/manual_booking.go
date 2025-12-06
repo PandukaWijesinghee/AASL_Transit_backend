@@ -97,7 +97,7 @@ type CreateManualBookingRequest struct {
 	PassengerPhone  *string  `json:"passenger_phone,omitempty"`
 	PassengerNIC    *string  `json:"passenger_nic,omitempty"`
 	PassengerNotes  *string  `json:"passenger_notes,omitempty"`
-	BoardingStopID  string   `json:"boarding_stop_id" binding:"required,uuid"` // Required - master_route_stops ID
+	BoardingStopID  string   `json:"boarding_stop_id" binding:"required,uuid"`  // Required - master_route_stops ID
 	AlightingStopID string   `json:"alighting_stop_id" binding:"required,uuid"` // Required - master_route_stops ID
 	SeatIDs         []string `json:"seat_ids" binding:"required,min=1"`         // trip_seat IDs
 	PaymentStatus   string   `json:"payment_status" binding:"required,oneof=pending partial paid collect_on_bus free"`
