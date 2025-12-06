@@ -15,10 +15,10 @@ import (
 
 // AppBookingHandler handles passenger app booking operations
 type AppBookingHandler struct {
-	bookingRepo *database.AppBookingRepository
-	tripRepo    *database.ScheduledTripRepository
+	bookingRepo  *database.AppBookingRepository
+	tripRepo     *database.ScheduledTripRepository
 	tripSeatRepo *database.TripSeatRepository
-	routeRepo   *database.BusOwnerRouteRepository
+	routeRepo    *database.BusOwnerRouteRepository
 }
 
 // NewAppBookingHandler creates a new AppBookingHandler
@@ -155,18 +155,18 @@ func (h *AppBookingHandler) CreateBooking(c *gin.Context) {
 
 	// Build bus booking
 	busBooking := &models.BusBooking{
-		ScheduledTripID:     req.ScheduledTripID,
-		RouteName:           routeName,
-		BoardingStopID:      req.BoardingStopID,
-		BoardingStopName:    req.BoardingStopName,
-		AlightingStopID:     req.AlightingStopID,
-		AlightingStopName:   req.AlightingStopName,
-		DepartureDatetime:   trip.DepartureDatetime,
-		NumberOfSeats:       len(req.Seats),
-		FarePerSeat:         trip.BaseFare,
-		TotalFare:           totalFare,
-		Status:              models.BusBookingPending,
-		SpecialRequests:     req.SpecialRequests,
+		ScheduledTripID:   req.ScheduledTripID,
+		RouteName:         routeName,
+		BoardingStopID:    req.BoardingStopID,
+		BoardingStopName:  req.BoardingStopName,
+		AlightingStopID:   req.AlightingStopID,
+		AlightingStopName: req.AlightingStopName,
+		DepartureDatetime: trip.DepartureDatetime,
+		NumberOfSeats:     len(req.Seats),
+		FarePerSeat:       trip.BaseFare,
+		TotalFare:         totalFare,
+		Status:            models.BusBookingPending,
+		SpecialRequests:   req.SpecialRequests,
 	}
 
 	// Build seat records
@@ -364,7 +364,7 @@ func (h *AppBookingHandler) ConfirmPayment(c *gin.Context) {
 	}
 
 	bookingID := c.Param("id")
-	
+
 	var req models.ConfirmAppPaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
@@ -410,9 +410,9 @@ func (h *AppBookingHandler) ConfirmPayment(c *gin.Context) {
 	// (This would be done by the repository in a proper implementation)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":     "Payment confirmed successfully",
-		"booking_id":  bookingID,
-		"status":      "confirmed",
+		"message":    "Payment confirmed successfully",
+		"booking_id": bookingID,
+		"status":     "confirmed",
 	})
 }
 
@@ -528,11 +528,11 @@ func (h *AppBookingHandler) GetBookingQR(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"qr_code":           *booking.BusBooking.QRCodeData,
-		"booking_reference": booking.BookingReference,
-		"passenger_name":    booking.PassengerName,
-		"route_name":        booking.BusBooking.RouteName,
+		"qr_code":            *booking.BusBooking.QRCodeData,
+		"booking_reference":  booking.BookingReference,
+		"passenger_name":     booking.PassengerName,
+		"route_name":         booking.BusBooking.RouteName,
 		"departure_datetime": booking.BusBooking.DepartureDatetime,
-		"seats":             len(booking.BusBooking.Seats),
+		"seats":              len(booking.BusBooking.Seats),
 	})
 }

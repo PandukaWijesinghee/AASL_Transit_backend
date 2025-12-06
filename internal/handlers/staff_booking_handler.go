@@ -63,17 +63,17 @@ func (h *StaffBookingHandler) VerifyBookingByQR(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"valid":               true,
-		"bus_booking_id":      busBooking.ID,
-		"route_name":          busBooking.RouteName,
-		"boarding_stop":       busBooking.BoardingStopName,
-		"alighting_stop":      busBooking.AlightingStopName,
-		"departure_datetime":  busBooking.DepartureDatetime,
-		"number_of_seats":     busBooking.NumberOfSeats,
-		"status":              busBooking.Status,
-		"is_checked_in":       busBooking.CheckedInAt != nil,
-		"check_in_time":       busBooking.CheckedInAt,
-		"seats":               busBooking.Seats,
+		"valid":              true,
+		"bus_booking_id":     busBooking.ID,
+		"route_name":         busBooking.RouteName,
+		"boarding_stop":      busBooking.BoardingStopName,
+		"alighting_stop":     busBooking.AlightingStopName,
+		"departure_datetime": busBooking.DepartureDatetime,
+		"number_of_seats":    busBooking.NumberOfSeats,
+		"status":             busBooking.Status,
+		"is_checked_in":      busBooking.CheckedInAt != nil,
+		"check_in_time":      busBooking.CheckedInAt,
+		"seats":              busBooking.Seats,
 	})
 }
 

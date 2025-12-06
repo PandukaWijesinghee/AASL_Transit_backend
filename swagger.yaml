@@ -5945,7 +5945,7 @@ paths:
       summary: Create a new bus booking
       description: |
         Create a new bus booking with seat selection from the passenger app.
-        
+
         **Flow:**
         1. Passenger selects trip and available seats
         2. App submits booking with passenger details for each seat
@@ -8978,7 +8978,15 @@ components:
           nullable: true
         booking_status:
           type: string
-          enum: [pending, confirmed, in_progress, completed, cancelled, partial_cancel]
+          enum:
+            [
+              pending,
+              confirmed,
+              in_progress,
+              completed,
+              cancelled,
+              partial_cancel,
+            ]
         passenger_name:
           type: string
         passenger_phone:
@@ -9086,7 +9094,17 @@ components:
           format: double
         status:
           type: string
-          enum: [pending, confirmed, checked_in, boarded, in_transit, completed, cancelled, no_show]
+          enum:
+            [
+              pending,
+              confirmed,
+              checked_in,
+              boarded,
+              in_transit,
+              completed,
+              cancelled,
+              no_show,
+            ]
         checked_in_at:
           type: string
           format: date-time
@@ -9173,7 +9191,16 @@ components:
           type: boolean
         status:
           type: string
-          enum: [pending, booked, checked_in, boarded, completed, cancelled, no_show]
+          enum:
+            [
+              pending,
+              booked,
+              checked_in,
+              boarded,
+              completed,
+              cancelled,
+              no_show,
+            ]
         checked_in_at:
           type: string
           format: date-time
@@ -9285,7 +9312,17 @@ components:
           type: integer
         status:
           type: string
-          enum: [pending, confirmed, checked_in, boarded, in_transit, completed, cancelled, no_show]
+          enum:
+            [
+              pending,
+              confirmed,
+              checked_in,
+              boarded,
+              in_transit,
+              completed,
+              cancelled,
+              no_show,
+            ]
         is_checked_in:
           type: boolean
         check_in_time:

@@ -30,7 +30,7 @@ func NewAppBookingRepository(db *sqlx.DB) *AppBookingRepository {
 // Example: BL-20251206-A1B2C3
 func (r *AppBookingRepository) GenerateBookingReference() (string, error) {
 	todayStr := time.Now().Format("20060102")
-	
+
 	for attempts := 0; attempts < 10; attempts++ {
 		// Generate 6 random bytes and take first 6 hex chars
 		randomBytes := make([]byte, 3)
@@ -38,21 +38,21 @@ func (r *AppBookingRepository) GenerateBookingReference() (string, error) {
 			return "", fmt.Errorf("failed to generate random bytes: %w", err)
 		}
 		randomStr := strings.ToUpper(hex.EncodeToString(randomBytes))
-		
+
 		newRef := fmt.Sprintf("BL-%s-%s", todayStr, randomStr)
-		
+
 		// Check if exists
 		var count int
 		err := r.db.Get(&count, `SELECT COUNT(*) FROM bookings WHERE booking_reference = $1`, newRef)
 		if err != nil {
 			return "", fmt.Errorf("failed to check reference uniqueness: %w", err)
 		}
-		
+
 		if count == 0 {
 			return newRef, nil
 		}
 	}
-	
+
 	return "", fmt.Errorf("failed to generate unique booking reference after 10 attempts")
 }
 
@@ -67,22 +67,22 @@ func (r *AppBookingRepository) GenerateBusBookingQR() (string, error) {
 			return "", fmt.Errorf("failed to generate random bytes: %w", err)
 		}
 		randomStr := strings.ToUpper(hex.EncodeToString(randomBytes))
-		
+
 		timestampStr := time.Now().Format("20060102150405")
 		qrData := fmt.Sprintf("QR-%s-%s", timestampStr, randomStr)
-		
+
 		// Check if exists
 		var count int
 		err := r.db.Get(&count, `SELECT COUNT(*) FROM bus_bookings WHERE qr_code_data = $1`, qrData)
 		if err != nil {
 			return "", fmt.Errorf("failed to check QR uniqueness: %w", err)
 		}
-		
+
 		if count == 0 {
 			return qrData, nil
 		}
 	}
-	
+
 	return "", fmt.Errorf("failed to generate unique QR code after 10 attempts")
 }
 
