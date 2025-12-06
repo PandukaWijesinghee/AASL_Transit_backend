@@ -285,6 +285,18 @@ func main() {
 	)
 	logger.Info("✓ Trip seat handler initialized")
 
+	// Initialize App Booking system (passenger app bookings)
+	logger.Info("Initializing app booking system...")
+	appBookingRepo := database.NewAppBookingRepository(sqlxDB.DB)
+	appBookingHandler := handlers.NewAppBookingHandler(
+		appBookingRepo,
+		scheduledTripRepo,
+		tripSeatRepo,
+		busOwnerRouteRepo,
+	)
+	staffBookingHandler := handlers.NewStaffBookingHandler(appBookingRepo)
+	logger.Info("✓ App booking system initialized")
+
 	// Initialize Gin router
 	router := gin.New()
 
@@ -635,6 +647,56 @@ func main() {
 			manualBookings.GET("/search", tripSeatHandler.SearchManualBookingsByPhone)
 		}
 		logger.Info("📋 Manual Booking routes registered successfully")
+
+		// ============================================================================
+		// APP BOOKINGS ROUTES (Passenger app bookings)
+		// ============================================================================
+		logger.Info("📱 Registering App Booking routes...")
+		appBookings := v1.Group("/bookings")
+		appBookings.Use(middleware.AuthMiddleware(jwtService))
+		{
+			logger.Info("  ✅ POST /api/v1/bookings - Create new booking")
+			appBookings.POST("", appBookingHandler.CreateBooking)
+			logger.Info("  ✅ GET /api/v1/bookings - Get my bookings")
+			appBookings.GET("", appBookingHandler.GetMyBookings)
+			logger.Info("  ✅ GET /api/v1/bookings/upcoming - Get upcoming bookings")
+			appBookings.GET("/upcoming", appBookingHandler.GetUpcomingBookings)
+			logger.Info("  ✅ GET /api/v1/bookings/:id - Get booking by ID")
+			appBookings.GET("/:id", appBookingHandler.GetBookingByID)
+			logger.Info("  ✅ GET /api/v1/bookings/reference/:reference - Get booking by reference")
+			appBookings.GET("/reference/:reference", appBookingHandler.GetBookingByReference)
+			logger.Info("  ✅ POST /api/v1/bookings/:id/confirm-payment - Confirm payment")
+			appBookings.POST("/:id/confirm-payment", appBookingHandler.ConfirmPayment)
+			logger.Info("  ✅ POST /api/v1/bookings/:id/cancel - Cancel booking")
+			appBookings.POST("/:id/cancel", appBookingHandler.CancelBooking)
+			logger.Info("  ✅ GET /api/v1/bookings/:id/qr - Get booking QR code")
+			appBookings.GET("/:id/qr", appBookingHandler.GetBookingQR)
+		}
+		logger.Info("📱 App Booking routes registered successfully")
+
+		// ============================================================================
+		// STAFF BOOKING ROUTES (Conductor/Driver operations)
+		// ============================================================================
+		logger.Info("👨‍✈️ Registering Staff Booking routes...")
+		staffBookings := v1.Group("/staff/bookings")
+		staffBookings.Use(middleware.AuthMiddleware(jwtService))
+		{
+			logger.Info("  ✅ POST /api/v1/staff/bookings/verify - Verify booking by QR")
+			staffBookings.POST("/verify", staffBookingHandler.VerifyBookingByQR)
+			logger.Info("  ✅ POST /api/v1/staff/bookings/check-in - Check-in passenger")
+			staffBookings.POST("/check-in", staffBookingHandler.CheckInPassenger)
+			logger.Info("  ✅ POST /api/v1/staff/bookings/board - Board passenger")
+			staffBookings.POST("/board", staffBookingHandler.BoardPassenger)
+			logger.Info("  ✅ POST /api/v1/staff/bookings/no-show - Mark no-show")
+			staffBookings.POST("/no-show", staffBookingHandler.MarkNoShow)
+		}
+		staffTrips := v1.Group("/staff/trips")
+		staffTrips.Use(middleware.AuthMiddleware(jwtService))
+		{
+			logger.Info("  ✅ GET /api/v1/staff/trips/:trip_id/bookings - Get trip bookings")
+			staffTrips.GET("/:trip_id/bookings", staffBookingHandler.GetTripBookings)
+		}
+		logger.Info("👨‍✈️ Staff Booking routes registered successfully")
 
 		// Permit-specific trip routes
 		permits.GET("/:id/trip-schedules", tripScheduleHandler.GetSchedulesByPermit)

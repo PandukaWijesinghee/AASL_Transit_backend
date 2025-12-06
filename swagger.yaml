@@ -107,6 +107,10 @@ tags:
     description: Trip seat management (create from layout, block/unblock, pricing)
   - name: Manual Bookings
     description: Phone, agent, and walk-in booking management for bus owners
+  - name: App Bookings
+    description: Passenger app booking endpoints (create, manage, and view bookings)
+  - name: Staff Bookings
+    description: Conductor/Driver booking operations (verify, check-in, board)
   - name: Search
     description: Trip search and discovery endpoints (Phase 1 MVP)
 
@@ -5934,6 +5938,570 @@ paths:
           $ref: "#/components/responses/InternalServerError"
 
   # ============================================================================
+  # APP BOOKINGS ENDPOINTS (Passenger App Bookings)
+  # ============================================================================
+  /api/v1/bookings:
+    post:
+      summary: Create a new bus booking
+      description: |
+        Create a new bus booking with seat selection from the passenger app.
+        
+        **Flow:**
+        1. Passenger selects trip and available seats
+        2. App submits booking with passenger details for each seat
+        3. System validates seat availability
+        4. System creates booking record with QR code
+        5. Returns booking with QR code for boarding
+      operationId: createAppBooking
+      tags:
+        - App Bookings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAppBookingRequest"
+      responses:
+        "201":
+          description: Booking created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponse"
+        "400":
+          description: Invalid request (missing fields, invalid trip, etc.)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: Seats not available (already booked)
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    get:
+      summary: Get my bookings
+      description: Get all bookings for the authenticated passenger, paginated.
+      operationId: getMyBookings
+      tags:
+        - App Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Maximum number of bookings to return
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Number of bookings to skip
+      responses:
+        "200":
+          description: Bookings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BookingListItem"
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/bookings/upcoming:
+    get:
+      summary: Get upcoming bookings
+      description: Get upcoming (not departed) bookings for the authenticated passenger.
+      operationId: getUpcomingBookings
+      tags:
+        - App Bookings
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Upcoming bookings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BookingListItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/bookings/{id}:
+    get:
+      summary: Get booking by ID
+      description: Get booking details by ID. Only the booking owner can access.
+      operationId: getBookingById
+      tags:
+        - App Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Booking ID
+      responses:
+        "200":
+          description: Booking retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MasterBooking"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Not authorized to view this booking
+        "404":
+          description: Booking not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/bookings/reference/{reference}:
+    get:
+      summary: Get booking by reference
+      description: Get booking details by booking reference (e.g., BL-20250106-A1B2C3).
+      operationId: getBookingByReference
+      tags:
+        - App Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Booking reference
+          example: "BL-20250106-A1B2C3"
+      responses:
+        "200":
+          description: Booking retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MasterBooking"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Not authorized to view this booking
+        "404":
+          description: Booking not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/bookings/{id}/confirm-payment:
+    post:
+      summary: Confirm payment for booking
+      description: |
+        Confirm payment for a booking after payment gateway callback.
+        Updates booking status to confirmed.
+      operationId: confirmPayment
+      tags:
+        - App Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Booking ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmPaymentRequest"
+      responses:
+        "200":
+          description: Payment confirmed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Payment confirmed successfully"
+                  booking_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    example: "confirmed"
+        "400":
+          description: Payment already confirmed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Not authorized
+        "404":
+          description: Booking not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/bookings/{id}/cancel:
+    post:
+      summary: Cancel booking
+      description: |
+        Cancel a booking and release booked seats.
+        Seats will become available again for booking.
+      operationId: cancelBooking
+      tags:
+        - App Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Booking ID
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Optional cancellation reason
+      responses:
+        "200":
+          description: Booking cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Booking cancelled successfully"
+                  booking_id:
+                    type: string
+                    format: uuid
+                  refund_needed:
+                    type: boolean
+                  refund_amount:
+                    type: number
+        "400":
+          description: Booking cannot be cancelled (already completed, etc.)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Not authorized
+        "404":
+          description: Booking not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/bookings/{id}/qr:
+    get:
+      summary: Get booking QR code
+      description: Get QR code data for boarding verification.
+      operationId: getBookingQR
+      tags:
+        - App Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Booking ID
+      responses:
+        "200":
+          description: QR code data retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  qr_code:
+                    type: string
+                    description: QR code data to display
+                  booking_reference:
+                    type: string
+                  passenger_name:
+                    type: string
+                  route_name:
+                    type: string
+                  departure_datetime:
+                    type: string
+                    format: date-time
+                  seats:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Not authorized
+        "404":
+          description: Booking or QR code not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================================
+  # STAFF BOOKINGS ENDPOINTS (Conductor/Driver Operations)
+  # ============================================================================
+  /api/v1/staff/bookings/verify:
+    post:
+      summary: Verify booking by QR code
+      description: |
+        Conductor/Driver scans passenger QR code to verify booking.
+        Returns booking details including passenger info and seat assignments.
+      operationId: verifyBookingByQR
+      tags:
+        - Staff Bookings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - qr_code
+              properties:
+                qr_code:
+                  type: string
+                  description: QR code data scanned from passenger's phone
+      responses:
+        "200":
+          description: Booking verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyBookingResponse"
+        "400":
+          description: Invalid QR code
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Booking not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/staff/bookings/check-in:
+    post:
+      summary: Check-in passenger
+      description: |
+        Conductor marks passenger as checked-in (ticket verified).
+        Can check-in entire bus booking or specific seat.
+      operationId: checkInPassenger
+      tags:
+        - Staff Bookings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - bus_booking_id
+              properties:
+                bus_booking_id:
+                  type: string
+                  format: uuid
+                  description: Bus booking ID to check-in
+                seat_id:
+                  type: string
+                  format: uuid
+                  description: Optional specific seat to check-in
+      responses:
+        "200":
+          description: Checked-in successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Booking checked in successfully"
+                  bus_booking_id:
+                    type: string
+                    format: uuid
+        "400":
+          description: Invalid request
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/staff/bookings/board:
+    post:
+      summary: Board passenger
+      description: Conductor marks specific seat as boarded (passenger is on the bus).
+      operationId: boardPassenger
+      tags:
+        - Staff Bookings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - seat_id
+              properties:
+                seat_id:
+                  type: string
+                  format: uuid
+                  description: Seat booking ID to mark as boarded
+      responses:
+        "200":
+          description: Passenger boarded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Passenger boarded successfully"
+                  seat_id:
+                    type: string
+                    format: uuid
+        "400":
+          description: Invalid request
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/staff/bookings/no-show:
+    post:
+      summary: Mark no-show
+      description: Conductor marks passenger as no-show (didn't show up).
+      operationId: markNoShow
+      tags:
+        - Staff Bookings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - seat_id
+              properties:
+                seat_id:
+                  type: string
+                  format: uuid
+                  description: Seat booking ID to mark as no-show
+      responses:
+        "200":
+          description: Marked as no-show successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Passenger marked as no-show"
+                  seat_id:
+                    type: string
+                    format: uuid
+        "400":
+          description: Invalid request
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/staff/trips/{trip_id}/bookings:
+    get:
+      summary: Get trip bookings
+      description: |
+        Get all bookings for a scheduled trip.
+        Returns booking list with stats (total booked, checked-in, boarded, no-show).
+      operationId: getTripBookings
+      tags:
+        - Staff Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: trip_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Scheduled trip ID
+      responses:
+        "200":
+          description: Trip bookings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BusBooking"
+                  total_booked:
+                    type: integer
+                    description: Total seats booked
+                  checked_in:
+                    type: integer
+                    description: Seats checked-in
+                  boarded:
+                    type: integer
+                    description: Passengers boarded
+                  no_show:
+                    type: integer
+                    description: No-shows
+                  booking_count:
+                    type: integer
+                    description: Number of booking records
+        "400":
+          description: Trip ID is required
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================================
   # SEARCH ENDPOINTS (Phase 1 MVP - Trip Discovery)
   # ============================================================================
   /api/v1/search:
@@ -8244,6 +8812,490 @@ components:
         payment_notes:
           type: string
           example: "Paid in full at counter"
+
+    # ==========================================================================
+    # APP BOOKINGS SCHEMAS (Passenger App)
+    # ==========================================================================
+    CreateAppBookingRequest:
+      type: object
+      required:
+        - scheduled_trip_id
+        - boarding_stop_name
+        - alighting_stop_name
+        - seats
+        - passenger_name
+        - passenger_phone
+      properties:
+        scheduled_trip_id:
+          type: string
+          format: uuid
+          description: ID of the scheduled trip to book
+        boarding_stop_id:
+          type: string
+          format: uuid
+          nullable: true
+        boarding_stop_name:
+          type: string
+          example: "Colombo Fort"
+        alighting_stop_id:
+          type: string
+          format: uuid
+          nullable: true
+        alighting_stop_name:
+          type: string
+          example: "Kandy Central"
+        seats:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/SeatSelection"
+        passenger_name:
+          type: string
+          description: Primary contact name
+          example: "John Perera"
+        passenger_phone:
+          type: string
+          description: Primary contact phone
+          example: "+94771234567"
+        passenger_email:
+          type: string
+          format: email
+          nullable: true
+          example: "john@email.com"
+        special_requests:
+          type: string
+          nullable: true
+          description: Special requests or notes
+        device_info:
+          type: object
+          nullable: true
+          description: Device metadata (OS, app version, etc.)
+
+    SeatSelection:
+      type: object
+      required:
+        - trip_seat_id
+        - seat_number
+        - passenger_name
+      properties:
+        trip_seat_id:
+          type: string
+          format: uuid
+          description: ID of the trip_seat record
+        seat_number:
+          type: string
+          example: "A1"
+        seat_type:
+          type: string
+          example: "window"
+        seat_price:
+          type: number
+          format: double
+          description: Price is calculated from trip_seat
+        passenger_name:
+          type: string
+          example: "John Perera"
+        passenger_phone:
+          type: string
+          nullable: true
+          example: "+94771234567"
+        passenger_email:
+          type: string
+          format: email
+          nullable: true
+        passenger_age:
+          type: integer
+          nullable: true
+          example: 35
+        passenger_gender:
+          type: string
+          nullable: true
+          enum: [male, female, other]
+        passenger_nic:
+          type: string
+          nullable: true
+          example: "199512345678"
+        is_primary:
+          type: boolean
+          default: false
+          description: Is this the primary passenger (for multi-seat bookings)
+
+    MasterBooking:
+      type: object
+      description: Master booking record
+      properties:
+        id:
+          type: string
+          format: uuid
+        booking_reference:
+          type: string
+          example: "BL-20250106-A1B2C3"
+        user_id:
+          type: string
+          format: uuid
+        booking_type:
+          type: string
+          enum: [bus_only, lounge_only, bus_with_lounge]
+        bus_total:
+          type: number
+          format: double
+        lounge_total:
+          type: number
+          format: double
+        pre_order_total:
+          type: number
+          format: double
+        subtotal:
+          type: number
+          format: double
+        discount_amount:
+          type: number
+          format: double
+        tax_amount:
+          type: number
+          format: double
+        total_amount:
+          type: number
+          format: double
+        promo_code:
+          type: string
+          nullable: true
+        payment_status:
+          type: string
+          enum: [pending, partial, paid, failed, refunded, partial_refund]
+        payment_method:
+          type: string
+          nullable: true
+        payment_reference:
+          type: string
+          nullable: true
+        payment_gateway:
+          type: string
+          nullable: true
+        paid_at:
+          type: string
+          format: date-time
+          nullable: true
+        booking_status:
+          type: string
+          enum: [pending, confirmed, in_progress, completed, cancelled, partial_cancel]
+        passenger_name:
+          type: string
+        passenger_phone:
+          type: string
+        passenger_email:
+          type: string
+          nullable: true
+        confirmed_at:
+          type: string
+          format: date-time
+          nullable: true
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+        cancellation_reason:
+          type: string
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        refund_amount:
+          type: number
+          format: double
+        refunded_at:
+          type: string
+          format: date-time
+          nullable: true
+        booking_source:
+          type: string
+          enum: [app, web, agent, kiosk]
+        notes:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        bus_booking:
+          $ref: "#/components/schemas/BusBooking"
+
+    BusBooking:
+      type: object
+      description: Bus trip details within a booking
+      properties:
+        id:
+          type: string
+          format: uuid
+        booking_id:
+          type: string
+          format: uuid
+        scheduled_trip_id:
+          type: string
+          format: uuid
+        route_name:
+          type: string
+          example: "Colombo - Kandy"
+        bus_number:
+          type: string
+          nullable: true
+          example: "NC-1234"
+        bus_type:
+          type: string
+          nullable: true
+          example: "Luxury"
+        boarding_stop_id:
+          type: string
+          format: uuid
+          nullable: true
+        boarding_stop_name:
+          type: string
+          example: "Colombo Fort"
+        alighting_stop_id:
+          type: string
+          format: uuid
+          nullable: true
+        alighting_stop_name:
+          type: string
+          example: "Kandy Central"
+        departure_datetime:
+          type: string
+          format: date-time
+        estimated_arrival_datetime:
+          type: string
+          format: date-time
+          nullable: true
+        actual_departure_datetime:
+          type: string
+          format: date-time
+          nullable: true
+        actual_arrival_datetime:
+          type: string
+          format: date-time
+          nullable: true
+        number_of_seats:
+          type: integer
+        fare_per_seat:
+          type: number
+          format: double
+        total_fare:
+          type: number
+          format: double
+        status:
+          type: string
+          enum: [pending, confirmed, checked_in, boarded, in_transit, completed, cancelled, no_show]
+        checked_in_at:
+          type: string
+          format: date-time
+          nullable: true
+        boarded_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+        qr_code_data:
+          type: string
+          nullable: true
+          description: QR code for boarding verification
+        qr_generated_at:
+          type: string
+          format: date-time
+          nullable: true
+        special_requests:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        seats:
+          type: array
+          items:
+            $ref: "#/components/schemas/BusBookingSeat"
+
+    BusBookingSeat:
+      type: object
+      description: Individual seat in a bus booking
+      properties:
+        id:
+          type: string
+          format: uuid
+        bus_booking_id:
+          type: string
+          format: uuid
+        scheduled_trip_id:
+          type: string
+          format: uuid
+        trip_seat_id:
+          type: string
+          format: uuid
+          nullable: true
+        seat_number:
+          type: string
+          example: "A1"
+        seat_type:
+          type: string
+          example: "window"
+        seat_price:
+          type: number
+          format: double
+        passenger_name:
+          type: string
+        passenger_phone:
+          type: string
+          nullable: true
+        passenger_email:
+          type: string
+          format: email
+          nullable: true
+        passenger_age:
+          type: integer
+          nullable: true
+        passenger_gender:
+          type: string
+          nullable: true
+        passenger_nic:
+          type: string
+          nullable: true
+        is_primary_passenger:
+          type: boolean
+        status:
+          type: string
+          enum: [pending, booked, checked_in, boarded, completed, cancelled, no_show]
+        checked_in_at:
+          type: string
+          format: date-time
+          nullable: true
+        boarded_at:
+          type: string
+          format: date-time
+          nullable: true
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    BookingResponse:
+      type: object
+      description: Response after creating a booking
+      properties:
+        booking:
+          $ref: "#/components/schemas/MasterBooking"
+        bus_booking:
+          $ref: "#/components/schemas/BusBooking"
+        seats:
+          type: array
+          items:
+            $ref: "#/components/schemas/BusBookingSeat"
+        qr_code:
+          type: string
+          description: QR code for boarding
+
+    BookingListItem:
+      type: object
+      description: Booking list item for displaying in lists
+      properties:
+        id:
+          type: string
+          format: uuid
+        booking_reference:
+          type: string
+        booking_type:
+          type: string
+        total_amount:
+          type: number
+          format: double
+        payment_status:
+          type: string
+        booking_status:
+          type: string
+        passenger_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        route_name:
+          type: string
+        departure_datetime:
+          type: string
+          format: date-time
+        number_of_seats:
+          type: integer
+        bus_status:
+          type: string
+        qr_code_data:
+          type: string
+          nullable: true
+
+    ConfirmPaymentRequest:
+      type: object
+      required:
+        - payment_method
+        - payment_reference
+        - payment_gateway
+      properties:
+        payment_method:
+          type: string
+          example: "card"
+        payment_reference:
+          type: string
+          example: "TXN-123456789"
+        payment_gateway:
+          type: string
+          example: "payhere"
+
+    VerifyBookingResponse:
+      type: object
+      description: Response after verifying a booking by QR
+      properties:
+        valid:
+          type: boolean
+          example: true
+        bus_booking_id:
+          type: string
+          format: uuid
+        route_name:
+          type: string
+        boarding_stop:
+          type: string
+        alighting_stop:
+          type: string
+        departure_datetime:
+          type: string
+          format: date-time
+        number_of_seats:
+          type: integer
+        status:
+          type: string
+          enum: [pending, confirmed, checked_in, boarded, in_transit, completed, cancelled, no_show]
+        is_checked_in:
+          type: boolean
+        check_in_time:
+          type: string
+          format: date-time
+          nullable: true
+        seats:
+          type: array
+          items:
+            $ref: "#/components/schemas/BusBookingSeat"
 
   responses:
     BadRequest:
