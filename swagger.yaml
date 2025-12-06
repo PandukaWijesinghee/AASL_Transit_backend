@@ -8820,7 +8820,9 @@ components:
       type: object
       required:
         - scheduled_trip_id
+        - boarding_stop_id
         - boarding_stop_name
+        - alighting_stop_id
         - alighting_stop_name
         - seats
         - passenger_name
@@ -8833,16 +8835,18 @@ components:
         boarding_stop_id:
           type: string
           format: uuid
-          nullable: true
+          description: ID of the boarding stop from route_stops (required for normalized schema)
         boarding_stop_name:
           type: string
+          description: Name of boarding stop (used for display/confirmation)
           example: "Colombo Fort"
         alighting_stop_id:
           type: string
           format: uuid
-          nullable: true
+          description: ID of the alighting stop from route_stops (required for normalized schema)
         alighting_stop_name:
           type: string
+          description: Name of alighting stop (used for display/confirmation)
           example: "Kandy Central"
         seats:
           type: array
@@ -9033,7 +9037,10 @@ components:
 
     BusBooking:
       type: object
-      description: Bus trip details within a booking
+      description: |
+        Bus trip details within a booking.
+        Note: Some fields (route_name, bus_number, bus_type, departure_datetime, etc.) 
+        are populated from the related scheduled_trip and route_stops tables via JOINs.
       properties:
         id:
           type: string
@@ -9046,14 +9053,17 @@ components:
           format: uuid
         route_name:
           type: string
+          description: Populated from scheduled_trip
           example: "Colombo - Kandy"
         bus_number:
           type: string
           nullable: true
+          description: Populated from scheduled_trip
           example: "NC-1234"
         bus_type:
           type: string
           nullable: true
+          description: Populated from scheduled_trip
           example: "Luxury"
         boarding_stop_id:
           type: string
@@ -9061,6 +9071,7 @@ components:
           nullable: true
         boarding_stop_name:
           type: string
+          description: Populated from route_stops via boarding_stop_id
           example: "Colombo Fort"
         alighting_stop_id:
           type: string
@@ -9068,22 +9079,27 @@ components:
           nullable: true
         alighting_stop_name:
           type: string
+          description: Populated from route_stops via alighting_stop_id
           example: "Kandy Central"
         departure_datetime:
           type: string
           format: date-time
+          description: Populated from scheduled_trip
         estimated_arrival_datetime:
           type: string
           format: date-time
           nullable: true
+          description: Populated from scheduled_trip
         actual_departure_datetime:
           type: string
           format: date-time
           nullable: true
+          description: Populated from scheduled_trip
         actual_arrival_datetime:
           type: string
           format: date-time
           nullable: true
+          description: Populated from scheduled_trip
         number_of_seats:
           type: integer
         fare_per_seat:
@@ -9145,7 +9161,9 @@ components:
 
     BusBookingSeat:
       type: object
-      description: Individual seat in a bus booking
+      description: |
+        Individual seat in a bus booking.
+        Note: seat_number, seat_type, and seat_price are populated from trip_seats table via JOIN.
       properties:
         id:
           type: string
@@ -9162,13 +9180,16 @@ components:
           nullable: true
         seat_number:
           type: string
+          description: Populated from trip_seats via trip_seat_id
           example: "A1"
         seat_type:
           type: string
+          description: Populated from trip_seats via trip_seat_id
           example: "window"
         seat_price:
           type: number
           format: double
+          description: Populated from trip_seats via trip_seat_id
         passenger_name:
           type: string
         passenger_phone:

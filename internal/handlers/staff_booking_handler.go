@@ -253,17 +253,17 @@ func (h *StaffBookingHandler) GetTripBookings(c *gin.Context) {
 		return
 	}
 
-	// Calculate stats
+	// Calculate stats (boarding is now tracked at bus_bookings level, not seat level)
 	var totalBooked, checkedIn, boarded, noShow int
 	for _, b := range bookings {
 		totalBooked += b.NumberOfSeats
 		if b.CheckedInAt != nil {
 			checkedIn += b.NumberOfSeats
 		}
+		if b.BoardedAt != nil {
+			boarded += b.NumberOfSeats
+		}
 		for _, seat := range b.Seats {
-			if seat.BoardedAt != nil {
-				boarded++
-			}
 			if seat.Status == "no_show" {
 				noShow++
 			}

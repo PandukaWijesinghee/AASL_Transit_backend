@@ -153,38 +153,39 @@ func (h *AppBookingHandler) CreateBooking(c *gin.Context) {
 		DeviceInfo:     req.DeviceInfo,
 	}
 
-	// Build bus booking
+	// Build bus booking (normalized - only store IDs, not denormalized data)
 	busBooking := &models.BusBooking{
-		ScheduledTripID:   req.ScheduledTripID,
+		ScheduledTripID: req.ScheduledTripID,
+		BoardingStopID:  req.BoardingStopID,
+		AlightingStopID: req.AlightingStopID,
+		NumberOfSeats:   len(req.Seats),
+		FarePerSeat:     trip.BaseFare,
+		TotalFare:       totalFare,
+		Status:          models.BusBookingPending,
+		SpecialRequests: req.SpecialRequests,
+		// Denormalized fields for response only (not stored in DB)
 		RouteName:         routeName,
-		BoardingStopID:    req.BoardingStopID,
 		BoardingStopName:  req.BoardingStopName,
-		AlightingStopID:   req.AlightingStopID,
 		AlightingStopName: req.AlightingStopName,
-		DepartureDatetime: trip.DepartureDatetime,
-		NumberOfSeats:     len(req.Seats),
-		FarePerSeat:       trip.BaseFare,
-		TotalFare:         totalFare,
-		Status:            models.BusBookingPending,
-		SpecialRequests:   req.SpecialRequests,
+		DepartureDatetime: &trip.DepartureDatetime,
 	}
 
-	// Build seat records
+	// Build seat records (normalized - seat info from trip_seats)
 	seats := make([]models.BusBookingSeat, len(req.Seats))
 	for i, seatReq := range req.Seats {
 		seats[i] = models.BusBookingSeat{
 			TripSeatID:         &seatReq.TripSeatID,
-			SeatNumber:         seatReq.SeatNumber,
-			SeatType:           seatReq.SeatType,
-			SeatPrice:          seatReq.SeatPrice,
 			PassengerName:      seatReq.PassengerName,
 			PassengerPhone:     seatReq.PassengerPhone,
 			PassengerEmail:     seatReq.PassengerEmail,
-			PassengerAge:       seatReq.PassengerAge,
 			PassengerGender:    seatReq.PassengerGender,
 			PassengerNIC:       seatReq.PassengerNIC,
 			IsPrimaryPassenger: seatReq.IsPrimary,
 			Status:             models.SeatBookingPending,
+			// Denormalized fields for response only (not stored in DB)
+			SeatNumber: seatReq.SeatNumber,
+			SeatType:   seatReq.SeatType,
+			SeatPrice:  seatReq.SeatPrice,
 		}
 	}
 

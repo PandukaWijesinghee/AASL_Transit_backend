@@ -175,25 +175,9 @@ type BusBooking struct {
 	BookingID       string `json:"booking_id" db:"booking_id"`
 	ScheduledTripID string `json:"scheduled_trip_id" db:"scheduled_trip_id"`
 
-	// Trip Snapshot
-	RouteName  string  `json:"route_name" db:"route_name"`
-	BusNumber  *string `json:"bus_number,omitempty" db:"bus_number"`
-	BusType    *string `json:"bus_type,omitempty" db:"bus_type"`
-	BusOwnerID *string `json:"bus_owner_id,omitempty" db:"bus_owner_id"`
-
-	// Stops
-	BoardingStopID     *string `json:"boarding_stop_id,omitempty" db:"boarding_stop_id"`
-	BoardingStopName   string  `json:"boarding_stop_name" db:"boarding_stop_name"`
-	BoardingStopOrder  *int    `json:"boarding_stop_order,omitempty" db:"boarding_stop_order"`
-	AlightingStopID    *string `json:"alighting_stop_id,omitempty" db:"alighting_stop_id"`
-	AlightingStopName  string  `json:"alighting_stop_name" db:"alighting_stop_name"`
-	AlightingStopOrder *int    `json:"alighting_stop_order,omitempty" db:"alighting_stop_order"`
-
-	// Timing
-	DepartureDatetime        time.Time  `json:"departure_datetime" db:"departure_datetime"`
-	EstimatedArrivalDatetime *time.Time `json:"estimated_arrival_datetime,omitempty" db:"estimated_arrival_datetime"`
-	ActualDepartureDatetime  *time.Time `json:"actual_departure_datetime,omitempty" db:"actual_departure_datetime"`
-	ActualArrivalDatetime    *time.Time `json:"actual_arrival_datetime,omitempty" db:"actual_arrival_datetime"`
+	// Stops (IDs only - names fetched via JOIN)
+	BoardingStopID  *string `json:"boarding_stop_id,omitempty" db:"boarding_stop_id"`
+	AlightingStopID *string `json:"alighting_stop_id,omitempty" db:"alighting_stop_id"`
 
 	// Seats & Fare
 	NumberOfSeats int     `json:"number_of_seats" db:"number_of_seats"`
@@ -223,8 +207,16 @@ type BusBooking struct {
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 
-	// Related data
+	// Related data (populated via JOINs for display)
 	Seats []BusBookingSeat `json:"seats,omitempty" db:"-"`
+
+	// Denormalized fields (populated via JOINs, not stored in DB)
+	RouteName         string     `json:"route_name,omitempty" db:"-"`
+	BusNumber         string     `json:"bus_number,omitempty" db:"-"`
+	BusType           string     `json:"bus_type,omitempty" db:"-"`
+	BoardingStopName  string     `json:"boarding_stop_name,omitempty" db:"-"`
+	AlightingStopName string     `json:"alighting_stop_name,omitempty" db:"-"`
+	DepartureDatetime *time.Time `json:"departure_datetime,omitempty" db:"-"`
 }
 
 // ============================================================================
@@ -238,16 +230,10 @@ type BusBookingSeat struct {
 	ScheduledTripID string  `json:"scheduled_trip_id" db:"scheduled_trip_id"`
 	TripSeatID      *string `json:"trip_seat_id,omitempty" db:"trip_seat_id"`
 
-	// Seat Info
-	SeatNumber string  `json:"seat_number" db:"seat_number"`
-	SeatType   string  `json:"seat_type" db:"seat_type"`
-	SeatPrice  float64 `json:"seat_price" db:"seat_price"`
-
 	// Passenger
 	PassengerName      string  `json:"passenger_name" db:"passenger_name"`
 	PassengerPhone     *string `json:"passenger_phone,omitempty" db:"passenger_phone"`
 	PassengerEmail     *string `json:"passenger_email,omitempty" db:"passenger_email"`
-	PassengerAge       *int    `json:"passenger_age,omitempty" db:"passenger_age"`
 	PassengerGender    *string `json:"passenger_gender,omitempty" db:"passenger_gender"`
 	PassengerNIC       *string `json:"passenger_nic,omitempty" db:"passenger_nic"`
 	IsPrimaryPassenger bool    `json:"is_primary_passenger" db:"is_primary_passenger"`
@@ -256,12 +242,15 @@ type BusBookingSeat struct {
 	Status SeatBookingStatus `json:"status" db:"status"`
 
 	// Timestamps
-	CheckedInAt *time.Time `json:"checked_in_at,omitempty" db:"checked_in_at"`
-	BoardedAt   *time.Time `json:"boarded_at,omitempty" db:"boarded_at"`
 	CancelledAt *time.Time `json:"cancelled_at,omitempty" db:"cancelled_at"`
 
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+
+	// Denormalized fields (populated via JOINs, not stored in DB)
+	SeatNumber string  `json:"seat_number,omitempty" db:"-"`
+	SeatType   string  `json:"seat_type,omitempty" db:"-"`
+	SeatPrice  float64 `json:"seat_price,omitempty" db:"-"`
 }
 
 // ============================================================================

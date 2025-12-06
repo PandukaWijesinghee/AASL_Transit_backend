@@ -158,27 +158,21 @@ func (r *AppBookingRepository) CreateBooking(
 	now := time.Now()
 	busBooking.QRGeneratedAt = &now
 
-	// 4. Insert bus booking
+	// 4. Insert bus booking (normalized - no duplicate columns)
 	busBooking.BookingID = booking.ID
 	busBookingQuery := `
 		INSERT INTO bus_bookings (
 			booking_id, scheduled_trip_id,
-			route_name, bus_number, bus_type, bus_owner_id,
-			boarding_stop_id, boarding_stop_name, boarding_stop_order,
-			alighting_stop_id, alighting_stop_name, alighting_stop_order,
-			departure_datetime, estimated_arrival_datetime,
+			boarding_stop_id, alighting_stop_id,
 			number_of_seats, fare_per_seat, total_fare,
 			status, qr_code_data, qr_generated_at, special_requests
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
 		) RETURNING id, created_at, updated_at`
 
 	err = tx.QueryRowx(busBookingQuery,
 		busBooking.BookingID, busBooking.ScheduledTripID,
-		busBooking.RouteName, busBooking.BusNumber, busBooking.BusType, busBooking.BusOwnerID,
-		busBooking.BoardingStopID, busBooking.BoardingStopName, busBooking.BoardingStopOrder,
-		busBooking.AlightingStopID, busBooking.AlightingStopName, busBooking.AlightingStopOrder,
-		busBooking.DepartureDatetime, busBooking.EstimatedArrivalDatetime,
+		busBooking.BoardingStopID, busBooking.AlightingStopID,
 		busBooking.NumberOfSeats, busBooking.FarePerSeat, busBooking.TotalFare,
 		busBooking.Status, busBooking.QRCodeData, busBooking.QRGeneratedAt, busBooking.SpecialRequests,
 	).Scan(&busBooking.ID, &busBooking.CreatedAt, &busBooking.UpdatedAt)
@@ -186,7 +180,7 @@ func (r *AppBookingRepository) CreateBooking(
 		return nil, fmt.Errorf("failed to create bus booking: %w", err)
 	}
 
-	// 5. Insert bus booking seats and update trip_seats
+	// 5. Insert bus booking seats (normalized - seat info comes from trip_seats) and update trip_seats
 	createdSeats := make([]models.BusBookingSeat, 0, len(seats))
 	for i := range seats {
 		seats[i].BusBookingID = busBooking.ID
@@ -195,19 +189,17 @@ func (r *AppBookingRepository) CreateBooking(
 		seatQuery := `
 			INSERT INTO bus_booking_seats (
 				bus_booking_id, scheduled_trip_id, trip_seat_id,
-				seat_number, seat_type, seat_price,
 				passenger_name, passenger_phone, passenger_email,
-				passenger_age, passenger_gender, passenger_nic,
+				passenger_gender, passenger_nic,
 				is_primary_passenger, status
 			) VALUES (
-				$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+				$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 			) RETURNING id, created_at, updated_at`
 
 		err = tx.QueryRowx(seatQuery,
 			seats[i].BusBookingID, seats[i].ScheduledTripID, seats[i].TripSeatID,
-			seats[i].SeatNumber, seats[i].SeatType, seats[i].SeatPrice,
 			seats[i].PassengerName, seats[i].PassengerPhone, seats[i].PassengerEmail,
-			seats[i].PassengerAge, seats[i].PassengerGender, seats[i].PassengerNIC,
+			seats[i].PassengerGender, seats[i].PassengerNIC,
 			seats[i].IsPrimaryPassenger, seats[i].Status,
 		).Scan(&seats[i].ID, &seats[i].CreatedAt, &seats[i].UpdatedAt)
 		if err != nil {
@@ -437,28 +429,28 @@ func (r *AppBookingRepository) CancelBooking(bookingID, userID string, reason *s
 // BUS BOOKING OPERATIONS
 // ============================================================================
 
-// GetBusBookingByBookingID retrieves bus booking by master booking ID
+// GetBusBookingByBookingID retrieves bus booking by master booking ID with JOINs for denormalized data
 func (r *AppBookingRepository) GetBusBookingByBookingID(bookingID string) (*models.BusBooking, error) {
 	busBooking := &models.BusBooking{}
 	query := `
-		SELECT id, booking_id, scheduled_trip_id,
-		       route_name, bus_number, bus_type, bus_owner_id,
-		       boarding_stop_id, boarding_stop_name, boarding_stop_order,
-		       alighting_stop_id, alighting_stop_name, alighting_stop_order,
-		       departure_datetime, estimated_arrival_datetime,
-		       actual_departure_datetime, actual_arrival_datetime,
-		       number_of_seats, fare_per_seat, total_fare,
-		       status, checked_in_at, checked_in_by_user_id,
-		       boarded_at, boarded_by_user_id, completed_at,
-		       cancelled_at, cancellation_reason,
-		       qr_code_data, qr_generated_at, special_requests,
-		       created_at, updated_at
-		FROM bus_bookings WHERE booking_id = $1`
+		SELECT bb.id, bb.booking_id, bb.scheduled_trip_id,
+		       bb.boarding_stop_id, bb.alighting_stop_id,
+		       bb.number_of_seats, bb.fare_per_seat, bb.total_fare,
+		       bb.status, bb.checked_in_at, bb.checked_in_by_user_id,
+		       bb.boarded_at, bb.boarded_by_user_id, bb.completed_at,
+		       bb.cancelled_at, bb.cancellation_reason,
+		       bb.qr_code_data, bb.qr_generated_at, bb.special_requests,
+		       bb.created_at, bb.updated_at
+		FROM bus_bookings bb
+		WHERE bb.booking_id = $1`
 
 	err := r.db.Get(busBooking, query, bookingID)
 	if err != nil {
 		return nil, err
 	}
+
+	// Get denormalized data via JOINs
+	r.populateBusBookingDetails(busBooking)
 
 	// Get seats
 	seats, err := r.GetSeatsByBusBookingID(busBooking.ID)
@@ -473,24 +465,24 @@ func (r *AppBookingRepository) GetBusBookingByBookingID(bookingID string) (*mode
 func (r *AppBookingRepository) GetBusBookingByQRCode(qrCode string) (*models.BusBooking, error) {
 	busBooking := &models.BusBooking{}
 	query := `
-		SELECT id, booking_id, scheduled_trip_id,
-		       route_name, bus_number, bus_type, bus_owner_id,
-		       boarding_stop_id, boarding_stop_name, boarding_stop_order,
-		       alighting_stop_id, alighting_stop_name, alighting_stop_order,
-		       departure_datetime, estimated_arrival_datetime,
-		       actual_departure_datetime, actual_arrival_datetime,
-		       number_of_seats, fare_per_seat, total_fare,
-		       status, checked_in_at, checked_in_by_user_id,
-		       boarded_at, boarded_by_user_id, completed_at,
-		       cancelled_at, cancellation_reason,
-		       qr_code_data, qr_generated_at, special_requests,
-		       created_at, updated_at
-		FROM bus_bookings WHERE qr_code_data = $1`
+		SELECT bb.id, bb.booking_id, bb.scheduled_trip_id,
+		       bb.boarding_stop_id, bb.alighting_stop_id,
+		       bb.number_of_seats, bb.fare_per_seat, bb.total_fare,
+		       bb.status, bb.checked_in_at, bb.checked_in_by_user_id,
+		       bb.boarded_at, bb.boarded_by_user_id, bb.completed_at,
+		       bb.cancelled_at, bb.cancellation_reason,
+		       bb.qr_code_data, bb.qr_generated_at, bb.special_requests,
+		       bb.created_at, bb.updated_at
+		FROM bus_bookings bb
+		WHERE bb.qr_code_data = $1`
 
 	err := r.db.Get(busBooking, query, qrCode)
 	if err != nil {
 		return nil, err
 	}
+
+	// Get denormalized data via JOINs
+	r.populateBusBookingDetails(busBooking)
 
 	// Get seats
 	seats, err := r.GetSeatsByBusBookingID(busBooking.ID)
@@ -504,25 +496,71 @@ func (r *AppBookingRepository) GetBusBookingByQRCode(qrCode string) (*models.Bus
 // GetBusBookingsByTripID retrieves all bus bookings for a scheduled trip
 func (r *AppBookingRepository) GetBusBookingsByTripID(tripID string) ([]models.BusBooking, error) {
 	query := `
-		SELECT id, booking_id, scheduled_trip_id,
-		       route_name, bus_number, bus_type, bus_owner_id,
-		       boarding_stop_id, boarding_stop_name, boarding_stop_order,
-		       alighting_stop_id, alighting_stop_name, alighting_stop_order,
-		       departure_datetime, estimated_arrival_datetime,
-		       actual_departure_datetime, actual_arrival_datetime,
-		       number_of_seats, fare_per_seat, total_fare,
-		       status, checked_in_at, checked_in_by_user_id,
-		       boarded_at, boarded_by_user_id, completed_at,
-		       cancelled_at, cancellation_reason,
-		       qr_code_data, qr_generated_at, special_requests,
-		       created_at, updated_at
-		FROM bus_bookings 
-		WHERE scheduled_trip_id = $1 AND status != 'cancelled'
-		ORDER BY created_at DESC`
+		SELECT bb.id, bb.booking_id, bb.scheduled_trip_id,
+		       bb.boarding_stop_id, bb.alighting_stop_id,
+		       bb.number_of_seats, bb.fare_per_seat, bb.total_fare,
+		       bb.status, bb.checked_in_at, bb.checked_in_by_user_id,
+		       bb.boarded_at, bb.boarded_by_user_id, bb.completed_at,
+		       bb.cancelled_at, bb.cancellation_reason,
+		       bb.qr_code_data, bb.qr_generated_at, bb.special_requests,
+		       bb.created_at, bb.updated_at
+		FROM bus_bookings bb
+		WHERE bb.scheduled_trip_id = $1 AND bb.status != 'cancelled'
+		ORDER BY bb.created_at DESC`
 
 	var bookings []models.BusBooking
 	err := r.db.Select(&bookings, query, tripID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Populate denormalized data for each booking
+	for i := range bookings {
+		r.populateBusBookingDetails(&bookings[i])
+	}
+
 	return bookings, err
+}
+
+// populateBusBookingDetails fetches denormalized data via JOINs
+func (r *AppBookingRepository) populateBusBookingDetails(bb *models.BusBooking) {
+	// Get route name, bus info, stop names, departure time
+	var details struct {
+		RouteName         string    `db:"route_name"`
+		BusNumber         string    `db:"bus_number"`
+		BusType           string    `db:"bus_type"`
+		BoardingStopName  string    `db:"boarding_stop_name"`
+		AlightingStopName string    `db:"alighting_stop_name"`
+		DepartureDatetime time.Time `db:"departure_datetime"`
+	}
+
+	query := `
+		SELECT 
+			COALESCE(mr.route_name, bor.custom_route_name, 'Unknown Route') as route_name,
+			COALESCE(b.bus_number, '') as bus_number,
+			COALESCE(b.bus_type, '') as bus_type,
+			COALESCE(mrs_board.stop_name, '') as boarding_stop_name,
+			COALESCE(mrs_alight.stop_name, '') as alighting_stop_name,
+			st.departure_datetime
+		FROM bus_bookings bb
+		JOIN scheduled_trips st ON bb.scheduled_trip_id = st.id
+		LEFT JOIN bus_owner_routes bor ON st.bus_owner_route_id = bor.id
+		LEFT JOIN master_routes mr ON bor.master_route_id = mr.id
+		LEFT JOIN route_permits rp ON st.permit_id = rp.id
+		LEFT JOIN buses b ON b.permit_id = rp.id
+		LEFT JOIN master_route_stops mrs_board ON bb.boarding_stop_id = mrs_board.id
+		LEFT JOIN master_route_stops mrs_alight ON bb.alighting_stop_id = mrs_alight.id
+		WHERE bb.id = $1`
+
+	err := r.db.Get(&details, query, bb.ID)
+	if err == nil {
+		bb.RouteName = details.RouteName
+		bb.BusNumber = details.BusNumber
+		bb.BusType = details.BusType
+		bb.BoardingStopName = details.BoardingStopName
+		bb.AlightingStopName = details.AlightingStopName
+		bb.DepartureDatetime = &details.DepartureDatetime
+	}
 }
 
 // UpdateBusBookingStatus updates bus booking status (check-in, board, complete)
@@ -551,23 +589,44 @@ func (r *AppBookingRepository) UpdateBusBookingStatus(
 // SEAT OPERATIONS
 // ============================================================================
 
-// GetSeatsByBusBookingID retrieves seats for a bus booking
+// GetSeatsByBusBookingID retrieves seats for a bus booking with JOINs for seat info
 func (r *AppBookingRepository) GetSeatsByBusBookingID(busBookingID string) ([]models.BusBookingSeat, error) {
 	query := `
-		SELECT id, bus_booking_id, scheduled_trip_id, trip_seat_id,
-		       seat_number, seat_type, seat_price,
-		       passenger_name, passenger_phone, passenger_email,
-		       passenger_age, passenger_gender, passenger_nic,
-		       is_primary_passenger, status,
-		       checked_in_at, boarded_at, cancelled_at,
-		       created_at, updated_at
-		FROM bus_booking_seats
-		WHERE bus_booking_id = $1
-		ORDER BY seat_number`
+		SELECT bbs.id, bbs.bus_booking_id, bbs.scheduled_trip_id, bbs.trip_seat_id,
+		       bbs.passenger_name, bbs.passenger_phone, bbs.passenger_email,
+		       bbs.passenger_gender, bbs.passenger_nic,
+		       bbs.is_primary_passenger, bbs.status,
+		       bbs.cancelled_at, bbs.created_at, bbs.updated_at,
+		       ts.seat_number, ts.seat_type, ts.seat_price
+		FROM bus_booking_seats bbs
+		LEFT JOIN trip_seats ts ON bbs.trip_seat_id = ts.id
+		WHERE bbs.bus_booking_id = $1
+		ORDER BY ts.seat_number`
 
-	var seats []models.BusBookingSeat
-	err := r.db.Select(&seats, query, busBookingID)
-	return seats, err
+	// Custom struct for scanning with JOINed data
+	type seatWithDetails struct {
+		models.BusBookingSeat
+		SeatNumberDB string  `db:"seat_number"`
+		SeatTypeDB   string  `db:"seat_type"`
+		SeatPriceDB  float64 `db:"seat_price"`
+	}
+
+	var rawSeats []seatWithDetails
+	err := r.db.Select(&rawSeats, query, busBookingID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to BusBookingSeat with denormalized fields
+	seats := make([]models.BusBookingSeat, len(rawSeats))
+	for i, raw := range rawSeats {
+		seats[i] = raw.BusBookingSeat
+		seats[i].SeatNumber = raw.SeatNumberDB
+		seats[i].SeatType = raw.SeatTypeDB
+		seats[i].SeatPrice = raw.SeatPriceDB
+	}
+
+	return seats, nil
 }
 
 // CheckSeatAvailability checks if seats are available for booking
