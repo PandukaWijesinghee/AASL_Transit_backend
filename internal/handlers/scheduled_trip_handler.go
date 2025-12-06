@@ -22,6 +22,7 @@ type ScheduledTripHandler struct {
 	busRepo      *database.BusRepository
 	staffRepo    *database.BusStaffRepository
 	settingRepo  *database.SystemSettingRepository
+	tripSeatRepo *database.TripSeatRepository
 }
 
 func NewScheduledTripHandler(
@@ -33,6 +34,7 @@ func NewScheduledTripHandler(
 	busRepo *database.BusRepository,
 	staffRepo *database.BusStaffRepository,
 	settingRepo *database.SystemSettingRepository,
+	tripSeatRepo *database.TripSeatRepository,
 ) *ScheduledTripHandler {
 	return &ScheduledTripHandler{
 		tripRepo:     tripRepo,
@@ -43,6 +45,7 @@ func NewScheduledTripHandler(
 		busRepo:      busRepo,
 		staffRepo:    staffRepo,
 		settingRepo:  settingRepo,
+		tripSeatRepo: tripSeatRepo,
 	}
 }
 
@@ -1318,6 +1321,19 @@ func (h *ScheduledTripHandler) AssignSeatLayout(c *gin.Context) {
 		return
 	}
 
+	// Auto-create trip seats from the layout
+	seatsCreated := 0
+	if req.SeatLayoutID != nil && *req.SeatLayoutID != "" {
+		seatsCreated, err = h.tripSeatRepo.CreateTripSeatsFromLayout(tripID, *req.SeatLayoutID, trip.BaseFare)
+		if err != nil {
+			fmt.Printf("⚠️ Warning: Failed to create trip seats: %v\n", err)
+			// Don't fail the entire request, just log the warning
+			// The user can manually trigger seat creation later if needed
+		} else {
+			fmt.Printf("✅ Created %d trip seats from layout %s\n", seatsCreated, *req.SeatLayoutID)
+		}
+	}
+
 	// Fetch updated trip
 	updatedTrip, err := h.tripRepo.GetByID(tripID)
 	if err != nil {
@@ -1326,7 +1342,8 @@ func (h *ScheduledTripHandler) AssignSeatLayout(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Seat layout assigned successfully",
-		"trip":    updatedTrip,
+		"message":       "Seat layout assigned successfully",
+		"trip":          updatedTrip,
+		"seats_created": seatsCreated,
 	})
 }

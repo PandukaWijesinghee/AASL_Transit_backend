@@ -248,6 +248,12 @@ func main() {
 		tripGeneratorSvc,
 	)
 
+	// Initialize Trip Seat and Manual Booking system
+	logger.Info("Initializing trip seat and manual booking system...")
+	tripSeatRepo := database.NewTripSeatRepository(sqlxDB.DB)
+	manualBookingRepo := database.NewManualBookingRepository(sqlxDB.DB)
+	logger.Info("✓ Trip seat and manual booking repositories initialized")
+
 	scheduledTripHandler := handlers.NewScheduledTripHandler(
 		scheduledTripRepo,
 		tripScheduleRepo,
@@ -257,6 +263,7 @@ func main() {
 		busRepository,
 		staffRepository,
 		systemSettingRepo,
+		tripSeatRepo,
 	)
 	systemSettingHandler := handlers.NewSystemSettingHandler(systemSettingRepo)
 	logger.Info("Trip scheduling handlers initialized")
@@ -268,10 +275,7 @@ func main() {
 	searchHandler := handlers.NewSearchHandler(searchService, logger)
 	logger.Info("✓ Search system initialized")
 
-	// Initialize Trip Seat and Manual Booking system
-	logger.Info("Initializing trip seat and manual booking system...")
-	tripSeatRepo := database.NewTripSeatRepository(sqlxDB.DB)
-	manualBookingRepo := database.NewManualBookingRepository(sqlxDB.DB)
+	// Initialize Trip Seat Handler (tripSeatRepo already initialized above)
 	tripSeatHandler := handlers.NewTripSeatHandler(
 		tripSeatRepo,
 		manualBookingRepo,
@@ -279,7 +283,7 @@ func main() {
 		ownerRepository,
 		busOwnerRouteRepo,
 	)
-	logger.Info("✓ Trip seat and manual booking system initialized")
+	logger.Info("✓ Trip seat handler initialized")
 
 	// Initialize Gin router
 	router := gin.New()
