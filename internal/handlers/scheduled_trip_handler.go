@@ -1223,13 +1223,13 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 
 // AssignSeatLayout assigns a seat layout template to a scheduled trip
 // @Summary Assign seat layout to scheduled trip
-// @Description Assign a seat layout template to a scheduled trip (bus owner only)
+// @Description Assign a seat layout template to a scheduled trip and automatically create trip seats from the layout (bus owner only)
 // @Tags Scheduled Trips
 // @Accept json
 // @Produce json
 // @Param id path string true "Scheduled Trip ID"
 // @Param request body map[string]string true "Seat layout assignment (seat_layout_id)"
-// @Success 200 {object} map[string]interface{} "Assignment success message"
+// @Success 200 {object} map[string]interface{} "Assignment success with seats_created count"
 // @Failure 400 {object} map[string]interface{} "Invalid request"
 // @Failure 403 {object} map[string]interface{} "Forbidden - not owner"
 // @Failure 404 {object} map[string]interface{} "Trip not found"
