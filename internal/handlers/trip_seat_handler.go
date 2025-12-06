@@ -42,9 +42,9 @@ func NewTripSeatHandler(
 // ===========================================================================
 
 // GetTripSeats returns all seats for a scheduled trip
-// GET /api/v1/trips/:tripId/seats
+// GET /api/v1/scheduled-trips/:id/seats
 func (h *TripSeatHandler) GetTripSeats(c *gin.Context) {
-	tripID := c.Param("tripId")
+	tripID := c.Param("id")
 	if tripID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Trip ID is required"})
 		return
@@ -71,9 +71,9 @@ func (h *TripSeatHandler) GetTripSeats(c *gin.Context) {
 }
 
 // GetTripSeatSummary returns seat availability summary for a trip
-// GET /api/v1/trips/:tripId/seats/summary
+// GET /api/v1/scheduled-trips/:id/seats/summary
 func (h *TripSeatHandler) GetTripSeatSummary(c *gin.Context) {
-	tripID := c.Param("tripId")
+	tripID := c.Param("id")
 	if tripID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Trip ID is required"})
 		return
@@ -89,9 +89,9 @@ func (h *TripSeatHandler) GetTripSeatSummary(c *gin.Context) {
 }
 
 // CreateTripSeats creates trip seats from a seat layout template
-// POST /api/v1/trips/:tripId/seats/create
+// POST /api/v1/scheduled-trips/:id/seats/create
 func (h *TripSeatHandler) CreateTripSeats(c *gin.Context) {
-	tripID := c.Param("tripId")
+	tripID := c.Param("id")
 	if tripID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Trip ID is required"})
 		return
@@ -132,9 +132,9 @@ func (h *TripSeatHandler) CreateTripSeats(c *gin.Context) {
 }
 
 // BlockSeats blocks one or more seats
-// POST /api/v1/trips/:tripId/seats/block
+// POST /api/v1/scheduled-trips/:id/seats/block
 func (h *TripSeatHandler) BlockSeats(c *gin.Context) {
-	tripID := c.Param("tripId")
+	tripID := c.Param("id")
 	if tripID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Trip ID is required"})
 		return
@@ -180,9 +180,9 @@ func (h *TripSeatHandler) BlockSeats(c *gin.Context) {
 }
 
 // UnblockSeats unblocks one or more seats
-// POST /api/v1/trips/:tripId/seats/unblock
+// POST /api/v1/scheduled-trips/:id/seats/unblock
 func (h *TripSeatHandler) UnblockSeats(c *gin.Context) {
-	tripID := c.Param("tripId")
+	tripID := c.Param("id")
 	if tripID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Trip ID is required"})
 		return
@@ -222,9 +222,9 @@ func (h *TripSeatHandler) UnblockSeats(c *gin.Context) {
 }
 
 // UpdateSeatPrices updates prices for one or more seats
-// PUT /api/v1/trips/:tripId/seats/price
+// PUT /api/v1/scheduled-trips/:id/seats/price
 func (h *TripSeatHandler) UpdateSeatPrices(c *gin.Context) {
-	tripID := c.Param("tripId")
+	tripID := c.Param("id")
 	if tripID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Trip ID is required"})
 		return
@@ -268,9 +268,9 @@ func (h *TripSeatHandler) UpdateSeatPrices(c *gin.Context) {
 // ===========================================================================
 
 // CreateManualBooking creates a phone/agent/walk-in booking
-// POST /api/v1/trips/:tripId/manual-bookings
+// POST /api/v1/scheduled-trips/:id/manual-bookings
 func (h *TripSeatHandler) CreateManualBooking(c *gin.Context) {
-	tripID := c.Param("tripId")
+	tripID := c.Param("id")
 	if tripID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Trip ID is required"})
 		return
@@ -365,9 +365,9 @@ func (h *TripSeatHandler) CreateManualBooking(c *gin.Context) {
 }
 
 // GetManualBookings returns all manual bookings for a trip
-// GET /api/v1/trips/:tripId/manual-bookings
+// GET /api/v1/scheduled-trips/:id/manual-bookings
 func (h *TripSeatHandler) GetManualBookings(c *gin.Context) {
-	tripID := c.Param("tripId")
+	tripID := c.Param("id")
 	if tripID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Trip ID is required"})
 		return
@@ -393,9 +393,9 @@ func (h *TripSeatHandler) GetManualBookings(c *gin.Context) {
 }
 
 // GetManualBooking returns a single manual booking
-// GET /api/v1/manual-bookings/:bookingId
+// GET /api/v1/manual-bookings/:id
 func (h *TripSeatHandler) GetManualBooking(c *gin.Context) {
-	bookingID := c.Param("bookingId")
+	bookingID := c.Param("id")
 	if bookingID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Booking ID is required"})
 		return
@@ -442,9 +442,9 @@ func (h *TripSeatHandler) GetManualBookingByReference(c *gin.Context) {
 }
 
 // UpdateManualBookingPayment updates payment information for a booking
-// PUT /api/v1/manual-bookings/:bookingId/payment
+// PUT /api/v1/manual-bookings/:id/payment
 func (h *TripSeatHandler) UpdateManualBookingPayment(c *gin.Context) {
-	bookingID := c.Param("bookingId")
+	bookingID := c.Param("id")
 	if bookingID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Booking ID is required"})
 		return
@@ -472,9 +472,9 @@ func (h *TripSeatHandler) UpdateManualBookingPayment(c *gin.Context) {
 }
 
 // CancelManualBooking cancels a manual booking and releases the seats
-// DELETE /api/v1/manual-bookings/:bookingId
+// DELETE /api/v1/manual-bookings/:id
 func (h *TripSeatHandler) CancelManualBooking(c *gin.Context) {
-	bookingID := c.Param("bookingId")
+	bookingID := c.Param("id")
 	if bookingID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Booking ID is required"})
 		return
@@ -497,9 +497,9 @@ func (h *TripSeatHandler) CancelManualBooking(c *gin.Context) {
 }
 
 // UpdateManualBookingStatus updates the status of a manual booking
-// PUT /api/v1/manual-bookings/:bookingId/status
+// PUT /api/v1/manual-bookings/:id/status
 func (h *TripSeatHandler) UpdateManualBookingStatus(c *gin.Context) {
-	bookingID := c.Param("bookingId")
+	bookingID := c.Param("id")
 	if bookingID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Booking ID is required"})
 		return
