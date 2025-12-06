@@ -27,36 +27,36 @@ const (
 
 // TripSeat represents a seat for a specific scheduled trip
 type TripSeat struct {
-	ID               string              `json:"id" db:"id"`
-	ScheduledTripID  string              `json:"scheduled_trip_id" db:"scheduled_trip_id"`
-	SeatNumber       string              `json:"seat_number" db:"seat_number"`
-	SeatType         string              `json:"seat_type" db:"seat_type"` // standard, window, aisle, premium, accessible
-	RowNumber        int                 `json:"row_number" db:"row_number"`
-	Position         int                 `json:"position" db:"position"`
-	SeatPrice        float64             `json:"seat_price" db:"seat_price"`
-	Status           TripSeatStatus      `json:"status" db:"status"`
+	ID               string               `json:"id" db:"id"`
+	ScheduledTripID  string               `json:"scheduled_trip_id" db:"scheduled_trip_id"`
+	SeatNumber       string               `json:"seat_number" db:"seat_number"`
+	SeatType         string               `json:"seat_type" db:"seat_type"` // standard, window, aisle, premium, accessible
+	RowNumber        int                  `json:"row_number" db:"row_number"`
+	Position         int                  `json:"position" db:"position"`
+	SeatPrice        float64              `json:"seat_price" db:"seat_price"`
+	Status           TripSeatStatus       `json:"status" db:"status"`
 	BookingType      *TripSeatBookingType `json:"booking_type,omitempty" db:"booking_type"`
-	BusBookingSeatID *string             `json:"bus_booking_seat_id,omitempty" db:"bus_booking_seat_id"`
-	ManualBookingID  *string             `json:"manual_booking_id,omitempty" db:"manual_booking_id"`
-	BlockReason      *string             `json:"block_reason,omitempty" db:"block_reason"`
-	BlockedByUserID  *string             `json:"blocked_by_user_id,omitempty" db:"blocked_by_user_id"`
-	BlockedAt        *time.Time          `json:"blocked_at,omitempty" db:"blocked_at"`
-	CreatedAt        time.Time           `json:"created_at" db:"created_at"`
-	UpdatedAt        time.Time           `json:"updated_at" db:"updated_at"`
+	BusBookingSeatID *string              `json:"bus_booking_seat_id,omitempty" db:"bus_booking_seat_id"`
+	ManualBookingID  *string              `json:"manual_booking_id,omitempty" db:"manual_booking_id"`
+	BlockReason      *string              `json:"block_reason,omitempty" db:"block_reason"`
+	BlockedByUserID  *string              `json:"blocked_by_user_id,omitempty" db:"blocked_by_user_id"`
+	BlockedAt        *time.Time           `json:"blocked_at,omitempty" db:"blocked_at"`
+	CreatedAt        time.Time            `json:"created_at" db:"created_at"`
+	UpdatedAt        time.Time            `json:"updated_at" db:"updated_at"`
 }
 
 // TripSeatSummary provides a quick overview of seat availability for a trip
 type TripSeatSummary struct {
-	ScheduledTripID   string `json:"scheduled_trip_id" db:"scheduled_trip_id"`
-	TotalSeats        int    `json:"total_seats" db:"total_seats"`
-	AvailableSeats    int    `json:"available_seats" db:"available_seats"`
-	BookedSeats       int    `json:"booked_seats" db:"booked_seats"`
-	BlockedSeats      int    `json:"blocked_seats" db:"blocked_seats"`
-	ReservedSeats     int    `json:"reserved_seats" db:"reserved_seats"`
-	AppBookings       int    `json:"app_bookings" db:"app_bookings"`
-	PhoneBookings     int    `json:"phone_bookings" db:"phone_bookings"`
-	AgentBookings     int    `json:"agent_bookings" db:"agent_bookings"`
-	WalkInBookings    int    `json:"walk_in_bookings" db:"walk_in_bookings"`
+	ScheduledTripID string `json:"scheduled_trip_id" db:"scheduled_trip_id"`
+	TotalSeats      int    `json:"total_seats" db:"total_seats"`
+	AvailableSeats  int    `json:"available_seats" db:"available_seats"`
+	BookedSeats     int    `json:"booked_seats" db:"booked_seats"`
+	BlockedSeats    int    `json:"blocked_seats" db:"blocked_seats"`
+	ReservedSeats   int    `json:"reserved_seats" db:"reserved_seats"`
+	AppBookings     int    `json:"app_bookings" db:"app_bookings"`
+	PhoneBookings   int    `json:"phone_bookings" db:"phone_bookings"`
+	AgentBookings   int    `json:"agent_bookings" db:"agent_bookings"`
+	WalkInBookings  int    `json:"walk_in_bookings" db:"walk_in_bookings"`
 }
 
 // TripSeatWithBookingInfo includes booking details for display

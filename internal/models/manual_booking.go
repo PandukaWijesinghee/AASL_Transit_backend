@@ -73,12 +73,12 @@ type ManualSeatBooking struct {
 
 // ManualBookingSeat represents a seat in a manual booking
 type ManualBookingSeat struct {
-	ID              string  `json:"id" db:"id"`
-	ManualBookingID string  `json:"manual_booking_id" db:"manual_booking_id"`
-	TripSeatID      string  `json:"trip_seat_id" db:"trip_seat_id"`
-	SeatNumber      string  `json:"seat_number" db:"seat_number"`
-	SeatPrice       float64 `json:"seat_price" db:"seat_price"`
-	PassengerName   *string `json:"passenger_name,omitempty" db:"passenger_name"`
+	ID              string    `json:"id" db:"id"`
+	ManualBookingID string    `json:"manual_booking_id" db:"manual_booking_id"`
+	TripSeatID      string    `json:"trip_seat_id" db:"trip_seat_id"`
+	SeatNumber      string    `json:"seat_number" db:"seat_number"`
+	SeatPrice       float64   `json:"seat_price" db:"seat_price"`
+	PassengerName   *string   `json:"passenger_name,omitempty" db:"passenger_name"`
 	CreatedAt       time.Time `json:"created_at" db:"created_at"`
 }
 
@@ -132,7 +132,7 @@ func GenerateBookingReference(bookingType ManualBookingType, sequenceNum int) st
 	case ManualBookingTypeWalkIn:
 		prefix = "WI"
 	}
-	
+
 	datePart := time.Now().Format("20060102")
 	return fmt.Sprintf("%s-%s-%03d", prefix, datePart, sequenceNum)
 }

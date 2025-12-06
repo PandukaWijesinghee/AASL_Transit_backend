@@ -5309,12 +5309,12 @@ paths:
       summary: Get all seats for a scheduled trip
       description: |
         Returns all seats for a scheduled trip with booking information.
-        
+
         **Response includes:**
         - All seats with their current status (available, booked, blocked, reserved)
         - Booking info for booked seats (passenger name, phone, reference)
         - Summary of seat availability counts
-        
+
         **Business Context:**
         Bus owners use this to view the seat map and see which seats are available,
         booked via the app, or manually booked via phone/agent/walk-in.
@@ -5390,14 +5390,14 @@ paths:
       summary: Create trip seats from a seat layout template
       description: |
         Creates trip_seats records from a seat layout template.
-        
+
         **Business Context:**
         When a bus owner assigns a seat layout to a trip, this endpoint creates
         individual seat records that can be booked. Each seat gets:
         - Seat number, row, position from the template
         - Base fare from the request (can be adjusted later)
         - Status: 'available'
-        
+
         **Note:** If seats already exist for this trip, they will be deleted
         and recreated from the new layout.
       operationId: createTripSeats
@@ -5445,12 +5445,12 @@ paths:
       summary: Block one or more seats
       description: |
         Block seats to prevent them from being booked.
-        
+
         **Use Cases:**
         - Reserve seats for VIPs before publishing
         - Block damaged/broken seats
         - Hold seats temporarily for phone reservations
-        
+
         **Note:** Only available seats can be blocked.
       operationId: blockSeats
       tags:
@@ -5497,7 +5497,7 @@ paths:
       summary: Unblock one or more seats
       description: |
         Release blocked seats to make them available for booking again.
-        
+
         **Note:** Only blocked seats can be unblocked.
       operationId: unblockSeats
       tags:
@@ -5544,7 +5544,7 @@ paths:
       summary: Update prices for specific seats
       description: |
         Update the price for one or more seats.
-        
+
         **Use Cases:**
         - Premium pricing for window seats
         - Discounted pricing for less desirable seats
@@ -5631,17 +5631,17 @@ paths:
       summary: Create a manual booking (phone/agent/walk-in)
       description: |
         Create a booking for a passenger who is not using the app.
-        
+
         **Booking Types:**
         - `phone`: Phone reservation (passenger called to book)
         - `agent`: Agent booking (travel agent made the booking)
         - `walk_in`: Walk-in booking (passenger arrived in person)
-        
+
         **Booking Reference Format:**
         - Phone: `PH-YYYYMMDD-XXX` (e.g., PH-20251206-001)
         - Agent: `AG-YYYYMMDD-XXX` (e.g., AG-20251206-001)
         - Walk-in: `WI-YYYYMMDD-XXX` (e.g., WI-20251206-001)
-        
+
         **Payment Status:**
         - `pending`: Payment not yet received
         - `partial`: Partial payment received
@@ -5720,7 +5720,7 @@ paths:
       summary: Cancel a manual booking
       description: |
         Cancel a manual booking and release the seats.
-        
+
         **Note:** Seats are automatically made available again.
       operationId: cancelManualBooking
       tags:
@@ -5801,7 +5801,7 @@ paths:
       summary: Update payment information for a booking
       description: |
         Update the payment status and details for a manual booking.
-        
+
         **Payment Methods:**
         - `cash`: Cash payment
         - `card`: Card payment
@@ -5849,10 +5849,10 @@ paths:
       summary: Update booking status
       description: |
         Update the status of a manual booking (e.g., check-in, board).
-        
+
         **Status Flow:**
         `confirmed` → `checked_in` → `boarded` → `completed`
-        
+
         Or: `confirmed` → `no_show` (if passenger doesn't show up)
       operationId: updateManualBookingStatus
       tags:
@@ -7964,7 +7964,11 @@ components:
             type: string
             format: uuid
           description: "IDs of seats to block"
-          example: ["550e8400-e29b-41d4-a716-446655440000", "550e8400-e29b-41d4-a716-446655440001"]
+          example:
+            [
+              "550e8400-e29b-41d4-a716-446655440000",
+              "550e8400-e29b-41d4-a716-446655440001",
+            ]
         reason:
           type: string
           description: "Reason for blocking seats"
