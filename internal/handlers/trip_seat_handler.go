@@ -288,7 +288,7 @@ func (h *TripSeatHandler) CreateManualBooking(c *gin.Context) {
 		return
 	}
 
-	// Override tripId from URL
+	// Set tripId from URL (required field - validated above from URL param)
 	req.ScheduledTripID = tripID
 
 	// Verify seats belong to this trip and are available
