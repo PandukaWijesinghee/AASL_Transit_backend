@@ -90,7 +90,7 @@ type ManualBookingWithSeats struct {
 
 // CreateManualBookingRequest is the request to create a phone/agent booking
 type CreateManualBookingRequest struct {
-	ScheduledTripID   string   `json:"scheduled_trip_id" binding:"required"`
+	ScheduledTripID   string   `json:"scheduled_trip_id"` // Set from URL path, not required in body
 	BookingType       string   `json:"booking_type" binding:"required,oneof=phone agent walk_in"`
 	PassengerName     string   `json:"passenger_name" binding:"required"`
 	PassengerPhone    *string  `json:"passenger_phone,omitempty"`
