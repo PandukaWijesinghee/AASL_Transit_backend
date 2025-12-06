@@ -268,6 +268,19 @@ func main() {
 	searchHandler := handlers.NewSearchHandler(searchService, logger)
 	logger.Info("✓ Search system initialized")
 
+	// Initialize Trip Seat and Manual Booking system
+	logger.Info("Initializing trip seat and manual booking system...")
+	tripSeatRepo := database.NewTripSeatRepository(sqlxDB.DB)
+	manualBookingRepo := database.NewManualBookingRepository(sqlxDB.DB)
+	tripSeatHandler := handlers.NewTripSeatHandler(
+		tripSeatRepo,
+		manualBookingRepo,
+		scheduledTripRepo,
+		ownerRepository,
+		busOwnerRouteRepo,
+	)
+	logger.Info("✓ Trip seat and manual booking system initialized")
+
 	// Initialize Gin router
 	router := gin.New()
 
@@ -581,7 +594,43 @@ func main() {
 			scheduledTrips.PATCH("/:id/assign", scheduledTripHandler.AssignStaffAndPermit)
 			// NEW: Assign seat layout
 			scheduledTrips.PATCH("/:id/assign-seat-layout", scheduledTripHandler.AssignSeatLayout)
+
+			// ============================================================================
+			// TRIP SEATS ROUTES (Seat management for scheduled trips)
+			// ============================================================================
+			scheduledTrips.GET("/:id/seats", tripSeatHandler.GetTripSeats)
+			scheduledTrips.GET("/:id/seats/summary", tripSeatHandler.GetTripSeatSummary)
+			scheduledTrips.POST("/:id/seats/create", tripSeatHandler.CreateTripSeats)
+			scheduledTrips.POST("/:id/seats/block", tripSeatHandler.BlockSeats)
+			scheduledTrips.POST("/:id/seats/unblock", tripSeatHandler.UnblockSeats)
+			scheduledTrips.PUT("/:id/seats/price", tripSeatHandler.UpdateSeatPrices)
+
+			// ============================================================================
+			// MANUAL BOOKINGS ROUTES (Phone/Agent/Walk-in bookings)
+			// ============================================================================
+			scheduledTrips.GET("/:id/manual-bookings", tripSeatHandler.GetManualBookings)
+			scheduledTrips.POST("/:id/manual-bookings", tripSeatHandler.CreateManualBooking)
 		}
+
+		// Manual Bookings standalone routes (for operations on existing bookings)
+		logger.Info("📋 Registering Manual Booking routes...")
+		manualBookings := v1.Group("/manual-bookings")
+		manualBookings.Use(middleware.AuthMiddleware(jwtService))
+		{
+			logger.Info("  ✅ GET /api/v1/manual-bookings/:id")
+			manualBookings.GET("/:id", tripSeatHandler.GetManualBooking)
+			logger.Info("  ✅ GET /api/v1/manual-bookings/reference/:ref")
+			manualBookings.GET("/reference/:ref", tripSeatHandler.GetManualBookingByReference)
+			logger.Info("  ✅ PUT /api/v1/manual-bookings/:id/payment")
+			manualBookings.PUT("/:id/payment", tripSeatHandler.UpdateManualBookingPayment)
+			logger.Info("  ✅ PUT /api/v1/manual-bookings/:id/status")
+			manualBookings.PUT("/:id/status", tripSeatHandler.UpdateManualBookingStatus)
+			logger.Info("  ✅ DELETE /api/v1/manual-bookings/:id")
+			manualBookings.DELETE("/:id", tripSeatHandler.CancelManualBooking)
+			logger.Info("  ✅ GET /api/v1/manual-bookings/search")
+			manualBookings.GET("/search", tripSeatHandler.SearchManualBookingsByPhone)
+		}
+		logger.Info("📋 Manual Booking routes registered successfully")
 
 		// Permit-specific trip routes
 		permits.GET("/:id/trip-schedules", tripScheduleHandler.GetSchedulesByPermit)

@@ -103,6 +103,10 @@ tags:
     description: Trip schedule template management
   - name: Scheduled Trips
     description: Generated trip instances and bookings
+  - name: Trip Seats
+    description: Trip seat management (create from layout, block/unblock, pricing)
+  - name: Manual Bookings
+    description: Phone, agent, and walk-in booking management for bus owners
   - name: Search
     description: Trip search and discovery endpoints (Phase 1 MVP)
 
@@ -5298,6 +5302,638 @@ paths:
           $ref: "#/components/responses/InternalServerError"
 
   # ============================================================================
+  # TRIP SEATS ENDPOINTS (Seat Management for Scheduled Trips)
+  # ============================================================================
+  /api/v1/scheduled-trips/{id}/seats:
+    get:
+      summary: Get all seats for a scheduled trip
+      description: |
+        Returns all seats for a scheduled trip with booking information.
+        
+        **Response includes:**
+        - All seats with their current status (available, booked, blocked, reserved)
+        - Booking info for booked seats (passenger name, phone, reference)
+        - Summary of seat availability counts
+        
+        **Business Context:**
+        Bus owners use this to view the seat map and see which seats are available,
+        booked via the app, or manually booked via phone/agent/walk-in.
+      operationId: getTripSeats
+      tags:
+        - Trip Seats
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the scheduled trip
+      responses:
+        "200":
+          description: Seats retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  seats:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TripSeatWithBookingInfo"
+                  summary:
+                    $ref: "#/components/schemas/TripSeatSummary"
+        "400":
+          description: Trip ID is required
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/scheduled-trips/{id}/seats/summary:
+    get:
+      summary: Get seat availability summary for a trip
+      description: |
+        Returns a summary of seat availability counts without full seat details.
+        Useful for quick availability checks in list views.
+      operationId: getTripSeatSummary
+      tags:
+        - Trip Seats
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the scheduled trip
+      responses:
+        "200":
+          description: Summary retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TripSeatSummary"
+        "400":
+          description: Trip ID is required
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/scheduled-trips/{id}/seats/create:
+    post:
+      summary: Create trip seats from a seat layout template
+      description: |
+        Creates trip_seats records from a seat layout template.
+        
+        **Business Context:**
+        When a bus owner assigns a seat layout to a trip, this endpoint creates
+        individual seat records that can be booked. Each seat gets:
+        - Seat number, row, position from the template
+        - Base fare from the request (can be adjusted later)
+        - Status: 'available'
+        
+        **Note:** If seats already exist for this trip, they will be deleted
+        and recreated from the new layout.
+      operationId: createTripSeats
+      tags:
+        - Trip Seats
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the scheduled trip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTripSeatsRequest"
+      responses:
+        "201":
+          description: Seats created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Trip seats created successfully"
+                  seats_count:
+                    type: integer
+                    example: 49
+        "400":
+          description: Invalid request
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/scheduled-trips/{id}/seats/block:
+    post:
+      summary: Block one or more seats
+      description: |
+        Block seats to prevent them from being booked.
+        
+        **Use Cases:**
+        - Reserve seats for VIPs before publishing
+        - Block damaged/broken seats
+        - Hold seats temporarily for phone reservations
+        
+        **Note:** Only available seats can be blocked.
+      operationId: blockSeats
+      tags:
+        - Trip Seats
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the scheduled trip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlockSeatsRequest"
+      responses:
+        "200":
+          description: Seats blocked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Seats blocked successfully"
+                  blocked_count:
+                    type: integer
+                    example: 2
+        "400":
+          description: Invalid seat IDs or seats not available
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/scheduled-trips/{id}/seats/unblock:
+    post:
+      summary: Unblock one or more seats
+      description: |
+        Release blocked seats to make them available for booking again.
+        
+        **Note:** Only blocked seats can be unblocked.
+      operationId: unblockSeats
+      tags:
+        - Trip Seats
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the scheduled trip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnblockSeatsRequest"
+      responses:
+        "200":
+          description: Seats unblocked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Seats unblocked successfully"
+                  unblocked_count:
+                    type: integer
+                    example: 2
+        "400":
+          description: Invalid seat IDs or seats not blocked
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/scheduled-trips/{id}/seats/price:
+    put:
+      summary: Update prices for specific seats
+      description: |
+        Update the price for one or more seats.
+        
+        **Use Cases:**
+        - Premium pricing for window seats
+        - Discounted pricing for less desirable seats
+        - Dynamic pricing based on demand
+      operationId: updateSeatPrices
+      tags:
+        - Trip Seats
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the scheduled trip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSeatPriceRequest"
+      responses:
+        "200":
+          description: Prices updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Seat prices updated successfully"
+                  updated_count:
+                    type: integer
+                    example: 4
+        "400":
+          description: Invalid seat IDs
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================================
+  # MANUAL BOOKINGS ENDPOINTS (Phone/Agent/Walk-in Bookings)
+  # ============================================================================
+  /api/v1/scheduled-trips/{id}/manual-bookings:
+    get:
+      summary: List all manual bookings for a trip
+      description: |
+        Returns all manual (phone/agent/walk-in) bookings for a scheduled trip.
+        Includes seat details for each booking.
+      operationId: getManualBookings
+      tags:
+        - Manual Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the scheduled trip
+      responses:
+        "200":
+          description: Bookings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ManualBookingWithSeats"
+        "400":
+          description: Trip ID is required
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      summary: Create a manual booking (phone/agent/walk-in)
+      description: |
+        Create a booking for a passenger who is not using the app.
+        
+        **Booking Types:**
+        - `phone`: Phone reservation (passenger called to book)
+        - `agent`: Agent booking (travel agent made the booking)
+        - `walk_in`: Walk-in booking (passenger arrived in person)
+        
+        **Booking Reference Format:**
+        - Phone: `PH-YYYYMMDD-XXX` (e.g., PH-20251206-001)
+        - Agent: `AG-YYYYMMDD-XXX` (e.g., AG-20251206-001)
+        - Walk-in: `WI-YYYYMMDD-XXX` (e.g., WI-20251206-001)
+        
+        **Payment Status:**
+        - `pending`: Payment not yet received
+        - `partial`: Partial payment received
+        - `paid`: Fully paid
+        - `collect_on_bus`: Payment to be collected by conductor
+        - `free`: Complimentary booking
+      operationId: createManualBooking
+      tags:
+        - Manual Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the scheduled trip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateManualBookingRequest"
+      responses:
+        "201":
+          description: Booking created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManualBookingWithSeats"
+        "400":
+          description: |
+            Invalid request:
+            - Seats not found
+            - Seats not available
+            - Seats don't belong to this trip
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/manual-bookings/{id}:
+    get:
+      summary: Get a manual booking by ID
+      description: Returns a single manual booking with seat details.
+      operationId: getManualBooking
+      tags:
+        - Manual Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the manual booking
+      responses:
+        "200":
+          description: Booking retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManualBookingWithSeats"
+        "404":
+          description: Booking not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      summary: Cancel a manual booking
+      description: |
+        Cancel a manual booking and release the seats.
+        
+        **Note:** Seats are automatically made available again.
+      operationId: cancelManualBooking
+      tags:
+        - Manual Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the manual booking
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Reason for cancellation
+                  example: "Passenger no-show"
+      responses:
+        "200":
+          description: Booking cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Booking cancelled successfully"
+        "404":
+          description: Booking not found or already cancelled
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/manual-bookings/reference/{ref}:
+    get:
+      summary: Get a manual booking by reference number
+      description: |
+        Look up a booking by its reference number (e.g., PH-20251206-001).
+        Useful for quick lookup when passenger provides their booking reference.
+      operationId: getManualBookingByReference
+      tags:
+        - Manual Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ref
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Booking reference (e.g., PH-20251206-001)
+          example: "PH-20251206-001"
+      responses:
+        "200":
+          description: Booking retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManualBookingWithSeats"
+        "404":
+          description: Booking not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/manual-bookings/{id}/payment:
+    put:
+      summary: Update payment information for a booking
+      description: |
+        Update the payment status and details for a manual booking.
+        
+        **Payment Methods:**
+        - `cash`: Cash payment
+        - `card`: Card payment
+        - `bank_transfer`: Bank transfer
+        - `online`: Online payment
+      operationId: updateManualBookingPayment
+      tags:
+        - Manual Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the manual booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateManualBookingPaymentRequest"
+      responses:
+        "200":
+          description: Payment updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Payment updated successfully"
+        "400":
+          description: Invalid request
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/manual-bookings/{id}/status:
+    put:
+      summary: Update booking status
+      description: |
+        Update the status of a manual booking (e.g., check-in, board).
+        
+        **Status Flow:**
+        `confirmed` → `checked_in` → `boarded` → `completed`
+        
+        Or: `confirmed` → `no_show` (if passenger doesn't show up)
+      operationId: updateManualBookingStatus
+      tags:
+        - Manual Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the manual booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [confirmed, checked_in, boarded, completed, no_show]
+                  example: "checked_in"
+      responses:
+        "200":
+          description: Status updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Status updated successfully"
+        "400":
+          description: Invalid status
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/manual-bookings/search:
+    get:
+      summary: Search manual bookings by passenger phone
+      description: |
+        Search for manual bookings by passenger phone number.
+        Returns all bookings (active and past) for the given phone.
+      operationId: searchManualBookingsByPhone
+      tags:
+        - Manual Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: phone
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Passenger phone number
+          example: "0771234567"
+      responses:
+        "200":
+          description: Bookings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ManualSeatBooking"
+        "400":
+          description: Phone number is required
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================================
   # SEARCH ENDPOINTS (Phase 1 MVP - Trip Discovery)
   # ============================================================================
   /api/v1/search:
@@ -7165,6 +7801,445 @@ components:
           type: integer
           example: 25
           description: "Number of routes serving this stop"
+
+    # ==========================================================================
+    # TRIP SEATS SCHEMAS
+    # ==========================================================================
+    TripSeat:
+      type: object
+      description: Individual seat in a scheduled trip
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        scheduled_trip_id:
+          type: string
+          format: uuid
+          example: "660e8400-e29b-41d4-a716-446655440001"
+        seat_number:
+          type: string
+          example: "A1W"
+        seat_type:
+          type: string
+          enum: [standard, window, aisle, premium, accessible]
+          example: "window"
+        row_number:
+          type: integer
+          example: 1
+        position:
+          type: integer
+          example: 1
+        seat_price:
+          type: number
+          format: double
+          example: 350.00
+        status:
+          type: string
+          enum: [available, reserved, booked, blocked]
+          example: "available"
+        booking_type:
+          type: string
+          nullable: true
+          enum: [app, phone, agent, walk_in, blocked]
+          example: "phone"
+        bus_booking_seat_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: "Reference to app booking seat (if booked via app)"
+        manual_booking_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: "Reference to manual booking (if booked via phone/agent/walk-in)"
+        block_reason:
+          type: string
+          nullable: true
+          example: "Reserved for VIP"
+        blocked_by_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        blocked_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TripSeatWithBookingInfo:
+      type: object
+      description: Trip seat with booking information for display
+      allOf:
+        - $ref: "#/components/schemas/TripSeat"
+        - type: object
+          properties:
+            passenger_name:
+              type: string
+              nullable: true
+              example: "John Perera"
+            passenger_phone:
+              type: string
+              nullable: true
+              example: "0771234567"
+            booking_reference:
+              type: string
+              nullable: true
+              example: "PH-20251206-001"
+            payment_status:
+              type: string
+              nullable: true
+              enum: [pending, partial, paid, collect_on_bus, free]
+              example: "paid"
+
+    TripSeatSummary:
+      type: object
+      description: Summary of seat availability for a trip
+      properties:
+        scheduled_trip_id:
+          type: string
+          format: uuid
+        total_seats:
+          type: integer
+          example: 49
+        available_seats:
+          type: integer
+          example: 35
+        booked_seats:
+          type: integer
+          example: 10
+        blocked_seats:
+          type: integer
+          example: 2
+        reserved_seats:
+          type: integer
+          example: 2
+        app_bookings:
+          type: integer
+          example: 5
+          description: "Seats booked via mobile app"
+        phone_bookings:
+          type: integer
+          example: 3
+          description: "Seats booked via phone call"
+        agent_bookings:
+          type: integer
+          example: 1
+          description: "Seats booked via travel agent"
+        walk_in_bookings:
+          type: integer
+          example: 1
+          description: "Seats booked via walk-in"
+
+    CreateTripSeatsRequest:
+      type: object
+      required:
+        - seat_layout_id
+        - base_fare
+      properties:
+        seat_layout_id:
+          type: string
+          format: uuid
+          description: "ID of the seat layout template to use"
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        base_fare:
+          type: number
+          format: double
+          description: "Base fare for all seats"
+          example: 350.00
+
+    BlockSeatsRequest:
+      type: object
+      required:
+        - seat_ids
+      properties:
+        seat_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: "IDs of seats to block"
+          example: ["550e8400-e29b-41d4-a716-446655440000", "550e8400-e29b-41d4-a716-446655440001"]
+        reason:
+          type: string
+          description: "Reason for blocking seats"
+          example: "Reserved for VIP"
+
+    UnblockSeatsRequest:
+      type: object
+      required:
+        - seat_ids
+      properties:
+        seat_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: "IDs of seats to unblock"
+          example: ["550e8400-e29b-41d4-a716-446655440000"]
+
+    UpdateSeatPriceRequest:
+      type: object
+      required:
+        - seat_ids
+        - new_price
+      properties:
+        seat_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: "IDs of seats to update"
+        new_price:
+          type: number
+          format: double
+          description: "New price for the seats"
+          example: 400.00
+
+    # ==========================================================================
+    # MANUAL BOOKINGS SCHEMAS
+    # ==========================================================================
+    ManualSeatBooking:
+      type: object
+      description: Manual booking created by bus owner (phone/agent/walk-in)
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        booking_reference:
+          type: string
+          example: "PH-20251206-001"
+          description: "Format: {TYPE}-{DATE}-{SEQ} where TYPE is PH (phone), AG (agent), or WI (walk-in)"
+        scheduled_trip_id:
+          type: string
+          format: uuid
+        created_by_user_id:
+          type: string
+          format: uuid
+          description: "ID of the user (bus owner) who created the booking"
+        booking_type:
+          type: string
+          enum: [phone, agent, walk_in]
+          example: "phone"
+        passenger_name:
+          type: string
+          example: "John Perera"
+        passenger_phone:
+          type: string
+          nullable: true
+          example: "0771234567"
+        passenger_nic:
+          type: string
+          nullable: true
+          example: "199512345678"
+        passenger_notes:
+          type: string
+          nullable: true
+          example: "Regular customer"
+        route_name:
+          type: string
+          example: "Colombo - Kandy"
+        boarding_stop_id:
+          type: string
+          format: uuid
+          nullable: true
+        boarding_stop_name:
+          type: string
+          example: "Colombo Fort"
+        alighting_stop_id:
+          type: string
+          format: uuid
+          nullable: true
+        alighting_stop_name:
+          type: string
+          example: "Kandy Town"
+        departure_datetime:
+          type: string
+          format: date-time
+        number_of_seats:
+          type: integer
+          example: 2
+        total_fare:
+          type: number
+          format: double
+          example: 700.00
+        payment_status:
+          type: string
+          enum: [pending, partial, paid, collect_on_bus, free]
+          example: "paid"
+        amount_paid:
+          type: number
+          format: double
+          example: 700.00
+        payment_method:
+          type: string
+          nullable: true
+          example: "cash"
+        payment_notes:
+          type: string
+          nullable: true
+          example: "Paid in full"
+        status:
+          type: string
+          enum: [confirmed, checked_in, boarded, completed, cancelled, no_show]
+          example: "confirmed"
+        confirmed_at:
+          type: string
+          format: date-time
+        checked_in_at:
+          type: string
+          format: date-time
+          nullable: true
+        boarded_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+        cancellation_reason:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ManualBookingSeat:
+      type: object
+      description: Seat assigned to a manual booking
+      properties:
+        id:
+          type: string
+          format: uuid
+        manual_booking_id:
+          type: string
+          format: uuid
+        trip_seat_id:
+          type: string
+          format: uuid
+        seat_number:
+          type: string
+          example: "A1W"
+        seat_price:
+          type: number
+          format: double
+          example: 350.00
+        passenger_name:
+          type: string
+          nullable: true
+          example: "John Perera"
+          description: "Optional per-seat passenger name"
+        created_at:
+          type: string
+          format: date-time
+
+    ManualBookingWithSeats:
+      type: object
+      description: Manual booking with seat details
+      allOf:
+        - $ref: "#/components/schemas/ManualSeatBooking"
+        - type: object
+          properties:
+            seats:
+              type: array
+              items:
+                $ref: "#/components/schemas/ManualBookingSeat"
+
+    CreateManualBookingRequest:
+      type: object
+      required:
+        - booking_type
+        - passenger_name
+        - boarding_stop_name
+        - alighting_stop_name
+        - seat_ids
+        - payment_status
+      properties:
+        booking_type:
+          type: string
+          enum: [phone, agent, walk_in]
+          example: "phone"
+        passenger_name:
+          type: string
+          example: "John Perera"
+        passenger_phone:
+          type: string
+          example: "0771234567"
+        passenger_nic:
+          type: string
+          example: "199512345678"
+        passenger_notes:
+          type: string
+          example: "Regular customer, prefers window seat"
+        boarding_stop_id:
+          type: string
+          format: uuid
+          description: "Optional stop ID for analytics"
+        boarding_stop_name:
+          type: string
+          example: "Colombo Fort"
+        alighting_stop_id:
+          type: string
+          format: uuid
+        alighting_stop_name:
+          type: string
+          example: "Kandy Town"
+        seat_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: "IDs of trip_seats to book"
+        payment_status:
+          type: string
+          enum: [pending, partial, paid, collect_on_bus, free]
+          example: "collect_on_bus"
+        amount_paid:
+          type: number
+          format: double
+          default: 0
+          example: 0
+        payment_method:
+          type: string
+          example: "cash"
+        payment_notes:
+          type: string
+          example: "Will pay on bus"
+
+    UpdateManualBookingPaymentRequest:
+      type: object
+      required:
+        - payment_status
+        - amount_paid
+      properties:
+        payment_status:
+          type: string
+          enum: [pending, partial, paid, collect_on_bus, free]
+          example: "paid"
+        amount_paid:
+          type: number
+          format: double
+          example: 700.00
+        payment_method:
+          type: string
+          example: "cash"
+        payment_notes:
+          type: string
+          example: "Paid in full at counter"
 
   responses:
     BadRequest:
