@@ -66,10 +66,10 @@ type ManualSeatBooking struct {
 	CancellationReason *string                    `json:"cancellation_reason,omitempty" db:"cancellation_reason"`
 	CreatedAt          time.Time                  `json:"created_at" db:"created_at"`
 	UpdatedAt          time.Time                  `json:"updated_at" db:"updated_at"`
-	// Populated from joins (not stored in DB)
-	RouteName         string `json:"route_name,omitempty" db:"-"`
-	BoardingStopName  string `json:"boarding_stop_name,omitempty" db:"-"`
-	AlightingStopName string `json:"alighting_stop_name,omitempty" db:"-"`
+	// Populated from joins (not stored in DB, but scanned from query results)
+	RouteName         string `json:"route_name,omitempty" db:"route_name"`
+	BoardingStopName  string `json:"boarding_stop_name,omitempty" db:"boarding_stop_name"`
+	AlightingStopName string `json:"alighting_stop_name,omitempty" db:"alighting_stop_name"`
 }
 
 // ManualBookingSeat represents a seat in a manual booking
