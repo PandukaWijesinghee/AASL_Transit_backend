@@ -138,14 +138,15 @@ func (h *AppBookingHandler) CreateBooking(c *gin.Context) {
 	}
 
 	// Build master booking
+	// Default to collect_on_bus since there's no online payment integration yet
 	booking := &models.MasterBooking{
 		UserID:         userCtx.UserID.String(),
 		BookingType:    models.BookingTypeBusOnly,
 		BusTotal:       totalFare,
 		Subtotal:       totalFare,
 		TotalAmount:    totalFare,
-		PaymentStatus:  models.MasterPaymentPending,
-		BookingStatus:  models.MasterBookingPending,
+		PaymentStatus:  models.MasterPaymentCollectOnBus,
+		BookingStatus:  models.MasterBookingConfirmed,
 		PassengerName:  req.PassengerName,
 		PassengerPhone: req.PassengerPhone,
 		PassengerEmail: req.PassengerEmail,

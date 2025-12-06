@@ -27,6 +27,8 @@ const (
 	MasterPaymentPending       MasterPaymentStatus = "pending"
 	MasterPaymentPartial       MasterPaymentStatus = "partial"
 	MasterPaymentPaid          MasterPaymentStatus = "paid"
+	MasterPaymentCollectOnBus  MasterPaymentStatus = "collect_on_bus"
+	MasterPaymentFree          MasterPaymentStatus = "free"
 	MasterPaymentFailed        MasterPaymentStatus = "failed"
 	MasterPaymentRefunded      MasterPaymentStatus = "refunded"
 	MasterPaymentPartialRefund MasterPaymentStatus = "partial_refund"
