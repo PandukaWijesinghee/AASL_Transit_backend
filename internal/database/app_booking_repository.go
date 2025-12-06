@@ -3,6 +3,7 @@ package database
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -111,6 +112,16 @@ func (r *AppBookingRepository) CreateBooking(
 	booking.BookingReference = bookingRef
 
 	// 2. Insert master booking
+	// Handle device_info JSON serialization
+	var deviceInfoJSON interface{}
+	if booking.DeviceInfo != nil && len(booking.DeviceInfo) > 0 {
+		jsonBytes, err := json.Marshal(booking.DeviceInfo)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize device_info: %w", err)
+		}
+		deviceInfoJSON = string(jsonBytes)
+	}
+
 	bookingQuery := `
 		INSERT INTO bookings (
 			booking_reference, user_id, booking_type,
@@ -132,7 +143,7 @@ func (r *AppBookingRepository) CreateBooking(
 		booking.PromoCode, booking.PromoDiscountType, booking.PromoDiscountValue,
 		booking.PaymentStatus, booking.PaymentMethod, booking.BookingStatus,
 		booking.PassengerName, booking.PassengerPhone, booking.PassengerEmail,
-		booking.BookingSource, booking.DeviceInfo, booking.Notes,
+		booking.BookingSource, deviceInfoJSON, booking.Notes,
 	).Scan(&booking.ID, &booking.CreatedAt, &booking.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create booking: %w", err)
