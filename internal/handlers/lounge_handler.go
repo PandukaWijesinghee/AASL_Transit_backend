@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -626,8 +627,34 @@ func (h *LoungeHandler) DeleteLounge(c *gin.Context) {
 // ===================================================================
 
 // GetAllActiveLounges handles GET /api/v1/lounges/active
+// Query params: state (string), limit (int)
+// @Summary Get all active lounges
+// @Description Retrieves all active lounges with optional state filter and limit
+// @Tags Lounges
+// @Produce json
+// @Param state query string false "Filter by state/province"
+// @Param limit query int false "Maximum number of lounges to return (random order)"
+// @Success 200 {object} map[string]interface{}
+// @Router /lounges/active [get]
 func (h *LoungeHandler) GetAllActiveLounges(c *gin.Context) {
-	lounges, err := h.loungeRepo.GetAllActiveLounges()
+	// Parse query params
+	state := c.Query("state")
+	var limit int
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	// Use search method if params provided, otherwise get all
+	var lounges []models.Lounge
+	var err error
+	if state != "" || limit > 0 {
+		lounges, err = h.loungeRepo.SearchActiveLounges(state, limit)
+	} else {
+		lounges, err = h.loungeRepo.GetAllActiveLounges()
+	}
+
 	if err != nil {
 		log.Printf("ERROR: Failed to get active lounges: %v", err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -673,11 +700,36 @@ func (h *LoungeHandler) GetAllActiveLounges(c *gin.Context) {
 			"images":          images,
 			"routes":          loungeRoutes,
 			"average_rating":  lounge.AverageRating,
+			"state":           lounge.State.String,
 		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"lounges": response,
 		"total":   len(response),
+	})
+}
+
+// GetDistinctStates handles GET /api/v1/lounges/states
+// @Summary Get all distinct states with active lounges
+// @Description Returns a list of states/provinces that have active lounges
+// @Tags Lounges
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /lounges/states [get]
+func (h *LoungeHandler) GetDistinctStates(c *gin.Context) {
+	states, err := h.loungeRepo.GetDistinctStates()
+	if err != nil {
+		log.Printf("ERROR: Failed to get distinct states: %v", err)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "database_error",
+			Message: "Failed to retrieve states",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"states": states,
+		"total":  len(states),
 	})
 }

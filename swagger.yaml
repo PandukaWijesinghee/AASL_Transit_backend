@@ -3572,10 +3572,36 @@ paths:
   /api/v1/lounges/active:
     get:
       summary: Get all active lounges (Public)
-      description: Retrieve all active and operational lounges - no authentication required
+      description: |
+        Retrieve all active and operational lounges - no authentication required.
+        
+        **Query Parameters:**
+        - `state`: Filter lounges by state/province (case-insensitive)
+        - `limit`: Limit number of results (uses random ordering when specified)
+        
+        **Default Behavior:**
+        - Without parameters: Returns all active lounges ordered by name
+        - With `limit=5`: Returns 5 random lounges (for initial app load)
+        - With `state=Western`: Returns all lounges in Western Province
       operationId: getAllActiveLounges
       tags:
-        - Lounge
+        - Lounge Marketplace
+      parameters:
+        - name: state
+          in: query
+          required: false
+          description: Filter by state/province (case-insensitive)
+          schema:
+            type: string
+            example: "Western"
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of lounges to return (uses random ordering)
+          schema:
+            type: integer
+            minimum: 1
+            example: 5
       responses:
         "200":
           description: Active lounges retrieved
@@ -3590,7 +3616,38 @@ paths:
                       $ref: "#/components/schemas/Lounge"
                   total:
                     type: integer
-                    description: Total number of active lounges
+                    description: Total number of lounges returned
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounges/states:
+    get:
+      summary: Get all states with active lounges (Public)
+      description: |
+        Returns a list of distinct states/provinces that have active lounges.
+        Used for populating state filter dropdowns in the passenger app.
+        No authentication required.
+      operationId: getDistinctStates
+      tags:
+        - Lounge Marketplace
+      responses:
+        "200":
+          description: States retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  states:
+                    type: array
+                    items:
+                      type: string
+                    example: ["Central", "Eastern", "Northern", "Southern", "Western"]
+                    description: List of state names with active lounges
+                  total:
+                    type: integer
+                    description: Number of states
+                    example: 5
         "500":
           $ref: "#/components/responses/InternalServerError"
 

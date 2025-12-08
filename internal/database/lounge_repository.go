@@ -129,6 +129,51 @@ func (r *LoungeRepository) GetAllActiveLounges() ([]models.Lounge, error) {
 	return lounges, nil
 }
 
+// SearchActiveLounges retrieves active lounges with optional state filter and limit
+func (r *LoungeRepository) SearchActiveLounges(state string, limit int) ([]models.Lounge, error) {
+	var lounges []models.Lounge
+	var args []interface{}
+	argNum := 1
+
+	query := `SELECT * FROM lounges WHERE status = 'active' AND is_operational = true`
+
+	if state != "" {
+		query += fmt.Sprintf(" AND LOWER(state) = LOWER($%d)", argNum)
+		args = append(args, state)
+		argNum++
+	}
+
+	// Add random ordering when limit is specified, otherwise order by name
+	if limit > 0 {
+		query += " ORDER BY RANDOM()"
+		query += fmt.Sprintf(" LIMIT $%d", argNum)
+		args = append(args, limit)
+	} else {
+		query += " ORDER BY lounge_name"
+	}
+
+	err := r.db.Select(&lounges, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search active lounges: %w", err)
+	}
+	return lounges, nil
+}
+
+// GetDistinctStates retrieves all distinct states from active lounges
+func (r *LoungeRepository) GetDistinctStates() ([]string, error) {
+	var states []string
+	query := `
+		SELECT DISTINCT state FROM lounges 
+		WHERE status = 'active' AND is_operational = true AND state IS NOT NULL AND state != ''
+		ORDER BY state
+	`
+	err := r.db.Select(&states, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get distinct states: %w", err)
+	}
+	return states, nil
+}
+
 // UpdateLounge updates lounge information
 func (r *LoungeRepository) UpdateLounge(
 	id uuid.UUID,
