@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -16,16 +17,19 @@ import (
 type LoungeHandler struct {
 	loungeRepo      *database.LoungeRepository
 	loungeOwnerRepo *database.LoungeOwnerRepository
+	loungeRouteRepo *database.LoungeRouteRepository
 }
 
 // NewLoungeHandler creates a new lounge handler
 func NewLoungeHandler(
 	loungeRepo *database.LoungeRepository,
 	loungeOwnerRepo *database.LoungeOwnerRepository,
+	loungeRouteRepo *database.LoungeRouteRepository,
 ) *LoungeHandler {
 	return &LoungeHandler{
 		loungeRepo:      loungeRepo,
 		loungeOwnerRepo: loungeOwnerRepo,
+		loungeRouteRepo: loungeRouteRepo,
 	}
 }
 
@@ -47,6 +51,8 @@ type AddLoungeRequest struct {
 	PriceUntilBus *string  `json:"price_until_bus"`              // DECIMAL as string (e.g., "1500.00")
 	Amenities     []string `json:"amenities"`                    // Array: ["wifi", "ac", "cafeteria", "charging_ports", "entertainment", "parking", "restrooms", "waiting_area"]
 	Images        []string `json:"images"`                       // Array of image URLs
+	// Routes that the lounge serves (array of route-stop combinations)
+	Routes []models.LoungeRouteRequest `json:"routes" binding:"required,min=1"` // At least one route required
 }
 
 // AddLounge handles POST /api/v1/lounge-owner/register/add-lounge
@@ -71,8 +77,33 @@ func (h *LoungeHandler) AddLounge(c *gin.Context) {
 		return
 	}
 
-	log.Printf("INFO: Add lounge request received - User: %s, Lounge: %s, Capacity: %v, Photos: %d",
-		userCtx.UserID, req.LoungeName, req.Capacity, len(req.Images))
+	log.Printf("INFO: Add lounge request received - User: %s, Lounge: %s, Capacity: %v, Photos: %d, Routes: %d",
+		userCtx.UserID, req.LoungeName, req.Capacity, len(req.Images), len(req.Routes))
+
+	// Validate all route UUIDs
+	for i, routeReq := range req.Routes {
+		if _, err := uuid.Parse(routeReq.MasterRouteID); err != nil {
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "validation_error",
+				Message: fmt.Sprintf("Invalid master_route_id format for route %d", i+1),
+			})
+			return
+		}
+		if _, err := uuid.Parse(routeReq.StopBeforeID); err != nil {
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "validation_error",
+				Message: fmt.Sprintf("Invalid stop_before_id format for route %d", i+1),
+			})
+			return
+		}
+		if _, err := uuid.Parse(routeReq.StopAfterID); err != nil {
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "validation_error",
+				Message: fmt.Sprintf("Invalid stop_after_id format for route %d", i+1),
+			})
+			return
+		}
+	}
 
 	// Get lounge owner record
 	owner, err := h.loungeOwnerRepo.GetLoungeOwnerByUserID(userCtx.UserID)
@@ -110,7 +141,7 @@ func (h *LoungeHandler) AddLounge(c *gin.Context) {
 	amenitiesJSON, _ := json.Marshal(req.Amenities)
 	imagesJSON, _ := json.Marshal(req.Images)
 
-	// Create lounge
+	// Create lounge (without route info)
 	lounge, err := h.loungeRepo.CreateLounge(
 		owner.ID,
 		req.LoungeName,
@@ -133,6 +164,31 @@ func (h *LoungeHandler) AddLounge(c *gin.Context) {
 			Message: "Failed to create lounge: " + err.Error(),
 		})
 		return
+	}
+
+	// Create lounge routes
+	for i, routeReq := range req.Routes {
+		masterRouteID, _ := uuid.Parse(routeReq.MasterRouteID)
+		stopBeforeID, _ := uuid.Parse(routeReq.StopBeforeID)
+		stopAfterID, _ := uuid.Parse(routeReq.StopAfterID)
+
+		loungeRoute := &models.LoungeRoute{
+			ID:            uuid.New(),
+			LoungeID:      lounge.ID,
+			MasterRouteID: masterRouteID,
+			StopBeforeID:  stopBeforeID,
+			StopAfterID:   stopAfterID,
+		}
+
+		if err := h.loungeRouteRepo.CreateLoungeRoute(loungeRoute); err != nil {
+			log.Printf("ERROR: Failed to create lounge route %d for lounge %s: %v", i+1, lounge.ID, err)
+			// Note: Lounge was created, but routes failed - consider transaction
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "creation_failed",
+				Message: "Failed to create lounge routes",
+			})
+			return
+		}
 	}
 
 	// Mark registration as completed (sets profile_completed = TRUE and registration_step = 'completed')
@@ -215,6 +271,13 @@ func (h *LoungeHandler) GetMyLounges(c *gin.Context) {
 			json.Unmarshal(lounge.Images, &images)
 		}
 
+		// Get routes for this lounge
+		loungeRoutes, err := h.loungeRouteRepo.GetLoungeRoutes(lounge.ID)
+		if err != nil {
+			log.Printf("WARNING: Failed to get routes for lounge %s: %v", lounge.ID, err)
+			loungeRoutes = []models.LoungeRoute{} // Empty array on error
+		}
+
 		response = append(response, gin.H{
 			"id":              lounge.ID,
 			"lounge_name":     lounge.LoungeName,
@@ -229,6 +292,7 @@ func (h *LoungeHandler) GetMyLounges(c *gin.Context) {
 			"price_until_bus": lounge.PriceUntilBus,
 			"amenities":       amenities,
 			"images":          images,
+			"routes":          loungeRoutes,
 			"status":          lounge.Status,
 			"is_operational":  lounge.IsOperational,
 			"average_rating":  lounge.AverageRating,
@@ -287,6 +351,13 @@ func (h *LoungeHandler) GetLoungeByID(c *gin.Context) {
 		json.Unmarshal(lounge.Images, &images)
 	}
 
+	// Get routes for this lounge
+	loungeRoutes, err := h.loungeRouteRepo.GetLoungeRoutes(lounge.ID)
+	if err != nil {
+		log.Printf("WARNING: Failed to get routes for lounge %s: %v", lounge.ID, err)
+		loungeRoutes = []models.LoungeRoute{} // Empty array on error
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"id":              lounge.ID,
 		"lounge_owner_id": lounge.LoungeOwnerID,
@@ -302,6 +373,7 @@ func (h *LoungeHandler) GetLoungeByID(c *gin.Context) {
 		"price_until_bus": lounge.PriceUntilBus,
 		"amenities":       amenities,
 		"images":          images,
+		"routes":          loungeRoutes,
 		"status":          lounge.Status,
 		"is_operational":  lounge.IsOperational,
 		"average_rating":  lounge.AverageRating,
@@ -328,6 +400,8 @@ type UpdateLoungeRequest struct {
 	PriceUntilBus *string  `json:"price_until_bus"`
 	Amenities     []string `json:"amenities"`
 	Images        []string `json:"images"`
+	// Routes that the lounge serves (array of route-stop combinations)
+	Routes []models.LoungeRouteRequest `json:"routes" binding:"required,min=1"`
 }
 
 // UpdateLounge handles PUT /api/v1/lounges/:id
@@ -393,7 +467,32 @@ func (h *LoungeHandler) UpdateLounge(c *gin.Context) {
 	amenitiesJSON, _ := json.Marshal(req.Amenities)
 	imagesJSON, _ := json.Marshal(req.Images)
 
-	// Update lounge
+	// Validate all route UUIDs
+	for i, routeReq := range req.Routes {
+		if _, err := uuid.Parse(routeReq.MasterRouteID); err != nil {
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "validation_error",
+				Message: fmt.Sprintf("Invalid master_route_id format for route %d", i+1),
+			})
+			return
+		}
+		if _, err := uuid.Parse(routeReq.StopBeforeID); err != nil {
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "validation_error",
+				Message: fmt.Sprintf("Invalid stop_before_id format for route %d", i+1),
+			})
+			return
+		}
+		if _, err := uuid.Parse(routeReq.StopAfterID); err != nil {
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "validation_error",
+				Message: fmt.Sprintf("Invalid stop_after_id format for route %d", i+1),
+			})
+			return
+		}
+	}
+
+	// Update lounge (basic info)
 	err = h.loungeRepo.UpdateLounge(
 		loungeID,
 		req.LoungeName,
@@ -416,6 +515,35 @@ func (h *LoungeHandler) UpdateLounge(c *gin.Context) {
 			Message: "Failed to update lounge",
 		})
 		return
+	}
+
+	// Delete all existing routes for this lounge
+	if err := h.loungeRouteRepo.DeleteAllLoungeRoutes(loungeID); err != nil {
+		log.Printf("ERROR: Failed to delete existing routes for lounge %s: %v", loungeID, err)
+	}
+
+	// Create new routes
+	for i, routeReq := range req.Routes {
+		masterRouteID, _ := uuid.Parse(routeReq.MasterRouteID)
+		stopBeforeID, _ := uuid.Parse(routeReq.StopBeforeID)
+		stopAfterID, _ := uuid.Parse(routeReq.StopAfterID)
+
+		loungeRoute := &models.LoungeRoute{
+			ID:            uuid.New(),
+			LoungeID:      loungeID,
+			MasterRouteID: masterRouteID,
+			StopBeforeID:  stopBeforeID,
+			StopAfterID:   stopAfterID,
+		}
+
+		if err := h.loungeRouteRepo.CreateLoungeRoute(loungeRoute); err != nil {
+			log.Printf("ERROR: Failed to create lounge route %d for lounge %s: %v", i+1, loungeID, err)
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "update_failed",
+				Message: "Failed to update lounge routes",
+			})
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -523,6 +651,13 @@ func (h *LoungeHandler) GetAllActiveLounges(c *gin.Context) {
 			json.Unmarshal(lounge.Images, &images)
 		}
 
+		// Get routes for this lounge
+		loungeRoutes, err := h.loungeRouteRepo.GetLoungeRoutes(lounge.ID)
+		if err != nil {
+			log.Printf("WARNING: Failed to get routes for lounge %s: %v", lounge.ID, err)
+			loungeRoutes = []models.LoungeRoute{} // Empty array on error
+		}
+
 		response = append(response, gin.H{
 			"id":              lounge.ID,
 			"lounge_name":     lounge.LoungeName,
@@ -536,6 +671,7 @@ func (h *LoungeHandler) GetAllActiveLounges(c *gin.Context) {
 			"price_until_bus": lounge.PriceUntilBus,
 			"amenities":       amenities,
 			"images":          images,
+			"routes":          loungeRoutes,
 			"average_rating":  lounge.AverageRating,
 		})
 	}

@@ -212,7 +212,8 @@ func main() {
 	// Initialize lounge owner, lounge, staff, and admin handlers
 	logger.Info("🔍 DEBUG: Initializing lounge handlers...")
 	loungeOwnerHandler := handlers.NewLoungeOwnerHandler(loungeOwnerRepository, userRepository)
-	loungeHandler := handlers.NewLoungeHandler(loungeRepository, loungeOwnerRepository)
+	loungeRouteRepository := database.NewLoungeRouteRepository(sqlxDB.DB)
+	loungeHandler := handlers.NewLoungeHandler(loungeRepository, loungeOwnerRepository, loungeRouteRepository)
 	loungeStaffHandler := handlers.NewLoungeStaffHandler(loungeStaffRepository, loungeRepository, loungeOwnerRepository)
 	logger.Info("🔍 DEBUG: Lounge handlers initialized successfully")
 	adminHandler := handlers.NewAdminHandler(loungeOwnerRepository, loungeRepository, userRepository)

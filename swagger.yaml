@@ -3011,6 +3011,7 @@ paths:
                 - contact_phone
                 - latitude
                 - longitude
+                - routes
               properties:
                 lounge_name:
                   type: string
@@ -3051,6 +3052,39 @@ paths:
                   type: integer
                   example: 50
                   description: Maximum number of people the lounge can accommodate
+                routes:
+                  type: array
+                  minItems: 1
+                  description: Array of routes that this lounge serves. Each route includes the master route and two consecutive stops where the lounge is located between.
+                  items:
+                    type: object
+                    required:
+                      - master_route_id
+                      - stop_before_id
+                      - stop_after_id
+                    properties:
+                      master_route_id:
+                        type: string
+                        format: uuid
+                        example: "550e8400-e29b-41d4-a716-446655440000"
+                        description: Route that the lounge serves
+                      stop_before_id:
+                        type: string
+                        format: uuid
+                        example: "660e8400-e29b-41d4-a716-446655440001"
+                        description: Stop before the lounge location
+                      stop_after_id:
+                        type: string
+                        format: uuid
+                        example: "770e8400-e29b-41d4-a716-446655440002"
+                        description: Stop after the lounge location
+                  example:
+                    - master_route_id: "550e8400-e29b-41d4-a716-446655440000"
+                      stop_before_id: "660e8400-e29b-41d4-a716-446655440001"
+                      stop_after_id: "770e8400-e29b-41d4-a716-446655440002"
+                    - master_route_id: "880e8400-e29b-41d4-a716-446655440003"
+                      stop_before_id: "990e8400-e29b-41d4-a716-446655440004"
+                      stop_after_id: "aa0e8400-e29b-41d4-a716-446655440005"
                 price_1_hour:
                   type: string
                   example: "500.00"
@@ -7221,6 +7255,47 @@ components:
           nullable: true
           example: 50
           description: "Maximum number of people the lounge can accommodate"
+        routes:
+          type: array
+          nullable: true
+          description: "Array of routes that this lounge serves. Each entry includes the route ID and two consecutive stops."
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                description: "Lounge route relationship ID"
+              lounge_id:
+                type: string
+                format: uuid
+                description: "Reference to the lounge"
+              master_route_id:
+                type: string
+                format: uuid
+                description: "Route that this lounge serves"
+              stop_before_id:
+                type: string
+                format: uuid
+                description: "Stop before the lounge location"
+              stop_after_id:
+                type: string
+                format: uuid
+                description: "Stop after the lounge location"
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+          example:
+            - id: "aa0e8400-e29b-41d4-a716-446655440010"
+              lounge_id: "550e8400-e29b-41d4-a716-446655440000"
+              master_route_id: "bb0e8400-e29b-41d4-a716-446655440011"
+              stop_before_id: "cc0e8400-e29b-41d4-a716-446655440012"
+              stop_after_id: "dd0e8400-e29b-41d4-a716-446655440013"
+              created_at: "2025-01-15T10:30:00Z"
+              updated_at: "2025-01-15T10:30:00Z"
         price_1_hour:
           type: string
           nullable: true
