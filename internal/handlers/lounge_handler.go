@@ -137,7 +137,7 @@ func (h *LoungeHandler) AddLounge(c *gin.Context) {
 		return
 	}
 
-	// Convert amenities and images to JSONB
+	// Convert amenities and images to JSON strings for JSONB columns
 	amenitiesJSON, _ := json.Marshal(req.Amenities)
 	imagesJSON, _ := json.Marshal(req.Images)
 
@@ -154,8 +154,8 @@ func (h *LoungeHandler) AddLounge(c *gin.Context) {
 		req.Price2Hours,
 		req.Price3Hours,
 		req.PriceUntilBus,
-		amenitiesJSON,
-		imagesJSON,
+		string(amenitiesJSON),
+		string(imagesJSON),
 	)
 	if err != nil {
 		log.Printf("ERROR: Failed to create lounge for user %s: %v", userCtx.UserID, err)
@@ -463,7 +463,7 @@ func (h *LoungeHandler) UpdateLounge(c *gin.Context) {
 		return
 	}
 
-	// Convert amenities and images to JSONB
+	// Convert amenities and images to JSON strings for JSONB columns
 	amenitiesJSON, _ := json.Marshal(req.Amenities)
 	imagesJSON, _ := json.Marshal(req.Images)
 
@@ -505,8 +505,8 @@ func (h *LoungeHandler) UpdateLounge(c *gin.Context) {
 		req.Price2Hours,
 		req.Price3Hours,
 		req.PriceUntilBus,
-		amenitiesJSON,
-		imagesJSON,
+		string(amenitiesJSON),
+		string(imagesJSON),
 	)
 	if err != nil {
 		log.Printf("ERROR: Failed to update lounge %s: %v", loungeID, err)

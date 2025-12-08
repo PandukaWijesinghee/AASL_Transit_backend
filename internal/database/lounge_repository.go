@@ -32,8 +32,8 @@ func (r *LoungeRepository) CreateLounge(
 	price2Hours *string,
 	price3Hours *string,
 	priceUntilBus *string,
-	amenities []byte,
-	images []byte,
+	amenities string,
+	images string,
 ) (*models.Lounge, error) {
 	lounge := &models.Lounge{
 		ID:            uuid.New(),
@@ -142,8 +142,8 @@ func (r *LoungeRepository) UpdateLounge(
 	price2Hours *string,
 	price3Hours *string,
 	priceUntilBus *string,
-	amenities []byte,
-	images []byte,
+	amenities string,
+	images string,
 ) error {
 	query := `
 		UPDATE lounges 
