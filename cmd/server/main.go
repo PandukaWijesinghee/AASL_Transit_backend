@@ -215,6 +215,13 @@ func main() {
 	loungeRouteRepository := database.NewLoungeRouteRepository(sqlxDB.DB)
 	loungeHandler := handlers.NewLoungeHandler(loungeRepository, loungeOwnerRepository, loungeRouteRepository)
 	loungeStaffHandler := handlers.NewLoungeStaffHandler(loungeStaffRepository, loungeRepository, loungeOwnerRepository)
+	
+	// Initialize lounge booking system
+	logger.Info("🏨 Initializing lounge booking system...")
+	loungeBookingRepo := database.NewLoungeBookingRepository(sqlxDB.DB)
+	loungeBookingHandler := handlers.NewLoungeBookingHandler(loungeBookingRepo, loungeRepository, loungeOwnerRepository)
+	logger.Info("✓ Lounge booking system initialized")
+	
 	logger.Info("🔍 DEBUG: Lounge handlers initialized successfully")
 	adminHandler := handlers.NewAdminHandler(loungeOwnerRepository, loungeRepository, userRepository)
 
@@ -522,6 +529,78 @@ func main() {
 			}
 		}
 		logger.Info("� Lounge routes registered successfully")
+
+		// ============================================================================
+		// LOUNGE BOOKING & MARKETPLACE ROUTES
+		// ============================================================================
+		logger.Info("🏨 Registering Lounge Booking routes...")
+		
+		// Lounge Marketplace - Categories (public)
+		loungeMarketplace := v1.Group("/lounge-marketplace")
+		{
+			logger.Info("  ✅ GET /api/v1/lounge-marketplace/categories (public)")
+			loungeMarketplace.GET("/categories", loungeBookingHandler.GetCategories)
+		}
+		
+		// Lounge Products - Add to existing lounges group (protected)
+		loungesProtectedProducts := v1.Group("/lounges")
+		loungesProtectedProducts.Use(middleware.AuthMiddleware(jwtService))
+		{
+			// Products for a lounge (anyone can view, owner can manage)
+			logger.Info("  ✅ GET /api/v1/lounges/:id/products")
+			loungesProtectedProducts.GET("/:id/products", loungeBookingHandler.GetLoungeProducts)
+			logger.Info("  ✅ POST /api/v1/lounges/:id/products (owner only)")
+			loungesProtectedProducts.POST("/:id/products", loungeBookingHandler.CreateProduct)
+			logger.Info("  ✅ PUT /api/v1/lounges/:id/products/:product_id (owner only)")
+			loungesProtectedProducts.PUT("/:id/products/:product_id", loungeBookingHandler.UpdateProduct)
+			logger.Info("  ✅ DELETE /api/v1/lounges/:id/products/:product_id (owner only)")
+			loungesProtectedProducts.DELETE("/:id/products/:product_id", loungeBookingHandler.DeleteProduct)
+			
+			// Bookings for a lounge (owner/staff view)
+			logger.Info("  ✅ GET /api/v1/lounges/:id/bookings (owner/staff)")
+			loungesProtectedProducts.GET("/:id/bookings", loungeBookingHandler.GetLoungeBookingsForOwner)
+			logger.Info("  ✅ GET /api/v1/lounges/:id/bookings/today (owner/staff)")
+			loungesProtectedProducts.GET("/:id/bookings/today", loungeBookingHandler.GetTodaysBookings)
+		}
+		
+		// Lounge Bookings - Passenger endpoints
+		loungeBookings := v1.Group("/lounge-bookings")
+		loungeBookings.Use(middleware.AuthMiddleware(jwtService))
+		{
+			logger.Info("  ✅ POST /api/v1/lounge-bookings - Create lounge booking")
+			loungeBookings.POST("", loungeBookingHandler.CreateLoungeBooking)
+			logger.Info("  ✅ GET /api/v1/lounge-bookings - Get my lounge bookings")
+			loungeBookings.GET("", loungeBookingHandler.GetMyLoungeBookings)
+			logger.Info("  ✅ GET /api/v1/lounge-bookings/upcoming - Get upcoming bookings")
+			loungeBookings.GET("/upcoming", loungeBookingHandler.GetUpcomingLoungeBookings)
+			logger.Info("  ✅ GET /api/v1/lounge-bookings/:id - Get booking by ID")
+			loungeBookings.GET("/:id", loungeBookingHandler.GetLoungeBookingByID)
+			logger.Info("  ✅ GET /api/v1/lounge-bookings/reference/:reference - Get by reference")
+			loungeBookings.GET("/reference/:reference", loungeBookingHandler.GetLoungeBookingByReference)
+			logger.Info("  ✅ POST /api/v1/lounge-bookings/:id/cancel - Cancel booking")
+			loungeBookings.POST("/:id/cancel", loungeBookingHandler.CancelLoungeBooking)
+			
+			// Staff operations
+			logger.Info("  ✅ POST /api/v1/lounge-bookings/:id/check-in - Check in guest")
+			loungeBookings.POST("/:id/check-in", loungeBookingHandler.CheckInGuest)
+			logger.Info("  ✅ POST /api/v1/lounge-bookings/:id/complete - Complete booking")
+			loungeBookings.POST("/:id/complete", loungeBookingHandler.CompleteLoungeBooking)
+			
+			// Orders for a booking
+			logger.Info("  ✅ GET /api/v1/lounge-bookings/:id/orders - Get booking orders")
+			loungeBookings.GET("/:id/orders", loungeBookingHandler.GetBookingOrders)
+		}
+		
+		// Lounge Orders - In-lounge ordering
+		loungeOrders := v1.Group("/lounge-orders")
+		loungeOrders.Use(middleware.AuthMiddleware(jwtService))
+		{
+			logger.Info("  ✅ POST /api/v1/lounge-orders - Create in-lounge order")
+			loungeOrders.POST("", loungeBookingHandler.CreateLoungeOrder)
+			logger.Info("  ✅ PUT /api/v1/lounge-orders/:id/status - Update order status")
+			loungeOrders.PUT("/:id/status", loungeBookingHandler.UpdateOrderStatus)
+		}
+		logger.Info("🏨 Lounge Booking routes registered successfully")
 
 		// Staff profile routes (for lounge staff members)
 		logger.Info("👤 Registering Staff profile routes...")

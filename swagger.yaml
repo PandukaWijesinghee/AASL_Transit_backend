@@ -113,6 +113,14 @@ tags:
     description: Conductor/Driver booking operations (verify, check-in, board)
   - name: Search
     description: Trip search and discovery endpoints (Phase 1 MVP)
+  - name: Lounge Marketplace
+    description: Lounge discovery and marketplace for passengers
+  - name: Lounge Bookings
+    description: Lounge booking management for passengers
+  - name: Lounge Products
+    description: Lounge product (food/beverages) management
+  - name: Lounge Orders
+    description: Lounge order management for food/beverages
 
 paths:
   # ============================================================================
@@ -3786,6 +3794,745 @@ paths:
                             type: string
                           status:
                             type: string
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================================
+  # Lounge Marketplace & Booking Endpoints
+  # ============================================================================
+
+  /api/v1/lounge-marketplace/categories:
+    get:
+      summary: Get lounge product categories
+      description: |
+        Retrieve all active product categories for lounge marketplace.
+        Categories include: Food, Beverages, Snacks, Combo Meals, etc.
+      operationId: getLoungeCategories
+      tags:
+        - Lounge Marketplace
+      responses:
+        "200":
+          description: Categories retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LoungeCategory"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounges/{lounge_id}/products:
+    get:
+      summary: Get lounge products
+      description: |
+        Retrieve all products available at a specific lounge.
+        Can filter by category using query parameter.
+      operationId: getLoungeProducts
+      tags:
+        - Lounge Products
+      parameters:
+        - name: lounge_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: category_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Filter by category ID
+      responses:
+        "200":
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LoungeProduct"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      summary: Create lounge product
+      description: |
+        Add a new product to a lounge's menu.
+        Requires lounge owner authentication.
+      operationId: createLoungeProduct
+      tags:
+        - Lounge Products
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lounge_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLoungeProductRequest"
+      responses:
+        "201":
+          description: Product created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Product created successfully"
+                  product:
+                    $ref: "#/components/schemas/LoungeProduct"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounges/{lounge_id}/products/{product_id}:
+    put:
+      summary: Update lounge product
+      description: |
+        Update an existing product in a lounge's menu.
+        Requires lounge owner authentication.
+      operationId: updateLoungeProduct
+      tags:
+        - Lounge Products
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lounge_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLoungeProductRequest"
+      responses:
+        "200":
+          description: Product updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Product updated successfully"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      summary: Delete lounge product
+      description: |
+        Delete a product from a lounge's menu.
+        Requires lounge owner authentication.
+      operationId: deleteLoungeProduct
+      tags:
+        - Lounge Products
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lounge_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Product deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Product deleted successfully"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounge-bookings:
+    post:
+      summary: Create lounge booking
+      description: |
+        Create a new lounge booking for a passenger.
+        Can include guest list and pre-ordered items.
+        
+        **Pricing Types:**
+        - 1 hour: Standard 1-hour access
+        - 2 hours: Extended 2-hour access
+        - 3 hours: Full 3-hour access  
+        - until_bus: Access until bus departs
+        
+        **Booking Status Flow:**
+        pending → confirmed → checked_in → completed
+                          ↘ cancelled / no_show
+      operationId: createLoungeBooking
+      tags:
+        - Lounge Bookings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLoungeBookingRequest"
+      responses:
+        "201":
+          description: Booking created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Lounge booking created successfully"
+                  booking:
+                    $ref: "#/components/schemas/LoungeBooking"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    get:
+      summary: Get my lounge bookings
+      description: |
+        Retrieve all lounge bookings for the authenticated passenger.
+        Returns both upcoming and past bookings.
+      operationId: getMyLoungeBookings
+      tags:
+        - Lounge Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, confirmed, checked_in, completed, cancelled, no_show]
+          description: Filter by booking status
+      responses:
+        "200":
+          description: Bookings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LoungeBooking"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounge-bookings/upcoming:
+    get:
+      summary: Get upcoming lounge bookings
+      description: |
+        Retrieve upcoming lounge bookings for the authenticated passenger.
+        Only returns bookings with status pending, confirmed, or checked_in.
+      operationId: getUpcomingLoungeBookings
+      tags:
+        - Lounge Bookings
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Upcoming bookings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LoungeBooking"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounge-bookings/{id}:
+    get:
+      summary: Get lounge booking by ID
+      description: |
+        Retrieve detailed information about a specific lounge booking.
+        Includes guest list and pre-ordered items.
+      operationId: getLoungeBookingById
+      tags:
+        - Lounge Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Booking retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoungeBookingDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounge-bookings/reference/{ref}:
+    get:
+      summary: Get lounge booking by reference
+      description: |
+        Retrieve a lounge booking by its booking reference number.
+        Useful for QR code scanning and quick lookup.
+      operationId: getLoungeBookingByReference
+      tags:
+        - Lounge Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ref
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "LB-20250101-ABC123"
+      responses:
+        "200":
+          description: Booking retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoungeBookingDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounge-bookings/{id}/cancel:
+    post:
+      summary: Cancel lounge booking
+      description: |
+        Cancel an existing lounge booking.
+        Only bookings with status 'pending' or 'confirmed' can be cancelled.
+      operationId: cancelLoungeBooking
+      tags:
+        - Lounge Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  example: "Change of plans"
+      responses:
+        "200":
+          description: Booking cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Booking cancelled successfully"
+        "400":
+          description: Cannot cancel booking in current status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounges/{lounge_id}/bookings:
+    get:
+      summary: Get lounge bookings (Owner)
+      description: |
+        Retrieve all bookings for a specific lounge.
+        Requires lounge owner authentication.
+      operationId: getLoungeBookingsForOwner
+      tags:
+        - Lounge Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lounge_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, confirmed, checked_in, completed, cancelled, no_show]
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Filter by booking date (YYYY-MM-DD)
+      responses:
+        "200":
+          description: Bookings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LoungeBookingDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounges/{lounge_id}/bookings/today:
+    get:
+      summary: Get today's lounge bookings (Owner)
+      description: |
+        Retrieve all bookings for today at a specific lounge.
+        Useful for lounge staff dashboard.
+      operationId: getTodayLoungeBookings
+      tags:
+        - Lounge Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lounge_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Today's bookings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LoungeBookingDetail"
+                  total:
+                    type: integer
+                  checked_in_count:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounge-bookings/{id}/check-in:
+    post:
+      summary: Check-in guest at lounge
+      description: |
+        Check-in a guest at the lounge.
+        Requires lounge owner or staff authentication.
+        Can check-in individual guests from a group booking.
+      operationId: checkInLoungeGuest
+      tags:
+        - Lounge Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                guest_id:
+                  type: string
+                  format: uuid
+                  description: Optional - check-in specific guest. If not provided, checks in the primary booker.
+      responses:
+        "200":
+          description: Check-in successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Guest checked in successfully"
+                  checked_in_at:
+                    type: string
+                    format: date-time
+        "400":
+          description: Cannot check-in (wrong status, already checked-in, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounge-bookings/{id}/complete:
+    post:
+      summary: Complete lounge booking
+      description: |
+        Mark a lounge booking as completed.
+        Requires lounge owner or staff authentication.
+        Usually done when guest leaves or access time expires.
+      operationId: completeLoungeBooking
+      tags:
+        - Lounge Bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Booking completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Booking completed successfully"
+                  completed_at:
+                    type: string
+                    format: date-time
+        "400":
+          description: Cannot complete booking (wrong status)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounge-orders:
+    post:
+      summary: Create lounge order
+      description: |
+        Create a new food/beverage order at a lounge.
+        Can be linked to an existing lounge booking or standalone.
+      operationId: createLoungeOrder
+      tags:
+        - Lounge Orders
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLoungeOrderRequest"
+      responses:
+        "201":
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Order created successfully"
+                  order:
+                    $ref: "#/components/schemas/LoungeOrder"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounge-orders/{id}/status:
+    put:
+      summary: Update lounge order status
+      description: |
+        Update the status of a lounge order.
+        Requires lounge owner or staff authentication.
+        
+        **Order Status Flow:**
+        pending → preparing → ready → delivered
+                           ↘ cancelled
+      operationId: updateLoungeOrderStatus
+      tags:
+        - Lounge Orders
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [pending, preparing, ready, delivered, cancelled]
+      responses:
+        "200":
+          description: Order status updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Order status updated successfully"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -8943,6 +9690,450 @@ components:
         payment_notes:
           type: string
           example: "Paid in full at counter"
+
+    # ==========================================================================
+    # LOUNGE BOOKING SCHEMAS
+    # ==========================================================================
+    LoungeCategory:
+      type: object
+      description: Product category for lounge marketplace
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Beverages"
+        description:
+          type: string
+          nullable: true
+          example: "Hot and cold drinks"
+        icon_url:
+          type: string
+          nullable: true
+        display_order:
+          type: integer
+          example: 1
+        is_active:
+          type: boolean
+          example: true
+
+    LoungeProduct:
+      type: object
+      description: Product available at a lounge
+      properties:
+        id:
+          type: string
+          format: uuid
+        lounge_id:
+          type: string
+          format: uuid
+        category_id:
+          type: string
+          format: uuid
+          nullable: true
+        category_name:
+          type: string
+          nullable: true
+          example: "Beverages"
+        name:
+          type: string
+          example: "Ceylon Tea"
+        description:
+          type: string
+          nullable: true
+          example: "Premium Ceylon black tea"
+        price:
+          type: string
+          example: "150.00"
+        image_url:
+          type: string
+          nullable: true
+        is_available:
+          type: boolean
+          example: true
+        preparation_time_mins:
+          type: integer
+          nullable: true
+          example: 5
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateLoungeProductRequest:
+      type: object
+      required:
+        - name
+        - price
+      properties:
+        category_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Ceylon Tea"
+        description:
+          type: string
+          example: "Premium Ceylon black tea"
+        price:
+          type: string
+          example: "150.00"
+        image_url:
+          type: string
+        is_available:
+          type: boolean
+          default: true
+        preparation_time_mins:
+          type: integer
+          example: 5
+
+    UpdateLoungeProductRequest:
+      type: object
+      properties:
+        category_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: string
+        image_url:
+          type: string
+        is_available:
+          type: boolean
+        preparation_time_mins:
+          type: integer
+
+    LoungeBooking:
+      type: object
+      description: Lounge booking record
+      properties:
+        id:
+          type: string
+          format: uuid
+        lounge_id:
+          type: string
+          format: uuid
+        lounge_name:
+          type: string
+          example: "City Central Lounge"
+        user_id:
+          type: string
+          format: uuid
+        bus_booking_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Optional link to bus booking
+        booking_reference:
+          type: string
+          example: "LB-20250101-ABC123"
+        pricing_type:
+          type: string
+          enum: [1_hour, 2_hours, 3_hours, until_bus]
+          example: "2_hours"
+        number_of_guests:
+          type: integer
+          example: 2
+        check_in_time:
+          type: string
+          format: date-time
+        expected_end_time:
+          type: string
+          format: date-time
+          nullable: true
+        actual_check_out_time:
+          type: string
+          format: date-time
+          nullable: true
+        base_price:
+          type: string
+          example: "900.00"
+        total_amount:
+          type: string
+          example: "1800.00"
+        payment_status:
+          type: string
+          enum: [pending, partial, paid, refunded]
+          example: "paid"
+        booking_status:
+          type: string
+          enum: [pending, confirmed, checked_in, completed, cancelled, no_show]
+          example: "confirmed"
+        special_requests:
+          type: string
+          nullable: true
+        cancellation_reason:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    LoungeBookingGuest:
+      type: object
+      description: Guest in a lounge booking
+      properties:
+        id:
+          type: string
+          format: uuid
+        lounge_booking_id:
+          type: string
+          format: uuid
+        guest_name:
+          type: string
+          example: "John Doe"
+        guest_phone:
+          type: string
+          nullable: true
+          example: "+94771234567"
+        is_primary:
+          type: boolean
+          example: true
+        checked_in_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    LoungeBookingDetail:
+      type: object
+      description: Detailed lounge booking with guests and pre-orders
+      allOf:
+        - $ref: "#/components/schemas/LoungeBooking"
+        - type: object
+          properties:
+            guests:
+              type: array
+              items:
+                $ref: "#/components/schemas/LoungeBookingGuest"
+            pre_orders:
+              type: array
+              items:
+                $ref: "#/components/schemas/LoungePreOrderItem"
+            lounge:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                lounge_name:
+                  type: string
+                address:
+                  type: string
+                contact_phone:
+                  type: string
+                  nullable: true
+
+    LoungePreOrderItem:
+      type: object
+      description: Pre-ordered item in a lounge booking
+      properties:
+        id:
+          type: string
+          format: uuid
+        lounge_booking_id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        product_name:
+          type: string
+          example: "Ceylon Tea"
+        quantity:
+          type: integer
+          example: 2
+        unit_price:
+          type: string
+          example: "150.00"
+        subtotal:
+          type: string
+          example: "300.00"
+        special_instructions:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, preparing, ready, delivered, cancelled]
+          example: "pending"
+
+    CreateLoungeBookingRequest:
+      type: object
+      required:
+        - lounge_id
+        - pricing_type
+        - check_in_time
+        - number_of_guests
+      properties:
+        lounge_id:
+          type: string
+          format: uuid
+        bus_booking_id:
+          type: string
+          format: uuid
+          description: Optional - link to existing bus booking
+        pricing_type:
+          type: string
+          enum: [1_hour, 2_hours, 3_hours, until_bus]
+          example: "2_hours"
+        check_in_time:
+          type: string
+          format: date-time
+        number_of_guests:
+          type: integer
+          minimum: 1
+          example: 2
+        special_requests:
+          type: string
+        guests:
+          type: array
+          description: Optional guest list
+          items:
+            type: object
+            required:
+              - guest_name
+            properties:
+              guest_name:
+                type: string
+                example: "John Doe"
+              guest_phone:
+                type: string
+                example: "+94771234567"
+              is_primary:
+                type: boolean
+                default: false
+        pre_orders:
+          type: array
+          description: Optional pre-order items
+          items:
+            type: object
+            required:
+              - product_id
+              - quantity
+            properties:
+              product_id:
+                type: string
+                format: uuid
+              quantity:
+                type: integer
+                minimum: 1
+              special_instructions:
+                type: string
+
+    LoungeOrder:
+      type: object
+      description: Food/beverage order at a lounge
+      properties:
+        id:
+          type: string
+          format: uuid
+        lounge_id:
+          type: string
+          format: uuid
+        lounge_booking_id:
+          type: string
+          format: uuid
+          nullable: true
+        user_id:
+          type: string
+          format: uuid
+        order_number:
+          type: string
+          example: "LO-20250101-001"
+        total_amount:
+          type: string
+          example: "750.00"
+        status:
+          type: string
+          enum: [pending, preparing, ready, delivered, cancelled]
+          example: "pending"
+        payment_status:
+          type: string
+          enum: [pending, paid, refunded]
+          example: "pending"
+        notes:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LoungeOrderItem"
+
+    LoungeOrderItem:
+      type: object
+      description: Item in a lounge order
+      properties:
+        id:
+          type: string
+          format: uuid
+        lounge_order_id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        product_name:
+          type: string
+          example: "Ceylon Tea"
+        quantity:
+          type: integer
+          example: 2
+        unit_price:
+          type: string
+          example: "150.00"
+        subtotal:
+          type: string
+          example: "300.00"
+        special_instructions:
+          type: string
+          nullable: true
+
+    CreateLoungeOrderRequest:
+      type: object
+      required:
+        - lounge_id
+        - items
+      properties:
+        lounge_id:
+          type: string
+          format: uuid
+        lounge_booking_id:
+          type: string
+          format: uuid
+          description: Optional - link to existing lounge booking
+        notes:
+          type: string
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+              - product_id
+              - quantity
+            properties:
+              product_id:
+                type: string
+                format: uuid
+              quantity:
+                type: integer
+                minimum: 1
+              special_instructions:
+                type: string
 
     # ==========================================================================
     # APP BOOKINGS SCHEMAS (Passenger App)
