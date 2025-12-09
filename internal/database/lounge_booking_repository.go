@@ -47,7 +47,10 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 	query := `
 		SELECT 
 			p.id, p.lounge_id, p.category_id, p.name, p.description, 
-			p.price, p.image_url, p.is_available, p.display_order, 
+			p.price, p.image_url, p.stock_status, p.product_type,
+			p.is_available, p.is_pre_orderable, p.is_vegetarian, p.is_halal,
+			p.display_order, p.service_duration_minutes, 
+			p.available_from, p.available_until, p.tags,
 			p.created_at, p.updated_at,
 			c.name as category_name
 		FROM lounge_products p
@@ -67,7 +70,10 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 		var categoryName string
 		err := rows.Scan(
 			&p.ID, &p.LoungeID, &p.CategoryID, &p.Name, &p.Description,
-			&p.Price, &p.ImageURL, &p.IsAvailable, &p.DisplayOrder,
+			&p.Price, &p.ImageURL, &p.StockStatus, &p.ProductType,
+			&p.IsAvailable, &p.IsPreOrderable, &p.IsVegetarian, &p.IsHalal,
+			&p.DisplayOrder, &p.ServiceDurationMinutes,
+			&p.AvailableFrom, &p.AvailableUntil, &p.Tags,
 			&p.CreatedAt, &p.UpdatedAt, &categoryName,
 		)
 		if err != nil {

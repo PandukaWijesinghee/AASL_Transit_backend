@@ -9806,13 +9806,54 @@ components:
         image_url:
           type: string
           nullable: true
+        stock_status:
+          type: string
+          enum: [in_stock, low_stock, out_of_stock, discontinued, made_to_order]
+          example: "in_stock"
+        product_type:
+          type: string
+          enum: [product, service, package]
+          example: "product"
         is_available:
           type: boolean
           example: true
-        preparation_time_mins:
+        is_pre_orderable:
+          type: boolean
+          example: false
+          description: "Whether the product can be pre-ordered before arrival"
+        is_vegetarian:
+          type: boolean
+          example: false
+          description: "Dietary information - vegetarian"
+        is_halal:
+          type: boolean
+          example: false
+          description: "Dietary information - halal"
+        display_order:
+          type: integer
+          example: 1
+          description: "Sort order for displaying products"
+        service_duration_minutes:
           type: integer
           nullable: true
-          example: 5
+          example: 60
+          description: "Duration in minutes for services (WiFi, storage, etc.)"
+        available_from:
+          type: string
+          nullable: true
+          example: "06:00:00"
+          description: "Time-based availability start (HH:MM:SS)"
+        available_until:
+          type: string
+          nullable: true
+          example: "10:30:00"
+          description: "Time-based availability end (HH:MM:SS)"
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["popular", "traditional"]
+          description: "Product tags for filtering/display"
         created_at:
           type: string
           format: date-time
