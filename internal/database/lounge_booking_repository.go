@@ -71,18 +71,41 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 		var categoryName string
 		var stockStatus, productType string
 		var tags []string
+		
+		// Use sql.Null* types for scanning, then convert to pointers
+		var description, imageURL, availableFrom, availableUntil sql.NullString
+		var serviceDurationMinutes sql.NullInt64
 
 		err := rows.Scan(
-			&p.ID, &p.LoungeID, &p.CategoryID, &p.Name, &p.Description,
-			&p.Price, &p.ImageURL, &stockStatus, &productType,
+			&p.ID, &p.LoungeID, &p.CategoryID, &p.Name, &description,
+			&p.Price, &imageURL, &stockStatus, &productType,
 			&p.IsAvailable, &p.IsPreOrderable, &p.IsVegetarian, &p.IsHalal,
-			&p.DisplayOrder, &p.ServiceDurationMinutes,
-			&p.AvailableFrom, &p.AvailableUntil, pq.Array(&tags),
+			&p.DisplayOrder, &serviceDurationMinutes,
+			&availableFrom, &availableUntil, pq.Array(&tags),
 			&p.CreatedAt, &p.UpdatedAt, &categoryName,
 		)
 		if err != nil {
 			return nil, err
 		}
+		
+		// Convert sql.Null* to pointers
+		if description.Valid {
+			p.Description = &description.String
+		}
+		if imageURL.Valid {
+			p.ImageURL = &imageURL.String
+		}
+		if serviceDurationMinutes.Valid {
+			val := int(serviceDurationMinutes.Int64)
+			p.ServiceDurationMinutes = &val
+		}
+		if availableFrom.Valid {
+			p.AvailableFrom = &availableFrom.String
+		}
+		if availableUntil.Valid {
+			p.AvailableUntil = &availableUntil.String
+		}
+		
 		p.StockStatus = models.LoungeProductStockStatus(stockStatus)
 		p.ProductType = models.LoungeProductType(productType)
 		p.Tags = tags

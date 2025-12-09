@@ -168,9 +168,9 @@ type LoungeProduct struct {
 	LoungeID               uuid.UUID                `db:"lounge_id" json:"lounge_id"`
 	CategoryID             uuid.UUID                `db:"category_id" json:"category_id"`
 	Name                   string                   `db:"name" json:"name"`
-	Description            sql.NullString           `db:"description" json:"description,omitempty"`
+	Description            *string                  `db:"description" json:"description,omitempty"`
 	Price                  string                   `db:"price" json:"price"` // DECIMAL(10,2) as string
-	ImageURL               sql.NullString           `db:"image_url" json:"image_url,omitempty"`
+	ImageURL               *string                  `db:"image_url" json:"image_url,omitempty"`
 	StockStatus            LoungeProductStockStatus `db:"stock_status" json:"stock_status"`
 	ProductType            LoungeProductType        `db:"product_type" json:"product_type"`
 	IsAvailable            bool                     `db:"is_available" json:"is_available"`
@@ -178,9 +178,9 @@ type LoungeProduct struct {
 	IsVegetarian           bool                     `db:"is_vegetarian" json:"is_vegetarian"`
 	IsHalal                bool                     `db:"is_halal" json:"is_halal"`
 	DisplayOrder           int                      `db:"display_order" json:"display_order"`
-	ServiceDurationMinutes sql.NullInt64            `db:"service_duration_minutes" json:"service_duration_minutes,omitempty"`
-	AvailableFrom          sql.NullString           `db:"available_from" json:"available_from,omitempty"`   // TIME
-	AvailableUntil         sql.NullString           `db:"available_until" json:"available_until,omitempty"` // TIME
+	ServiceDurationMinutes *int                     `db:"service_duration_minutes" json:"service_duration_minutes,omitempty"`
+	AvailableFrom          *string                  `db:"available_from" json:"available_from,omitempty"`   // TIME
+	AvailableUntil         *string                  `db:"available_until" json:"available_until,omitempty"` // TIME
 	Tags                   []string                 `db:"tags" json:"tags,omitempty"`                       // TEXT[]
 	CreatedAt              time.Time                `db:"created_at" json:"created_at"`
 	UpdatedAt              time.Time                `db:"updated_at" json:"updated_at"`

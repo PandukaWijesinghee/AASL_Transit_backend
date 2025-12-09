@@ -174,12 +174,10 @@ func (h *LoungeBookingHandler) CreateProduct(c *gin.Context) {
 	}
 
 	if req.Description != nil {
-		product.Description.String = *req.Description
-		product.Description.Valid = true
+		product.Description = req.Description
 	}
 	if req.ImageURL != nil {
-		product.ImageURL.String = *req.ImageURL
-		product.ImageURL.Valid = true
+		product.ImageURL = req.ImageURL
 	}
 
 	if err := h.bookingRepo.CreateProduct(product); err != nil {
@@ -305,12 +303,10 @@ func (h *LoungeBookingHandler) UpdateProduct(c *gin.Context) {
 		product.CategoryID = categoryID
 	}
 	if req.Description != nil {
-		product.Description.String = *req.Description
-		product.Description.Valid = true
+		product.Description = req.Description
 	}
 	if req.ImageURL != nil {
-		product.ImageURL.String = *req.ImageURL
-		product.ImageURL.Valid = true
+		product.ImageURL = req.ImageURL
 	}
 	if req.IsAvailable != nil {
 		product.IsAvailable = *req.IsAvailable
