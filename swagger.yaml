@@ -10106,22 +10106,29 @@ components:
         product_name:
           type: string
           example: "Ceylon Tea"
+        product_type:
+          type: string
+          enum: [product, service, combo]
+          example: "product"
+          description: "Type of product (snapshot at booking time)"
+        product_image_url:
+          type: string
+          nullable: true
+          example: "https://example.com/images/ceylon-tea.jpg"
+          description: "Product image URL (snapshot at booking time)"
         quantity:
           type: integer
           example: 2
         unit_price:
           type: string
           example: "150.00"
-        subtotal:
+        total_price:
           type: string
           example: "300.00"
-        special_instructions:
+          description: "unit_price * quantity"
+        created_at:
           type: string
-          nullable: true
-        status:
-          type: string
-          enum: [pending, preparing, ready, delivered, cancelled]
-          example: "pending"
+          format: date-time
 
     CreateLoungeBookingRequest:
       type: object

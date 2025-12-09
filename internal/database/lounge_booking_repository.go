@@ -300,8 +300,8 @@ func (r *LoungeBookingRepository) CreateLoungeBooking(
 
 	// Insert pre-orders
 	preOrderQuery := `
-		INSERT INTO lounge_booking_pre_orders (id, lounge_booking_id, product_id, product_name, quantity, unit_price, total_price, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO lounge_booking_pre_orders (id, lounge_booking_id, product_id, product_name, product_type, product_image_url, quantity, unit_price, total_price, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 	for i := range preOrders {
 		preOrders[i].ID = uuid.New()
@@ -310,7 +310,8 @@ func (r *LoungeBookingRepository) CreateLoungeBooking(
 
 		_, err = tx.Exec(preOrderQuery,
 			preOrders[i].ID, preOrders[i].LoungeBookingID, preOrders[i].ProductID,
-			preOrders[i].ProductName, preOrders[i].Quantity, preOrders[i].UnitPrice,
+			preOrders[i].ProductName, preOrders[i].ProductType, preOrders[i].ProductImageURL,
+			preOrders[i].Quantity, preOrders[i].UnitPrice,
 			preOrders[i].TotalPrice, preOrders[i].CreatedAt,
 		)
 		if err != nil {

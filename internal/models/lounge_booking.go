@@ -297,14 +297,16 @@ type LoungeBookingGuest struct {
 
 // LoungeBookingPreOrder represents a pre-ordered item with a booking
 type LoungeBookingPreOrder struct {
-	ID              uuid.UUID `db:"id" json:"id"`
-	LoungeBookingID uuid.UUID `db:"lounge_booking_id" json:"lounge_booking_id"`
-	ProductID       uuid.UUID `db:"product_id" json:"product_id"`
-	ProductName     string    `db:"product_name" json:"product_name"` // Snapshot at booking time
-	Quantity        int       `db:"quantity" json:"quantity"`
-	UnitPrice       string    `db:"unit_price" json:"unit_price"`   // DECIMAL - snapshot
-	TotalPrice      string    `db:"total_price" json:"total_price"` // DECIMAL
-	CreatedAt       time.Time `db:"created_at" json:"created_at"`
+	ID              uuid.UUID  `db:"id" json:"id"`
+	LoungeBookingID uuid.UUID  `db:"lounge_booking_id" json:"lounge_booking_id"`
+	ProductID       uuid.UUID  `db:"product_id" json:"product_id"`
+	ProductName     string     `db:"product_name" json:"product_name"`         // Snapshot at booking time
+	ProductType     string     `db:"product_type" json:"product_type"`         // Snapshot - NOT NULL in DB
+	ProductImageURL *string    `db:"product_image_url" json:"product_image_url,omitempty"` // Snapshot
+	Quantity        int        `db:"quantity" json:"quantity"`
+	UnitPrice       string     `db:"unit_price" json:"unit_price"`             // DECIMAL - snapshot
+	TotalPrice      string     `db:"total_price" json:"total_price"`           // DECIMAL
+	CreatedAt       time.Time  `db:"created_at" json:"created_at"`
 }
 
 // ============================================================================
