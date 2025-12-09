@@ -23,13 +23,13 @@ type LoungeOwner struct {
 
 	// Registration Progress Tracking
 	RegistrationStep LoungeOwnerRegistrationStep `db:"registration_step" json:"registration_step"` // phone_verified, profile_submitted, lounge_added, completed
-	ProfileCompleted bool                         `db:"profile_completed" json:"profile_completed"` // True when registration_step = 'completed' (but still pending admin approval)
+	ProfileCompleted bool                        `db:"profile_completed" json:"profile_completed"` // True when registration_step = 'completed' (but still pending admin approval)
 
 	// Verification
 	VerificationStatus LoungeOwnerVerificationStatus `db:"verification_status" json:"verification_status"` // pending, approved, rejected, suspended
-	VerificationNotes  sql.NullString `db:"verification_notes" json:"verification_notes,omitempty"`
-	VerifiedAt         sql.NullTime   `db:"verified_at" json:"verified_at,omitempty"`
-	VerifiedBy         uuid.NullUUID  `db:"verified_by" json:"verified_by,omitempty"`
+	VerificationNotes  sql.NullString                `db:"verification_notes" json:"verification_notes,omitempty"`
+	VerifiedAt         sql.NullTime                  `db:"verified_at" json:"verified_at,omitempty"`
+	VerifiedBy         uuid.NullUUID                 `db:"verified_by" json:"verified_by,omitempty"`
 
 	// Timestamps
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
@@ -50,18 +50,18 @@ const (
 type LoungeOwnerRegistrationStep string
 
 const (
-	LoungeOwnerRegStepPhoneVerified     LoungeOwnerRegistrationStep = "phone_verified"
-	LoungeOwnerRegStepProfileSubmitted  LoungeOwnerRegistrationStep = "profile_submitted"
-	LoungeOwnerRegStepLoungeAdded       LoungeOwnerRegistrationStep = "lounge_added"
-	LoungeOwnerRegStepCompleted         LoungeOwnerRegistrationStep = "completed"
+	LoungeOwnerRegStepPhoneVerified    LoungeOwnerRegistrationStep = "phone_verified"
+	LoungeOwnerRegStepProfileSubmitted LoungeOwnerRegistrationStep = "profile_submitted"
+	LoungeOwnerRegStepLoungeAdded      LoungeOwnerRegistrationStep = "lounge_added"
+	LoungeOwnerRegStepCompleted        LoungeOwnerRegistrationStep = "completed"
 )
 
 // Legacy constants for backward compatibility
 const (
-	RegStepPhoneVerified = "phone_verified"
-	RegStepBusinessInfo  = "profile_submitted" // Updated mapping
-	RegStepLoungeAdded   = "lounge_added"
-	RegStepCompleted     = "completed"
+	RegStepPhoneVerified       = "phone_verified"
+	RegStepBusinessInfo        = "profile_submitted" // Updated mapping
+	RegStepLoungeAdded         = "lounge_added"
+	RegStepCompleted           = "completed"
 	LoungeVerificationPending  = "pending"
 	LoungeVerificationApproved = "approved"
 	LoungeVerificationRejected = "rejected"

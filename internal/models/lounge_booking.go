@@ -69,9 +69,9 @@ const (
 type LoungeBookingDeliveryPreference string
 
 const (
-	LoungeBookingDeliveryPreferenceOnArrival  LoungeBookingDeliveryPreference = "on_arrival"
-	LoungeBookingDeliveryPreferenceScheduled  LoungeBookingDeliveryPreference = "scheduled"
-	LoungeBookingDeliveryPreferenceImmediate  LoungeBookingDeliveryPreference = "immediate"
+	LoungeBookingDeliveryPreferenceOnArrival LoungeBookingDeliveryPreference = "on_arrival"
+	LoungeBookingDeliveryPreferenceScheduled LoungeBookingDeliveryPreference = "scheduled"
+	LoungeBookingDeliveryPreferenceImmediate LoungeBookingDeliveryPreference = "immediate"
 )
 
 // LoungeOrderStatus represents the status of an in-lounge order
@@ -303,21 +303,21 @@ type LoungeBookingPreOrder struct {
 
 // LoungeOrder represents an order placed while inside the lounge
 type LoungeOrder struct {
-	ID              uuid.UUID           `db:"id" json:"id"`
-	LoungeBookingID uuid.UUID           `db:"lounge_booking_id" json:"lounge_booking_id"`
-	LoungeID        uuid.UUID           `db:"lounge_id" json:"lounge_id"`
-	OrderNumber     string              `db:"order_number" json:"order_number"`
-	Subtotal        string              `db:"subtotal" json:"subtotal"` // DECIMAL
-	DiscountAmount  string              `db:"discount_amount" json:"discount_amount"`
-	TotalAmount     string              `db:"total_amount" json:"total_amount"`
+	ID              uuid.UUID                `db:"id" json:"id"`
+	LoungeBookingID uuid.UUID                `db:"lounge_booking_id" json:"lounge_booking_id"`
+	LoungeID        uuid.UUID                `db:"lounge_id" json:"lounge_id"`
+	OrderNumber     string                   `db:"order_number" json:"order_number"`
+	Subtotal        string                   `db:"subtotal" json:"subtotal"` // DECIMAL
+	DiscountAmount  string                   `db:"discount_amount" json:"discount_amount"`
+	TotalAmount     string                   `db:"total_amount" json:"total_amount"`
 	Status          LoungeOrderStatus        `db:"status" json:"status"`
 	PaymentStatus   LoungeOrderPaymentStatus `db:"payment_status" json:"payment_status"`
-	PaymentMethod   sql.NullString      `db:"payment_method" json:"payment_method,omitempty"`
-	Notes           sql.NullString      `db:"notes" json:"notes,omitempty"`
-	PreparedByStaff *uuid.UUID          `db:"prepared_by_staff" json:"prepared_by_staff,omitempty"`
-	ServedByStaff   *uuid.UUID          `db:"served_by_staff" json:"served_by_staff,omitempty"`
-	CreatedAt       time.Time           `db:"created_at" json:"created_at"`
-	UpdatedAt       time.Time           `db:"updated_at" json:"updated_at"`
+	PaymentMethod   sql.NullString           `db:"payment_method" json:"payment_method,omitempty"`
+	Notes           sql.NullString           `db:"notes" json:"notes,omitempty"`
+	PreparedByStaff *uuid.UUID               `db:"prepared_by_staff" json:"prepared_by_staff,omitempty"`
+	ServedByStaff   *uuid.UUID               `db:"served_by_staff" json:"served_by_staff,omitempty"`
+	CreatedAt       time.Time                `db:"created_at" json:"created_at"`
+	UpdatedAt       time.Time                `db:"updated_at" json:"updated_at"`
 
 	// Populated via JOINs
 	Items []LoungeOrderItem `db:"-" json:"items,omitempty"`

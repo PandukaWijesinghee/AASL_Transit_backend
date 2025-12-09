@@ -23,9 +23,9 @@ type LoungeStaff struct {
 
 	// Employment Info
 	EmploymentStatus LoungeStaffEmploymentStatus `db:"employment_status" json:"employment_status"` // active, terminated, suspended
-	HiredDate        sql.NullTime   `db:"hired_date" json:"hired_date,omitempty"`
-	TerminatedDate   sql.NullTime   `db:"terminated_date" json:"terminated_date,omitempty"`
-	Notes            sql.NullString `db:"notes" json:"notes,omitempty"`
+	HiredDate        sql.NullTime                `db:"hired_date" json:"hired_date,omitempty"`
+	TerminatedDate   sql.NullTime                `db:"terminated_date" json:"terminated_date,omitempty"`
+	Notes            sql.NullString              `db:"notes" json:"notes,omitempty"`
 
 	// Timestamps
 	CreatedAt time.Time `db:"created_at" json:"created_at"` // Invitation time

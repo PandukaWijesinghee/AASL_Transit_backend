@@ -119,7 +119,7 @@ func (r *LoungeRepository) GetAllActiveLounges() ([]models.Lounge, error) {
 	var lounges []models.Lounge
 	query := `
 		SELECT * FROM lounges 
-		WHERE status = 'active' AND is_operational = true
+		WHERE status = 'approved' AND is_operational = true
 		ORDER BY lounge_name
 	`
 	err := r.db.Select(&lounges, query)
@@ -135,7 +135,7 @@ func (r *LoungeRepository) SearchActiveLounges(state string, limit int) ([]model
 	var args []interface{}
 	argNum := 1
 
-	query := `SELECT * FROM lounges WHERE status = 'active' AND is_operational = true`
+	query := `SELECT * FROM lounges WHERE status = 'approved' AND is_operational = true`
 
 	if state != "" {
 		query += fmt.Sprintf(" AND LOWER(state) = LOWER($%d)", argNum)
@@ -164,7 +164,7 @@ func (r *LoungeRepository) GetDistinctStates() ([]string, error) {
 	var states []string
 	query := `
 		SELECT DISTINCT state FROM lounges 
-		WHERE status = 'active' AND is_operational = true AND state IS NOT NULL AND state != ''
+		WHERE status = 'approved' AND is_operational = true AND state IS NOT NULL AND state != ''
 		ORDER BY state
 	`
 	err := r.db.Select(&states, query)
