@@ -47,13 +47,13 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 	query := `
 		SELECT 
 			p.id, p.lounge_id, p.category_id, p.name, p.description, 
-			p.price, p.image_url, p.is_available, p.sort_order, 
+			p.price, p.image_url, p.is_available, p.display_order, 
 			p.created_at, p.updated_at,
 			c.name as category_name
 		FROM lounge_products p
 		JOIN lounge_marketplace_categories c ON p.category_id = c.id
 		WHERE p.lounge_id = $1 AND p.is_available = TRUE
-		ORDER BY c.sort_order, p.sort_order ASC
+		ORDER BY c.sort_order, p.display_order ASC
 	`
 
 	rows, err := r.db.Queryx(query, loungeID)
@@ -67,7 +67,7 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 		var categoryName string
 		err := rows.Scan(
 			&p.ID, &p.LoungeID, &p.CategoryID, &p.Name, &p.Description,
-			&p.Price, &p.ImageURL, &p.IsAvailable, &p.SortOrder,
+			&p.Price, &p.ImageURL, &p.IsAvailable, &p.DisplayOrder,
 			&p.CreatedAt, &p.UpdatedAt, &categoryName,
 		)
 		if err != nil {
@@ -105,12 +105,12 @@ func (r *LoungeBookingRepository) CreateProduct(product *models.LoungeProduct) e
 	query := `
 		INSERT INTO lounge_products (
 			id, lounge_id, category_id, name, description, price, 
-			image_url, is_available, sort_order, created_at, updated_at
+			image_url, is_available, display_order, created_at, updated_at
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 	_, err := r.db.Exec(query,
 		product.ID, product.LoungeID, product.CategoryID, product.Name, product.Description,
-		product.Price, product.ImageURL, product.IsAvailable, product.SortOrder,
+		product.Price, product.ImageURL, product.IsAvailable, product.DisplayOrder,
 		product.CreatedAt, product.UpdatedAt,
 	)
 	return err
@@ -122,12 +122,12 @@ func (r *LoungeBookingRepository) UpdateProduct(product *models.LoungeProduct) e
 	query := `
 		UPDATE lounge_products
 		SET name = $2, description = $3, price = $4, image_url = $5, 
-		    is_available = $6, sort_order = $7, category_id = $8, updated_at = $9
+		    is_available = $6, display_order = $7, category_id = $8, updated_at = $9
 		WHERE id = $1
 	`
 	_, err := r.db.Exec(query,
 		product.ID, product.Name, product.Description, product.Price, product.ImageURL,
-		product.IsAvailable, product.SortOrder, product.CategoryID, product.UpdatedAt,
+		product.IsAvailable, product.DisplayOrder, product.CategoryID, product.UpdatedAt,
 	)
 	return err
 }

@@ -95,7 +95,7 @@ type CreateProductRequest struct {
 	Description *string `json:"description,omitempty"`
 	Price       string  `json:"price" binding:"required"`
 	ImageURL    *string `json:"image_url,omitempty"`
-	SortOrder   int     `json:"sort_order"`
+	DisplayOrder int    `json:"display_order"`
 }
 
 // CreateProduct handles POST /api/v1/lounges/:id/products (lounge owner only)
@@ -165,12 +165,12 @@ func (h *LoungeBookingHandler) CreateProduct(c *gin.Context) {
 	}
 
 	product := &models.LoungeProduct{
-		LoungeID:    loungeID,
-		CategoryID:  categoryID,
-		Name:        req.Name,
-		Price:       req.Price,
-		IsAvailable: true,
-		SortOrder:   req.SortOrder,
+		LoungeID:     loungeID,
+		CategoryID:   categoryID,
+		Name:         req.Name,
+		Price:        req.Price,
+		IsAvailable:  true,
+		DisplayOrder: req.DisplayOrder,
 	}
 
 	if req.Description != nil {
@@ -205,7 +205,7 @@ type UpdateProductRequest struct {
 	Price       string  `json:"price"`
 	ImageURL    *string `json:"image_url,omitempty"`
 	IsAvailable *bool   `json:"is_available,omitempty"`
-	SortOrder   int     `json:"sort_order"`
+	DisplayOrder int    `json:"display_order"`
 }
 
 // UpdateProduct handles PUT /api/v1/lounges/:id/products/:product_id
@@ -315,7 +315,7 @@ func (h *LoungeBookingHandler) UpdateProduct(c *gin.Context) {
 	if req.IsAvailable != nil {
 		product.IsAvailable = *req.IsAvailable
 	}
-	product.SortOrder = req.SortOrder
+	product.DisplayOrder = req.DisplayOrder
 
 	if err := h.bookingRepo.UpdateProduct(product); err != nil {
 		log.Printf("ERROR: Failed to update product: %v", err)

@@ -169,15 +169,15 @@ type LoungeProduct struct {
 	ID          uuid.UUID                `db:"id" json:"id"`
 	LoungeID    uuid.UUID                `db:"lounge_id" json:"lounge_id"`
 	CategoryID  uuid.UUID                `db:"category_id" json:"category_id"`
-	Name        string                   `db:"name" json:"name"`
-	Description sql.NullString           `db:"description" json:"description,omitempty"`
-	Price       string                   `db:"price" json:"price"` // DECIMAL(10,2) as string
-	ImageURL    sql.NullString           `db:"image_url" json:"image_url,omitempty"`
-	StockStatus LoungeProductStockStatus `db:"stock_status" json:"stock_status"`
-	ProductType LoungeProductType        `db:"product_type" json:"product_type"`
-	IsAvailable bool                     `db:"is_available" json:"is_available"`
-	SortOrder   int                      `db:"sort_order" json:"sort_order"`
-	CreatedAt   time.Time                `db:"created_at" json:"created_at"`
+	Name         string                   `db:"name" json:"name"`
+	Description  sql.NullString           `db:"description" json:"description,omitempty"`
+	Price        string                   `db:"price" json:"price"` // DECIMAL(10,2) as string
+	ImageURL     sql.NullString           `db:"image_url" json:"image_url,omitempty"`
+	StockStatus  LoungeProductStockStatus `db:"stock_status" json:"stock_status"`
+	ProductType  LoungeProductType        `db:"product_type" json:"product_type"`
+	IsAvailable  bool                     `db:"is_available" json:"is_available"`
+	DisplayOrder int                      `db:"display_order" json:"display_order"`
+	CreatedAt    time.Time                `db:"created_at" json:"created_at"`
 	UpdatedAt   time.Time                `db:"updated_at" json:"updated_at"`
 
 	// Populated via JOINs
