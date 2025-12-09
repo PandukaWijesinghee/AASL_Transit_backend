@@ -9920,6 +9920,16 @@ components:
         lounge_name:
           type: string
           example: "City Central Lounge"
+        lounge_address:
+          type: string
+          nullable: true
+          example: "123 Main Street, Colombo"
+          description: "Denormalized lounge address at booking time"
+        lounge_phone:
+          type: string
+          nullable: true
+          example: "+94112345678"
+          description: "Denormalized lounge phone at booking time"
         user_id:
           type: string
           format: uuid
@@ -9942,8 +9952,13 @@ components:
           example: "standalone"
         pricing_type:
           type: string
-          enum: [1_hour, 2_hours, 3_hours, until_bus]
+          enum: [1_hour, 2_hours, 3_hours, until_bus, custom]
           example: "2_hours"
+        price_per_guest:
+          type: string
+          nullable: true
+          example: "450.00"
+          description: "Price per guest (base_price / number_of_guests)"
         number_of_guests:
           type: integer
           example: 2
