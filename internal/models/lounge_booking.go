@@ -326,6 +326,20 @@ type LoungeBookingGuest struct {
 	CreatedAt        time.Time      `db:"created_at" json:"created_at"`
 }
 
+// MarshalJSON implements custom JSON marshaling for LoungeBookingGuest
+func (g *LoungeBookingGuest) MarshalJSON() ([]byte, error) {
+	type Alias LoungeBookingGuest
+	return json.Marshal(&struct {
+		*Alias
+		GuestPhone  *string    `json:"guest_phone,omitempty"`
+		CheckedInAt *time.Time `json:"checked_in_at,omitempty"`
+	}{
+		Alias:       (*Alias)(g),
+		GuestPhone:  nullStringToPtr(g.GuestPhone),
+		CheckedInAt: nullTimeToPtr(g.CheckedInAt),
+	})
+}
+
 // ============================================================================
 // LOUNGE BOOKING PRE-ORDER (lounge_booking_pre_orders table)
 // ============================================================================
@@ -370,6 +384,20 @@ type LoungeOrder struct {
 	Items []LoungeOrderItem `db:"-" json:"items,omitempty"`
 }
 
+// MarshalJSON implements custom JSON marshaling for LoungeOrder
+func (o *LoungeOrder) MarshalJSON() ([]byte, error) {
+	type Alias LoungeOrder
+	return json.Marshal(&struct {
+		*Alias
+		PaymentMethod *string `json:"payment_method,omitempty"`
+		Notes         *string `json:"notes,omitempty"`
+	}{
+		Alias:         (*Alias)(o),
+		PaymentMethod: nullStringToPtr(o.PaymentMethod),
+		Notes:         nullStringToPtr(o.Notes),
+	})
+}
+
 // ============================================================================
 // LOUNGE ORDER ITEM (lounge_order_items table)
 // ============================================================================
@@ -405,6 +433,18 @@ type LoungeProductReview struct {
 	// Populated via JOINs
 	UserName    string `db:"-" json:"user_name,omitempty"`
 	ProductName string `db:"-" json:"product_name,omitempty"`
+}
+
+// MarshalJSON implements custom JSON marshaling for LoungeProductReview
+func (r *LoungeProductReview) MarshalJSON() ([]byte, error) {
+	type Alias LoungeProductReview
+	return json.Marshal(&struct {
+		*Alias
+		ReviewText *string `json:"review_text,omitempty"`
+	}{
+		Alias:      (*Alias)(r),
+		ReviewText: nullStringToPtr(r.ReviewText),
+	})
 }
 
 // ============================================================================
