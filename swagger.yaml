@@ -9825,6 +9825,10 @@ components:
           type: boolean
           example: false
           description: "Dietary information - vegetarian"
+        is_vegan:
+          type: boolean
+          example: false
+          description: "Dietary information - vegan"
         is_halal:
           type: boolean
           example: false

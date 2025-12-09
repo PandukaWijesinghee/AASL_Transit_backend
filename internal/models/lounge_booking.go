@@ -176,6 +176,7 @@ type LoungeProduct struct {
 	IsAvailable            bool                     `db:"is_available" json:"is_available"`
 	IsPreOrderable         bool                     `db:"is_pre_orderable" json:"is_pre_orderable"`
 	IsVegetarian           bool                     `db:"is_vegetarian" json:"is_vegetarian"`
+	IsVegan                bool                     `db:"is_vegan" json:"is_vegan"`
 	IsHalal                bool                     `db:"is_halal" json:"is_halal"`
 	DisplayOrder           int                      `db:"display_order" json:"display_order"`
 	ServiceDurationMinutes *int                     `db:"service_duration_minutes" json:"service_duration_minutes,omitempty"`

@@ -29,10 +29,10 @@ func NewLoungeBookingRepository(db *sqlx.DB) *LoungeBookingRepository {
 func (r *LoungeBookingRepository) GetAllCategories() ([]models.LoungeMarketplaceCategory, error) {
 	var categories []models.LoungeMarketplaceCategory
 	query := `
-		SELECT id, name, description, icon_url, sort_order, is_active, created_at, updated_at
+		SELECT id, name, description, icon_url, display_order, is_active, created_at, updated_at
 		FROM lounge_marketplace_categories
 		WHERE is_active = TRUE
-		ORDER BY sort_order ASC
+		ORDER BY display_order ASC
 	`
 	err := r.db.Select(&categories, query)
 	return categories, err
@@ -49,7 +49,7 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 		SELECT 
 			p.id, p.lounge_id, p.category_id, p.name, p.description, 
 			p.price, p.image_url, p.stock_status, p.product_type,
-			p.is_available, p.is_pre_orderable, p.is_vegetarian, p.is_halal,
+			p.is_available, p.is_pre_orderable, p.is_vegetarian, p.is_vegan, p.is_halal,
 			p.display_order, p.service_duration_minutes, 
 			p.available_from, p.available_until, p.tags,
 			p.created_at, p.updated_at,
@@ -79,7 +79,7 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 		err := rows.Scan(
 			&p.ID, &p.LoungeID, &p.CategoryID, &p.Name, &description,
 			&p.Price, &imageURL, &stockStatus, &productType,
-			&p.IsAvailable, &p.IsPreOrderable, &p.IsVegetarian, &p.IsHalal,
+			&p.IsAvailable, &p.IsPreOrderable, &p.IsVegetarian, &p.IsVegan, &p.IsHalal,
 			&p.DisplayOrder, &serviceDurationMinutes,
 			&availableFrom, &availableUntil, pq.Array(&tags),
 			&p.CreatedAt, &p.UpdatedAt, &categoryName,
@@ -118,18 +118,69 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 
 // GetProductByID returns a product by ID
 func (r *LoungeBookingRepository) GetProductByID(productID uuid.UUID) (*models.LoungeProduct, error) {
-	var product models.LoungeProduct
+	var p models.LoungeProduct
 	query := `
-		SELECT id, lounge_id, category_id, name, description, price, 
-		       image_url, is_available, sort_order, created_at, updated_at
-		FROM lounge_products
-		WHERE id = $1
+		SELECT 
+			p.id, p.lounge_id, p.category_id, p.name, p.description, 
+			p.price, p.image_url, p.stock_status, p.product_type,
+			p.is_available, p.is_pre_orderable, p.display_order,
+			p.service_duration_minutes, p.available_from, p.available_until,
+			p.is_vegetarian, p.is_vegan, p.is_halal, p.tags,
+			p.created_at, p.updated_at,
+			c.name as category_name
+		FROM lounge_products p
+		LEFT JOIN lounge_marketplace_categories c ON p.category_id = c.id
+		WHERE p.id = $1
 	`
-	err := r.db.Get(&product, query, productID)
+	
+	// Scan with proper type handling
+	var description, imageURL, availableFrom, availableUntil sql.NullString
+	var serviceDurationMinutes sql.NullInt64
+	var tags []string
+	var stockStatus, productType, categoryName string
+	
+	err := r.db.QueryRow(query, productID).Scan(
+		&p.ID, &p.LoungeID, &p.CategoryID, &p.Name, &description,
+		&p.Price, &imageURL, &stockStatus, &productType,
+		&p.IsAvailable, &p.IsPreOrderable, &p.DisplayOrder,
+		&serviceDurationMinutes, &availableFrom, &availableUntil,
+		&p.IsVegetarian, &p.IsVegan, &p.IsHalal, pq.Array(&tags),
+		&p.CreatedAt, &p.UpdatedAt,
+		&categoryName,
+	)
+	
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
-	return &product, err
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert nullable fields to pointers
+	if description.Valid {
+		p.Description = &description.String
+	}
+	if imageURL.Valid {
+		p.ImageURL = &imageURL.String
+	}
+	if serviceDurationMinutes.Valid {
+		val := int(serviceDurationMinutes.Int64)
+		p.ServiceDurationMinutes = &val
+	}
+	if availableFrom.Valid {
+		p.AvailableFrom = &availableFrom.String
+	}
+	if availableUntil.Valid {
+		p.AvailableUntil = &availableUntil.String
+	}
+	
+	// Set ENUM types and other fields
+	p.StockStatus = models.LoungeProductStockStatus(stockStatus)
+	p.ProductType = models.LoungeProductType(productType)
+	p.Tags = tags
+	p.CategoryName = categoryName
+	
+	return &p, nil
 }
 
 // CreateProduct creates a new product for a lounge
