@@ -599,11 +599,11 @@ func (h *LoungeBookingHandler) CreateLoungeBooking(c *gin.Context) {
 
 		preOrders = append(preOrders, models.LoungeBookingPreOrder{
 			ProductID:       productID,
-			ProductName:     product.Name,                    // Snapshot
-			ProductType:     string(product.ProductType),     // Snapshot - required NOT NULL
-			ProductImageURL: product.ImageURL,                // Snapshot
+			ProductName:     product.Name,                // Snapshot
+			ProductType:     string(product.ProductType), // Snapshot - required NOT NULL
+			ProductImageURL: product.ImageURL,            // Snapshot
 			Quantity:        po.Quantity,
-			UnitPrice:       unitPrice,                       // Snapshot
+			UnitPrice:       unitPrice, // Snapshot
 			TotalPrice:      strconv.FormatFloat(totalFloat, 'f', 2, 64),
 		})
 	}

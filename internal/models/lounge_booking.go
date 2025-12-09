@@ -21,23 +21,9 @@ const (
 	LoungeBookingStandalone LoungeBookingType = "standalone" // Independent lounge visit
 )
 
-// LoungeBookingLoungeType represents the lounge type ENUM
-type LoungeBookingLoungeType string
-
-const (
-	LoungeBookingLoungeTypeHourly  LoungeBookingLoungeType = "hourly"
-	LoungeBookingLoungeTypeDayPass LoungeBookingLoungeType = "day_pass"
-	LoungeBookingLoungeTypePremium LoungeBookingLoungeType = "premium"
-)
-
-// LoungeBookingDurationType represents the duration type ENUM
-type LoungeBookingDurationType string
-
-const (
-	LoungeBookingDurationTypeHours   LoungeBookingDurationType = "hours"
-	LoungeBookingDurationTypeDays    LoungeBookingDurationType = "days"
-	LoungeBookingDurationTypeMinutes LoungeBookingDurationType = "minutes"
-)
+// NOTE: PricingType is stored as plain string in LoungeBooking struct
+// Database ENUM values: '1_hour', '2_hours', '3_hours', 'until_bus', 'custom'
+// Validation is done in CreateLoungeBookingRequest.Validate()
 
 // LoungeBookingStatus represents the status of a lounge booking
 type LoungeBookingStatus string
@@ -66,12 +52,14 @@ const (
 )
 
 // LoungeBookingDeliveryPreference represents the delivery preference ENUM
+// Database ENUM: 'on_check_in', 'on_check_out', 'specific_time', 'on_request'
 type LoungeBookingDeliveryPreference string
 
 const (
-	LoungeBookingDeliveryPreferenceOnArrival LoungeBookingDeliveryPreference = "on_arrival"
-	LoungeBookingDeliveryPreferenceScheduled LoungeBookingDeliveryPreference = "scheduled"
-	LoungeBookingDeliveryPreferenceImmediate LoungeBookingDeliveryPreference = "immediate"
+	LoungeBookingDeliveryPreferenceOnCheckIn   LoungeBookingDeliveryPreference = "on_check_in"
+	LoungeBookingDeliveryPreferenceOnCheckOut  LoungeBookingDeliveryPreference = "on_check_out"
+	LoungeBookingDeliveryPreferenceSpecificTime LoungeBookingDeliveryPreference = "specific_time"
+	LoungeBookingDeliveryPreferenceOnRequest   LoungeBookingDeliveryPreference = "on_request"
 )
 
 // LoungeOrderStatus represents the status of an in-lounge order
@@ -297,16 +285,16 @@ type LoungeBookingGuest struct {
 
 // LoungeBookingPreOrder represents a pre-ordered item with a booking
 type LoungeBookingPreOrder struct {
-	ID              uuid.UUID  `db:"id" json:"id"`
-	LoungeBookingID uuid.UUID  `db:"lounge_booking_id" json:"lounge_booking_id"`
-	ProductID       uuid.UUID  `db:"product_id" json:"product_id"`
-	ProductName     string     `db:"product_name" json:"product_name"`         // Snapshot at booking time
-	ProductType     string     `db:"product_type" json:"product_type"`         // Snapshot - NOT NULL in DB
-	ProductImageURL *string    `db:"product_image_url" json:"product_image_url,omitempty"` // Snapshot
-	Quantity        int        `db:"quantity" json:"quantity"`
-	UnitPrice       string     `db:"unit_price" json:"unit_price"`             // DECIMAL - snapshot
-	TotalPrice      string     `db:"total_price" json:"total_price"`           // DECIMAL
-	CreatedAt       time.Time  `db:"created_at" json:"created_at"`
+	ID              uuid.UUID `db:"id" json:"id"`
+	LoungeBookingID uuid.UUID `db:"lounge_booking_id" json:"lounge_booking_id"`
+	ProductID       uuid.UUID `db:"product_id" json:"product_id"`
+	ProductName     string    `db:"product_name" json:"product_name"`                     // Snapshot at booking time
+	ProductType     string    `db:"product_type" json:"product_type"`                     // Snapshot - NOT NULL in DB
+	ProductImageURL *string   `db:"product_image_url" json:"product_image_url,omitempty"` // Snapshot
+	Quantity        int       `db:"quantity" json:"quantity"`
+	UnitPrice       string    `db:"unit_price" json:"unit_price"`   // DECIMAL - snapshot
+	TotalPrice      string    `db:"total_price" json:"total_price"` // DECIMAL
+	CreatedAt       time.Time `db:"created_at" json:"created_at"`
 }
 
 // ============================================================================
@@ -440,10 +428,10 @@ func (r *CreateLoungeBookingRequest) Validate() error {
 	}
 
 	validPricingTypes := map[string]bool{
-		"1_hour": true, "2_hours": true, "3_hours": true, "until_bus": true,
+		"1_hour": true, "2_hours": true, "3_hours": true, "until_bus": true, "custom": true,
 	}
 	if !validPricingTypes[r.PricingType] {
-		return errors.New("invalid pricing_type")
+		return errors.New("invalid pricing_type: must be 1_hour, 2_hours, 3_hours, until_bus, or custom")
 	}
 
 	// Ensure at least one primary guest

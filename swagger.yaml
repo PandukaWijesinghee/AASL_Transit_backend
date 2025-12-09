@@ -10147,7 +10147,7 @@ components:
           description: Optional - link to existing bus booking
         pricing_type:
           type: string
-          enum: [1_hour, 2_hours, 3_hours, until_bus]
+          enum: [1_hour, 2_hours, 3_hours, until_bus, custom]
           example: "2_hours"
         check_in_time:
           type: string

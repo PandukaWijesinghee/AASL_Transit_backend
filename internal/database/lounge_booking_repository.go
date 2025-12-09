@@ -132,13 +132,13 @@ func (r *LoungeBookingRepository) GetProductByID(productID uuid.UUID) (*models.L
 		LEFT JOIN lounge_marketplace_categories c ON p.category_id = c.id
 		WHERE p.id = $1
 	`
-	
+
 	// Scan with proper type handling
 	var description, imageURL, availableFrom, availableUntil sql.NullString
 	var serviceDurationMinutes sql.NullInt64
 	var tags []string
 	var stockStatus, productType, categoryName string
-	
+
 	err := r.db.QueryRow(query, productID).Scan(
 		&p.ID, &p.LoungeID, &p.CategoryID, &p.Name, &description,
 		&p.Price, &imageURL, &stockStatus, &productType,
@@ -148,14 +148,14 @@ func (r *LoungeBookingRepository) GetProductByID(productID uuid.UUID) (*models.L
 		&p.CreatedAt, &p.UpdatedAt,
 		&categoryName,
 	)
-	
+
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Convert nullable fields to pointers
 	if description.Valid {
 		p.Description = &description.String
@@ -173,13 +173,13 @@ func (r *LoungeBookingRepository) GetProductByID(productID uuid.UUID) (*models.L
 	if availableUntil.Valid {
 		p.AvailableUntil = &availableUntil.String
 	}
-	
+
 	// Set ENUM types and other fields
 	p.StockStatus = models.LoungeProductStockStatus(stockStatus)
 	p.ProductType = models.LoungeProductType(productType)
 	p.Tags = tags
 	p.CategoryName = categoryName
-	
+
 	return &p, nil
 }
 
