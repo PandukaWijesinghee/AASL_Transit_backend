@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -56,10 +57,10 @@ const (
 type LoungeBookingDeliveryPreference string
 
 const (
-	LoungeBookingDeliveryPreferenceOnCheckIn   LoungeBookingDeliveryPreference = "on_check_in"
-	LoungeBookingDeliveryPreferenceOnCheckOut  LoungeBookingDeliveryPreference = "on_check_out"
+	LoungeBookingDeliveryPreferenceOnCheckIn    LoungeBookingDeliveryPreference = "on_check_in"
+	LoungeBookingDeliveryPreferenceOnCheckOut   LoungeBookingDeliveryPreference = "on_check_out"
 	LoungeBookingDeliveryPreferenceSpecificTime LoungeBookingDeliveryPreference = "specific_time"
-	LoungeBookingDeliveryPreferenceOnRequest   LoungeBookingDeliveryPreference = "on_request"
+	LoungeBookingDeliveryPreferenceOnRequest    LoungeBookingDeliveryPreference = "on_request"
 )
 
 // LoungeOrderStatus represents the status of an in-lounge order
@@ -261,6 +262,52 @@ type LoungeBooking struct {
 	// Populated via JOINs (not in DB table itself)
 	Guests    []LoungeBookingGuest    `db:"-" json:"guests,omitempty"`
 	PreOrders []LoungeBookingPreOrder `db:"-" json:"pre_orders,omitempty"`
+}
+
+// MarshalJSON customizes JSON encoding for LoungeBooking
+// Converts sql.NullTime and sql.NullString to proper JSON null or string values
+func (lb *LoungeBooking) MarshalJSON() ([]byte, error) {
+	type Alias LoungeBooking
+	return json.Marshal(&struct {
+		*Alias
+		ScheduledDeparture  *time.Time `json:"scheduled_departure,omitempty"`
+		ActualArrival       *time.Time `json:"actual_arrival,omitempty"`
+		ActualDeparture     *time.Time `json:"actual_departure,omitempty"`
+		CancelledAt         *time.Time `json:"cancelled_at,omitempty"`
+		PromoCode           *string    `json:"promo_code,omitempty"`
+		SpecialRequests     *string    `json:"special_requests,omitempty"`
+		InternalNotes       *string    `json:"internal_notes,omitempty"`
+		LoungeAddress       *string    `json:"lounge_address,omitempty"`
+		LoungePhone         *string    `json:"lounge_phone,omitempty"`
+		CancellationReason  *string    `json:"cancellation_reason,omitempty"`
+	}{
+		Alias:               (*Alias)(lb),
+		ScheduledDeparture:  nullTimeToPtr(lb.ScheduledDeparture),
+		ActualArrival:       nullTimeToPtr(lb.ActualArrival),
+		ActualDeparture:     nullTimeToPtr(lb.ActualDeparture),
+		CancelledAt:         nullTimeToPtr(lb.CancelledAt),
+		PromoCode:           nullStringToPtr(lb.PromoCode),
+		SpecialRequests:     nullStringToPtr(lb.SpecialRequests),
+		InternalNotes:       nullStringToPtr(lb.InternalNotes),
+		LoungeAddress:       nullStringToPtr(lb.LoungeAddress),
+		LoungePhone:         nullStringToPtr(lb.LoungePhone),
+		CancellationReason:  nullStringToPtr(lb.CancellationReason),
+	})
+}
+
+// Helper functions for null type conversion
+func nullTimeToPtr(nt sql.NullTime) *time.Time {
+	if nt.Valid {
+		return &nt.Time
+	}
+	return nil
+}
+
+func nullStringToPtr(ns sql.NullString) *string {
+	if ns.Valid {
+		return &ns.String
+	}
+	return nil
 }
 
 // ============================================================================
