@@ -257,17 +257,21 @@ type LoungeBooking struct {
 	SpecialRequests sql.NullString `db:"special_requests" json:"special_requests,omitempty"`
 	InternalNotes   sql.NullString `db:"internal_notes" json:"internal_notes,omitempty"`
 
+	// Lounge Info (denormalized for booking record)
+	LoungeName    string         `db:"lounge_name" json:"lounge_name"`
+	LoungeAddress sql.NullString `db:"lounge_address" json:"lounge_address,omitempty"`
+	LoungePhone   sql.NullString `db:"lounge_phone" json:"lounge_phone,omitempty"`
+	PricePerGuest string         `db:"price_per_guest" json:"price_per_guest"`
+
 	// Timestamps
 	CancelledAt        sql.NullTime   `db:"cancelled_at" json:"cancelled_at,omitempty"`
 	CancellationReason sql.NullString `db:"cancellation_reason" json:"cancellation_reason,omitempty"`
 	CreatedAt          time.Time      `db:"created_at" json:"created_at"`
 	UpdatedAt          time.Time      `db:"updated_at" json:"updated_at"`
 
-	// Populated via JOINs (not in DB)
-	LoungeName    string                  `db:"-" json:"lounge_name,omitempty"`
-	LoungeAddress string                  `db:"-" json:"lounge_address,omitempty"`
-	Guests        []LoungeBookingGuest    `db:"-" json:"guests,omitempty"`
-	PreOrders     []LoungeBookingPreOrder `db:"-" json:"pre_orders,omitempty"`
+	// Populated via JOINs (not in DB table itself)
+	Guests    []LoungeBookingGuest    `db:"-" json:"guests,omitempty"`
+	PreOrders []LoungeBookingPreOrder `db:"-" json:"pre_orders,omitempty"`
 }
 
 // ============================================================================

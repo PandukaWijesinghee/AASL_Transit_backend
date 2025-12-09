@@ -174,22 +174,24 @@ func (r *LoungeBookingRepository) CreateLoungeBooking(
 		INSERT INTO lounge_bookings (
 			id, booking_reference, user_id, lounge_id, master_booking_id, bus_booking_id,
 			booking_type, scheduled_arrival, scheduled_departure, 
-			number_of_guests, pricing_type, base_price, pre_order_total, 
+			number_of_guests, pricing_type, price_per_guest, base_price, pre_order_total, 
 			discount_amount, total_amount, status, payment_status,
+			lounge_name, lounge_address, lounge_phone,
 			primary_guest_name, primary_guest_phone, promo_code, special_requests,
 			created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
 		)
 	`
 	_, err = tx.Exec(bookingQuery,
 		booking.ID, booking.BookingReference, booking.UserID, booking.LoungeID,
 		booking.MasterBookingID, booking.BusBookingID, booking.BookingType,
 		booking.ScheduledArrival, booking.ScheduledDeparture,
-		booking.NumberOfGuests, booking.PricingType, booking.BasePrice,
+		booking.NumberOfGuests, booking.PricingType, booking.PricePerGuest, booking.BasePrice,
 		booking.PreOrderTotal, booking.DiscountAmount, booking.TotalAmount,
-		booking.Status, booking.PaymentStatus, booking.PrimaryGuestName,
-		booking.PrimaryGuestPhone, booking.PromoCode, booking.SpecialRequests,
+		booking.Status, booking.PaymentStatus, 
+		booking.LoungeName, booking.LoungeAddress, booking.LoungePhone,
+		booking.PrimaryGuestName, booking.PrimaryGuestPhone, booking.PromoCode, booking.SpecialRequests,
 		booking.CreatedAt, booking.UpdatedAt,
 	)
 	if err != nil {

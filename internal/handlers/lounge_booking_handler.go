@@ -490,7 +490,12 @@ func (h *LoungeBookingHandler) CreateLoungeBooking(c *gin.Context) {
 		return
 	}
 
-	// Build booking
+	// Calculate price per guest
+	var basePriceVal float64
+	basePriceVal, _ = strconv.ParseFloat(basePrice, 64)
+	pricePerGuest := strconv.FormatFloat(basePriceVal/float64(req.NumberOfGuests), 'f', 2, 64)
+
+	// Build booking with denormalized lounge info
 	booking := &models.LoungeBooking{
 		UserID:            userCtx.UserID,
 		LoungeID:          loungeID,
@@ -499,11 +504,20 @@ func (h *LoungeBookingHandler) CreateLoungeBooking(c *gin.Context) {
 		NumberOfGuests:    req.NumberOfGuests,
 		PricingType:       req.PricingType,
 		BasePrice:         basePrice,
+		PricePerGuest:     pricePerGuest,
 		PreOrderTotal:     "0.00",
 		DiscountAmount:    "0.00",
 		PrimaryGuestName:  req.PrimaryGuestName,
 		PrimaryGuestPhone: req.PrimaryGuestPhone,
+		// Denormalized lounge info (snapshot at booking time)
+		LoungeName:    lounge.LoungeName,
+		LoungeAddress: lounge.Description, // Using description as address since address is already populated
+		LoungePhone:   lounge.ContactPhone,
 	}
+
+	// Set LoungeAddress properly
+	booking.LoungeAddress.String = lounge.Address
+	booking.LoungeAddress.Valid = true
 
 	// Handle scheduled departure
 	if req.ScheduledDeparture != nil {
