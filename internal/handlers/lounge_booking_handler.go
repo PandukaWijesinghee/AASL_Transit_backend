@@ -461,7 +461,7 @@ func (h *LoungeBookingHandler) CreateLoungeBooking(c *gin.Context) {
 		return
 	}
 
-	if lounge.Status != "active" || !lounge.IsOperational {
+	if lounge.Status != "approved" || !lounge.IsOperational {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "lounge_unavailable",
 			Message: "This lounge is currently not accepting bookings",
