@@ -9923,6 +9923,11 @@ components:
         user_id:
           type: string
           format: uuid
+        master_booking_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Optional link to master booking (for bus+lounge bookings)
         bus_booking_id:
           type: string
           format: uuid
@@ -9930,7 +9935,11 @@ components:
           description: Optional link to bus booking
         booking_reference:
           type: string
-          example: "LB-20250101-ABC123"
+          example: "LNG-abc123"
+        booking_type:
+          type: string
+          enum: [pre_trip, post_trip, standalone]
+          example: "standalone"
         pricing_type:
           type: string
           enum: [1_hour, 2_hours, 3_hours, until_bus]
@@ -9938,33 +9947,65 @@ components:
         number_of_guests:
           type: integer
           example: 2
-        check_in_time:
+        scheduled_arrival:
           type: string
           format: date-time
-        expected_end_time:
-          type: string
-          format: date-time
-          nullable: true
-        actual_check_out_time:
+          description: "When guest plans to arrive"
+        scheduled_departure:
           type: string
           format: date-time
           nullable: true
+          description: "When guest plans to leave (null if until_bus)"
+        actual_arrival:
+          type: string
+          format: date-time
+          nullable: true
+          description: "Actual check-in time"
+        actual_departure:
+          type: string
+          format: date-time
+          nullable: true
+          description: "Actual check-out time"
         base_price:
           type: string
           example: "900.00"
+        pre_order_total:
+          type: string
+          example: "0.00"
+          description: "Total of pre-ordered items"
+        discount_amount:
+          type: string
+          example: "0.00"
         total_amount:
           type: string
-          example: "1800.00"
+          example: "900.00"
+        status:
+          type: string
+          enum: [pending, confirmed, checked_in, in_lounge, checked_out, completed, cancelled, no_show]
+          example: "confirmed"
         payment_status:
           type: string
-          enum: [pending, partial, paid, refunded]
-          example: "paid"
-        booking_status:
+          enum: [pending, paid, partial, collect_on_site, failed, refunded]
+          example: "pending"
+        primary_guest_name:
           type: string
-          enum: [pending, confirmed, checked_in, completed, cancelled, no_show]
-          example: "confirmed"
+          example: "John Doe"
+        primary_guest_phone:
+          type: string
+          example: "+94771234567"
+        promo_code:
+          type: string
+          nullable: true
+          example: "WELCOME10"
         special_requests:
           type: string
+          nullable: true
+        internal_notes:
+          type: string
+          nullable: true
+        cancelled_at:
+          type: string
+          format: date-time
           nullable: true
         cancellation_reason:
           type: string
