@@ -90,12 +90,12 @@ func (h *LoungeBookingHandler) GetLoungeProducts(c *gin.Context) {
 
 // CreateProductRequest represents the request to create a product
 type CreateProductRequest struct {
-	CategoryID  string  `json:"category_id" binding:"required"`
-	Name        string  `json:"name" binding:"required"`
-	Description *string `json:"description,omitempty"`
-	Price       string  `json:"price" binding:"required"`
-	ImageURL    *string `json:"image_url,omitempty"`
-	DisplayOrder int    `json:"display_order"`
+	CategoryID   string  `json:"category_id" binding:"required"`
+	Name         string  `json:"name" binding:"required"`
+	Description  *string `json:"description,omitempty"`
+	Price        string  `json:"price" binding:"required"`
+	ImageURL     *string `json:"image_url,omitempty"`
+	DisplayOrder int     `json:"display_order"`
 }
 
 // CreateProduct handles POST /api/v1/lounges/:id/products (lounge owner only)
@@ -199,13 +199,13 @@ func (h *LoungeBookingHandler) CreateProduct(c *gin.Context) {
 
 // UpdateProductRequest represents the request to update a product
 type UpdateProductRequest struct {
-	CategoryID  string  `json:"category_id"`
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
-	Price       string  `json:"price"`
-	ImageURL    *string `json:"image_url,omitempty"`
-	IsAvailable *bool   `json:"is_available,omitempty"`
-	DisplayOrder int    `json:"display_order"`
+	CategoryID   string  `json:"category_id"`
+	Name         string  `json:"name"`
+	Description  *string `json:"description,omitempty"`
+	Price        string  `json:"price"`
+	ImageURL     *string `json:"image_url,omitempty"`
+	IsAvailable  *bool   `json:"is_available,omitempty"`
+	DisplayOrder int     `json:"display_order"`
 }
 
 // UpdateProduct handles PUT /api/v1/lounges/:id/products/:product_id

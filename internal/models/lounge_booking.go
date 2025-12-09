@@ -128,14 +128,14 @@ const (
 
 // LoungeMarketplaceCategory represents a product category
 type LoungeMarketplaceCategory struct {
-	ID          uuid.UUID      `db:"id" json:"id"`
+	ID           uuid.UUID      `db:"id" json:"id"`
 	Name         string         `db:"name" json:"name"`
 	Description  sql.NullString `db:"description" json:"description,omitempty"`
 	IconURL      sql.NullString `db:"icon_url" json:"icon_url,omitempty"`
 	DisplayOrder int            `db:"display_order" json:"display_order"`
 	IsActive     bool           `db:"is_active" json:"is_active"`
-	CreatedAt   time.Time      `db:"created_at" json:"created_at"`
-	UpdatedAt   time.Time      `db:"updated_at" json:"updated_at"`
+	CreatedAt    time.Time      `db:"created_at" json:"created_at"`
+	UpdatedAt    time.Time      `db:"updated_at" json:"updated_at"`
 }
 
 // ============================================================================
@@ -150,25 +150,23 @@ const (
 	LoungeProductStockStatusLowStock     LoungeProductStockStatus = "low_stock"
 	LoungeProductStockStatusOutOfStock   LoungeProductStockStatus = "out_of_stock"
 	LoungeProductStockStatusDiscontinued LoungeProductStockStatus = "discontinued"
+	LoungeProductStockStatusMadeToOrder  LoungeProductStockStatus = "made_to_order" // Fresh-cooked items
 )
 
 // LoungeProductType represents the product type ENUM
 type LoungeProductType string
 
 const (
-	LoungeProductTypeFood     LoungeProductType = "food"
-	LoungeProductTypeBeverage LoungeProductType = "beverage"
-	LoungeProductTypeSnack    LoungeProductType = "snack"
-	LoungeProductTypeMeal     LoungeProductType = "meal"
-	LoungeProductTypeDessert  LoungeProductType = "dessert"
-	LoungeProductTypeService  LoungeProductType = "service"
+	LoungeProductTypeProduct LoungeProductType = "product" // Food, beverages, snacks, etc.
+	LoungeProductTypeService LoungeProductType = "service" // Storage, WiFi, shower, etc.
+	LoungeProductTypePackage LoungeProductType = "package" // Bundled offerings
 )
 
 // LoungeProduct represents a product/service offered by a lounge
 type LoungeProduct struct {
-	ID          uuid.UUID                `db:"id" json:"id"`
-	LoungeID    uuid.UUID                `db:"lounge_id" json:"lounge_id"`
-	CategoryID  uuid.UUID                `db:"category_id" json:"category_id"`
+	ID           uuid.UUID                `db:"id" json:"id"`
+	LoungeID     uuid.UUID                `db:"lounge_id" json:"lounge_id"`
+	CategoryID   uuid.UUID                `db:"category_id" json:"category_id"`
 	Name         string                   `db:"name" json:"name"`
 	Description  sql.NullString           `db:"description" json:"description,omitempty"`
 	Price        string                   `db:"price" json:"price"` // DECIMAL(10,2) as string
@@ -178,7 +176,7 @@ type LoungeProduct struct {
 	IsAvailable  bool                     `db:"is_available" json:"is_available"`
 	DisplayOrder int                      `db:"display_order" json:"display_order"`
 	CreatedAt    time.Time                `db:"created_at" json:"created_at"`
-	UpdatedAt   time.Time                `db:"updated_at" json:"updated_at"`
+	UpdatedAt    time.Time                `db:"updated_at" json:"updated_at"`
 
 	// Populated via JOINs
 	CategoryName string `db:"-" json:"category_name,omitempty"`
