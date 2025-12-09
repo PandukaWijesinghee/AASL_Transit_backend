@@ -71,7 +71,7 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 		var categoryName string
 		var stockStatus, productType string
 		var tags []string
-		
+
 		// Use sql.Null* types for scanning, then convert to pointers
 		var description, imageURL, availableFrom, availableUntil sql.NullString
 		var serviceDurationMinutes sql.NullInt64
@@ -87,7 +87,7 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Convert sql.Null* to pointers
 		if description.Valid {
 			p.Description = &description.String
@@ -105,7 +105,7 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 		if availableUntil.Valid {
 			p.AvailableUntil = &availableUntil.String
 		}
-		
+
 		p.StockStatus = models.LoungeProductStockStatus(stockStatus)
 		p.ProductType = models.LoungeProductType(productType)
 		p.Tags = tags
