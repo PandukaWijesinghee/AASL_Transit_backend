@@ -270,28 +270,28 @@ func (lb *LoungeBooking) MarshalJSON() ([]byte, error) {
 	type Alias LoungeBooking
 	return json.Marshal(&struct {
 		*Alias
-		ScheduledDeparture  *time.Time `json:"scheduled_departure,omitempty"`
-		ActualArrival       *time.Time `json:"actual_arrival,omitempty"`
-		ActualDeparture     *time.Time `json:"actual_departure,omitempty"`
-		CancelledAt         *time.Time `json:"cancelled_at,omitempty"`
-		PromoCode           *string    `json:"promo_code,omitempty"`
-		SpecialRequests     *string    `json:"special_requests,omitempty"`
-		InternalNotes       *string    `json:"internal_notes,omitempty"`
-		LoungeAddress       *string    `json:"lounge_address,omitempty"`
-		LoungePhone         *string    `json:"lounge_phone,omitempty"`
-		CancellationReason  *string    `json:"cancellation_reason,omitempty"`
+		ScheduledDeparture *time.Time `json:"scheduled_departure,omitempty"`
+		ActualArrival      *time.Time `json:"actual_arrival,omitempty"`
+		ActualDeparture    *time.Time `json:"actual_departure,omitempty"`
+		CancelledAt        *time.Time `json:"cancelled_at,omitempty"`
+		PromoCode          *string    `json:"promo_code,omitempty"`
+		SpecialRequests    *string    `json:"special_requests,omitempty"`
+		InternalNotes      *string    `json:"internal_notes,omitempty"`
+		LoungeAddress      *string    `json:"lounge_address,omitempty"`
+		LoungePhone        *string    `json:"lounge_phone,omitempty"`
+		CancellationReason *string    `json:"cancellation_reason,omitempty"`
 	}{
-		Alias:               (*Alias)(lb),
-		ScheduledDeparture:  nullTimeToPtr(lb.ScheduledDeparture),
-		ActualArrival:       nullTimeToPtr(lb.ActualArrival),
-		ActualDeparture:     nullTimeToPtr(lb.ActualDeparture),
-		CancelledAt:         nullTimeToPtr(lb.CancelledAt),
-		PromoCode:           nullStringToPtr(lb.PromoCode),
-		SpecialRequests:     nullStringToPtr(lb.SpecialRequests),
-		InternalNotes:       nullStringToPtr(lb.InternalNotes),
-		LoungeAddress:       nullStringToPtr(lb.LoungeAddress),
-		LoungePhone:         nullStringToPtr(lb.LoungePhone),
-		CancellationReason:  nullStringToPtr(lb.CancellationReason),
+		Alias:              (*Alias)(lb),
+		ScheduledDeparture: nullTimeToPtr(lb.ScheduledDeparture),
+		ActualArrival:      nullTimeToPtr(lb.ActualArrival),
+		ActualDeparture:    nullTimeToPtr(lb.ActualDeparture),
+		CancelledAt:        nullTimeToPtr(lb.CancelledAt),
+		PromoCode:          nullStringToPtr(lb.PromoCode),
+		SpecialRequests:    nullStringToPtr(lb.SpecialRequests),
+		InternalNotes:      nullStringToPtr(lb.InternalNotes),
+		LoungeAddress:      nullStringToPtr(lb.LoungeAddress),
+		LoungePhone:        nullStringToPtr(lb.LoungePhone),
+		CancellationReason: nullStringToPtr(lb.CancellationReason),
 	})
 }
 
