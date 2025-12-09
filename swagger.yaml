@@ -10854,3 +10854,149 @@ components:
               value:
                 error: Internal server error
                 details: An unexpected error occurred
+
+  # =============================================================================
+  # LOUNGE ENUMS - Must match PostgreSQL ENUM types and Go backend constants
+  # =============================================================================
+  
+  # Lounge Owner ENUMs
+  LoungeOwnerVerificationStatus:
+    type: string
+    enum:
+      - pending
+      - approved
+      - rejected
+      - suspended
+    description: Lounge owner verification status by admin
+    
+  LoungeOwnerRegistrationStep:
+    type: string
+    enum:
+      - phone_verified
+      - profile_submitted
+      - lounge_added
+      - completed
+    description: Lounge owner registration progress tracking
+    
+  # Lounge ENUMs
+  LoungeStatus:
+    type: string
+    enum:
+      - pending
+      - approved
+      - suspended
+      - rejected
+    description: Lounge approval status by admin
+    
+  # Lounge Staff ENUMs
+  LoungeStaffEmploymentStatus:
+    type: string
+    enum:
+      - active
+      - terminated
+      - suspended
+    description: Lounge staff employment status
+    
+  # Lounge Booking ENUMs
+  LoungeBookingStatus:
+    type: string
+    enum:
+      - pending
+      - confirmed
+      - checked_in
+      - in_lounge
+      - checked_out
+      - completed
+      - cancelled
+      - no_show
+    description: Lounge booking lifecycle status
+    
+  LoungeBookingLoungeType:
+    type: string
+    enum:
+      - hourly
+      - day_pass
+      - premium
+    description: Type of lounge booking package
+    
+  LoungeBookingDurationType:
+    type: string
+    enum:
+      - hours
+      - days
+      - minutes
+    description: Duration measurement unit for lounge booking
+    
+  LoungeBookingPreOrderStatus:
+    type: string
+    enum:
+      - pending
+      - confirmed
+      - preparing
+      - ready
+      - delivered
+      - cancelled
+    description: Pre-order item status
+    
+  LoungeBookingDeliveryPreference:
+    type: string
+    enum:
+      - on_arrival
+      - scheduled
+      - immediate
+    description: When to deliver pre-ordered items
+    
+  # Lounge Order ENUMs
+  LoungeOrderStatus:
+    type: string
+    enum:
+      - pending
+      - confirmed
+      - preparing
+      - ready
+      - served
+      - completed
+      - cancelled
+    description: In-lounge order status
+    
+  LoungeOrderPaymentStatus:
+    type: string
+    enum:
+      - pending
+      - paid
+      - failed
+      - refunded
+      - partial
+    description: Payment status for lounge orders
+    
+  LoungeOrderItemStatus:
+    type: string
+    enum:
+      - pending
+      - confirmed
+      - preparing
+      - ready
+      - served
+      - cancelled
+    description: Individual order item status
+    
+  # Lounge Product ENUMs
+  LoungeProductStockStatus:
+    type: string
+    enum:
+      - in_stock
+      - low_stock
+      - out_of_stock
+      - discontinued
+    description: Product availability status
+    
+  LoungeProductType:
+    type: string
+    enum:
+      - food
+      - beverage
+      - snack
+      - meal
+      - dessert
+      - service
+    description: Category of lounge product

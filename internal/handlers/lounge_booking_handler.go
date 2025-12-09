@@ -551,7 +551,7 @@ func (h *LoungeBookingHandler) CreateLoungeBooking(c *gin.Context) {
 	// Build pre-orders and calculate total
 	var preOrders []models.LoungeBookingPreOrder
 	preOrderTotal := 0.0
-	
+
 	for _, po := range req.PreOrders {
 		productID, err := uuid.Parse(po.ProductID)
 		if err != nil {
@@ -1170,7 +1170,7 @@ func (h *LoungeBookingHandler) CreateLoungeOrder(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Log user context for auditing
 	log.Printf("INFO: Creating lounge order for user %s", userCtx.UserID)
 

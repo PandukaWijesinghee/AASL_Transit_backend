@@ -22,7 +22,7 @@ type LoungeStaff struct {
 	ProfileCompleted bool `db:"profile_completed" json:"profile_completed"`
 
 	// Employment Info
-	EmploymentStatus string         `db:"employment_status" json:"employment_status"` // active, suspended, terminated
+	EmploymentStatus LoungeStaffEmploymentStatus `db:"employment_status" json:"employment_status"` // active, terminated, suspended
 	HiredDate        sql.NullTime   `db:"hired_date" json:"hired_date,omitempty"`
 	TerminatedDate   sql.NullTime   `db:"terminated_date" json:"terminated_date,omitempty"`
 	Notes            sql.NullString `db:"notes" json:"notes,omitempty"`
@@ -32,9 +32,11 @@ type LoungeStaff struct {
 	UpdatedAt time.Time `db:"updated_at" json:"updated_at"` // Last update / registration completion
 }
 
-// Employment status constants
+// LoungeStaffEmploymentStatus represents the employment status ENUM
+type LoungeStaffEmploymentStatus string
+
 const (
-	StaffEmploymentActive     = "active"
-	StaffEmploymentSuspended  = "suspended"
-	StaffEmploymentTerminated = "terminated"
+	LoungeStaffEmploymentActive     LoungeStaffEmploymentStatus = "active"
+	LoungeStaffEmploymentTerminated LoungeStaffEmploymentStatus = "terminated"
+	LoungeStaffEmploymentSuspended  LoungeStaffEmploymentStatus = "suspended"
 )

@@ -43,8 +43,8 @@ type Lounge struct {
 	Images []byte `db:"images" json:"images,omitempty"` // ["url1", "url2"]
 
 	// Status
-	Status        string `db:"status" json:"status"` // pending, active, inactive, suspended
-	IsOperational bool   `db:"is_operational" json:"is_operational"`
+	Status        LoungeStatus `db:"status" json:"status"` // pending, approved, suspended, rejected
+	IsOperational bool         `db:"is_operational" json:"is_operational"`
 
 	// Metadata
 	AverageRating sql.NullString `db:"average_rating" json:"average_rating,omitempty"` // DECIMAL stored as string
@@ -53,10 +53,12 @@ type Lounge struct {
 	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
 }
 
-// LoungeStatus constants
+// LoungeStatus represents the lounge status ENUM
+type LoungeStatus string
+
 const (
-	LoungeStatusPending   = "pending"
-	LoungeStatusActive    = "active"
-	LoungeStatusInactive  = "inactive"
-	LoungeStatusSuspended = "suspended"
+	LoungeStatusPending   LoungeStatus = "pending"
+	LoungeStatusApproved  LoungeStatus = "approved"
+	LoungeStatusSuspended LoungeStatus = "suspended"
+	LoungeStatusRejected  LoungeStatus = "rejected"
 )

@@ -55,13 +55,13 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 		WHERE p.lounge_id = $1 AND p.is_available = TRUE
 		ORDER BY c.sort_order, p.sort_order ASC
 	`
-	
+
 	rows, err := r.db.Queryx(query, loungeID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	for rows.Next() {
 		var p models.LoungeProduct
 		var categoryName string
@@ -76,7 +76,7 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 		p.CategoryName = categoryName
 		products = append(products, p)
 	}
-	
+
 	return products, nil
 }
 
@@ -101,7 +101,7 @@ func (r *LoungeBookingRepository) CreateProduct(product *models.LoungeProduct) e
 	product.ID = uuid.New()
 	product.CreatedAt = time.Now()
 	product.UpdatedAt = time.Now()
-	
+
 	query := `
 		INSERT INTO lounge_products (
 			id, lounge_id, category_id, name, description, price, 
@@ -154,7 +154,7 @@ func (r *LoungeBookingRepository) CreateLoungeBooking(
 		return nil, err
 	}
 	defer tx.Rollback()
-	
+
 	// Generate booking reference and ID
 	booking.ID = uuid.New()
 	booking.BookingReference = models.GenerateLoungeBookingReference()
@@ -162,7 +162,7 @@ func (r *LoungeBookingRepository) CreateLoungeBooking(
 	booking.PaymentStatus = models.LoungePaymentPending
 	booking.CreatedAt = time.Now()
 	booking.UpdatedAt = time.Now()
-	
+
 	// Insert booking
 	bookingQuery := `
 		INSERT INTO lounge_bookings (
@@ -189,7 +189,7 @@ func (r *LoungeBookingRepository) CreateLoungeBooking(
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert booking: %w", err)
 	}
-	
+
 	// Insert guests
 	guestQuery := `
 		INSERT INTO lounge_booking_guests (id, lounge_booking_id, guest_name, guest_phone, is_primary_guest, created_at)
@@ -199,7 +199,7 @@ func (r *LoungeBookingRepository) CreateLoungeBooking(
 		guests[i].ID = uuid.New()
 		guests[i].LoungeBookingID = booking.ID
 		guests[i].CreatedAt = time.Now()
-		
+
 		_, err = tx.Exec(guestQuery,
 			guests[i].ID, guests[i].LoungeBookingID, guests[i].GuestName,
 			guests[i].GuestPhone, guests[i].IsPrimaryGuest, guests[i].CreatedAt,
@@ -208,7 +208,7 @@ func (r *LoungeBookingRepository) CreateLoungeBooking(
 			return nil, fmt.Errorf("failed to insert guest: %w", err)
 		}
 	}
-	
+
 	// Insert pre-orders
 	preOrderQuery := `
 		INSERT INTO lounge_booking_pre_orders (id, lounge_booking_id, product_id, product_name, quantity, unit_price, total_price, created_at)
@@ -218,7 +218,7 @@ func (r *LoungeBookingRepository) CreateLoungeBooking(
 		preOrders[i].ID = uuid.New()
 		preOrders[i].LoungeBookingID = booking.ID
 		preOrders[i].CreatedAt = time.Now()
-		
+
 		_, err = tx.Exec(preOrderQuery,
 			preOrders[i].ID, preOrders[i].LoungeBookingID, preOrders[i].ProductID,
 			preOrders[i].ProductName, preOrders[i].Quantity, preOrders[i].UnitPrice,
@@ -228,11 +228,11 @@ func (r *LoungeBookingRepository) CreateLoungeBooking(
 			return nil, fmt.Errorf("failed to insert pre-order: %w", err)
 		}
 	}
-	
+
 	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
-	
+
 	booking.Guests = guests
 	booking.PreOrders = preOrders
 	return booking, nil
@@ -254,7 +254,7 @@ func (r *LoungeBookingRepository) GetLoungeBookingByID(bookingID uuid.UUID) (*mo
 		JOIN lounges l ON lb.lounge_id = l.id
 		WHERE lb.id = $1
 	`
-	
+
 	row := r.db.QueryRow(query, bookingID)
 	err := row.Scan(
 		&booking.ID, &booking.BookingReference, &booking.UserID, &booking.LoungeID,
@@ -272,7 +272,7 @@ func (r *LoungeBookingRepository) GetLoungeBookingByID(bookingID uuid.UUID) (*mo
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Get guests
 	var guests []models.LoungeBookingGuest
 	guestQuery := `
@@ -286,7 +286,7 @@ func (r *LoungeBookingRepository) GetLoungeBookingByID(bookingID uuid.UUID) (*mo
 		return nil, err
 	}
 	booking.Guests = guests
-	
+
 	// Get pre-orders
 	var preOrders []models.LoungeBookingPreOrder
 	preOrderQuery := `
@@ -300,7 +300,7 @@ func (r *LoungeBookingRepository) GetLoungeBookingByID(bookingID uuid.UUID) (*mo
 		return nil, err
 	}
 	booking.PreOrders = preOrders
-	
+
 	return &booking, nil
 }
 
@@ -472,14 +472,14 @@ func (r *LoungeBookingRepository) CreateLoungeOrder(order *models.LoungeOrder, i
 		return nil, err
 	}
 	defer tx.Rollback()
-	
+
 	order.ID = uuid.New()
 	order.OrderNumber = models.GenerateLoungeOrderNumber()
 	order.Status = models.LoungeOrderStatusPending
-	order.PaymentStatus = models.LoungePaymentPending
+	order.PaymentStatus = models.LoungeOrderPaymentStatusPending
 	order.CreatedAt = time.Now()
 	order.UpdatedAt = time.Now()
-	
+
 	orderQuery := `
 		INSERT INTO lounge_orders (
 			id, lounge_booking_id, lounge_id, order_number, subtotal, 
@@ -495,7 +495,7 @@ func (r *LoungeBookingRepository) CreateLoungeOrder(order *models.LoungeOrder, i
 	if err != nil {
 		return nil, fmt.Errorf("failed to create order: %w", err)
 	}
-	
+
 	itemQuery := `
 		INSERT INTO lounge_order_items (id, order_id, product_id, product_name, quantity, unit_price, total_price, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -504,7 +504,7 @@ func (r *LoungeBookingRepository) CreateLoungeOrder(order *models.LoungeOrder, i
 		items[i].ID = uuid.New()
 		items[i].OrderID = order.ID
 		items[i].CreatedAt = time.Now()
-		
+
 		_, err = tx.Exec(itemQuery,
 			items[i].ID, items[i].OrderID, items[i].ProductID,
 			items[i].ProductName, items[i].Quantity, items[i].UnitPrice,
@@ -514,11 +514,11 @@ func (r *LoungeBookingRepository) CreateLoungeOrder(order *models.LoungeOrder, i
 			return nil, fmt.Errorf("failed to create order item: %w", err)
 		}
 	}
-	
+
 	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
-	
+
 	order.Items = items
 	return order, nil
 }
@@ -539,7 +539,7 @@ func (r *LoungeBookingRepository) GetOrdersByBookingID(bookingID uuid.UUID) ([]m
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Get items for each order
 	for i := range orders {
 		var items []models.LoungeOrderItem
@@ -555,7 +555,7 @@ func (r *LoungeBookingRepository) GetOrdersByBookingID(bookingID uuid.UUID) ([]m
 		}
 		orders[i].Items = items
 	}
-	
+
 	return orders, nil
 }
 
@@ -607,7 +607,7 @@ func (r *LoungeBookingRepository) IncrementPromoUsage(promoID uuid.UUID) error {
 func (r *LoungeBookingRepository) GetLoungePrice(loungeID uuid.UUID, pricingType string) (string, error) {
 	var price sql.NullString
 	var query string
-	
+
 	switch pricingType {
 	case "1_hour":
 		query = `SELECT price_1_hour FROM lounges WHERE id = $1`
@@ -620,12 +620,12 @@ func (r *LoungeBookingRepository) GetLoungePrice(loungeID uuid.UUID, pricingType
 	default:
 		return "0.00", fmt.Errorf("invalid pricing type: %s", pricingType)
 	}
-	
+
 	err := r.db.Get(&price, query, loungeID)
 	if err != nil {
 		return "0.00", err
 	}
-	
+
 	if !price.Valid {
 		return "0.00", nil
 	}

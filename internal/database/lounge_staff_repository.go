@@ -31,7 +31,7 @@ func (r *LoungeStaffRepository) AddStaffToLounge(
 		LoungeID:         loungeID,
 		UserID:           userID,
 		ProfileCompleted: false,
-		EmploymentStatus: employmentStatus,
+		EmploymentStatus: models.LoungeStaffEmploymentStatus(employmentStatus),
 		CreatedAt:        time.Now(),
 		UpdatedAt:        time.Now(),
 	}

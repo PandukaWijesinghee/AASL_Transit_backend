@@ -795,10 +795,10 @@ func (h *AuthHandler) VerifyOTPLoungeOwner(c *gin.Context, loungeOwnerRepo *data
 			// Don't fail login, but log error
 		} else {
 			log.Printf("INFO: Created lounge_owner record for user %s", user.ID)
-			registrationStep = newOwner.RegistrationStep // Should be 'phone_verified'
+			registrationStep = string(newOwner.RegistrationStep) // Convert ENUM to string
 		}
 	} else {
-		registrationStep = existingOwner.RegistrationStep
+		registrationStep = string(existingOwner.RegistrationStep) // Convert ENUM to string
 	}
 
 	// Generate JWT tokens with user's actual data

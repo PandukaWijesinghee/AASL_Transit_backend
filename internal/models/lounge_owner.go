@@ -22,11 +22,11 @@ type LoungeOwner struct {
 	ManagerEmail     sql.NullString `db:"manager_email" json:"manager_email,omitempty"`           // Manager's email (optional)
 
 	// Registration Progress Tracking
-	RegistrationStep string `db:"registration_step" json:"registration_step"` // phone_verified, business_info, lounge_added, completed (no NIC verification step)
-	ProfileCompleted bool   `db:"profile_completed" json:"profile_completed"` // True when registration_step = 'completed' (but still pending admin approval)
+	RegistrationStep LoungeOwnerRegistrationStep `db:"registration_step" json:"registration_step"` // phone_verified, profile_submitted, lounge_added, completed
+	ProfileCompleted bool                         `db:"profile_completed" json:"profile_completed"` // True when registration_step = 'completed' (but still pending admin approval)
 
 	// Verification
-	VerificationStatus string         `db:"verification_status" json:"verification_status"` // pending, approved, rejected
+	VerificationStatus LoungeOwnerVerificationStatus `db:"verification_status" json:"verification_status"` // pending, approved, rejected, suspended
 	VerificationNotes  sql.NullString `db:"verification_notes" json:"verification_notes,omitempty"`
 	VerifiedAt         sql.NullTime   `db:"verified_at" json:"verified_at,omitempty"`
 	VerifiedBy         uuid.NullUUID  `db:"verified_by" json:"verified_by,omitempty"`
@@ -36,18 +36,32 @@ type LoungeOwner struct {
 	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
 }
 
-// Registration step constants
-// New flow: phone_verified -> business_info -> lounge_added -> completed
-// Note: nic_uploaded step has been removed (NIC images collected with business_info, verified by admin)
+// LoungeOwnerVerificationStatus represents the verification status ENUM
+type LoungeOwnerVerificationStatus string
+
 const (
-	RegStepPhoneVerified = "phone_verified"
-	RegStepBusinessInfo  = "business_info"
-	RegStepLoungeAdded   = "lounge_added"
-	RegStepCompleted     = "completed"
+	LoungeOwnerVerificationPending   LoungeOwnerVerificationStatus = "pending"
+	LoungeOwnerVerificationApproved  LoungeOwnerVerificationStatus = "approved"
+	LoungeOwnerVerificationRejected  LoungeOwnerVerificationStatus = "rejected"
+	LoungeOwnerVerificationSuspended LoungeOwnerVerificationStatus = "suspended"
 )
 
-// Lounge owner verification status constants (for admin approval)
+// LoungeOwnerRegistrationStep represents the registration step ENUM
+type LoungeOwnerRegistrationStep string
+
 const (
+	LoungeOwnerRegStepPhoneVerified     LoungeOwnerRegistrationStep = "phone_verified"
+	LoungeOwnerRegStepProfileSubmitted  LoungeOwnerRegistrationStep = "profile_submitted"
+	LoungeOwnerRegStepLoungeAdded       LoungeOwnerRegistrationStep = "lounge_added"
+	LoungeOwnerRegStepCompleted         LoungeOwnerRegistrationStep = "completed"
+)
+
+// Legacy constants for backward compatibility
+const (
+	RegStepPhoneVerified = "phone_verified"
+	RegStepBusinessInfo  = "profile_submitted" // Updated mapping
+	RegStepLoungeAdded   = "lounge_added"
+	RegStepCompleted     = "completed"
 	LoungeVerificationPending  = "pending"
 	LoungeVerificationApproved = "approved"
 	LoungeVerificationRejected = "rejected"

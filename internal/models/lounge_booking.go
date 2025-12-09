@@ -16,9 +16,27 @@ import (
 type LoungeBookingType string
 
 const (
-	LoungeBookingPreTrip    LoungeBookingType = "pre_trip"    // Before bus departure
-	LoungeBookingPostTrip   LoungeBookingType = "post_trip"   // After bus arrival
-	LoungeBookingStandalone LoungeBookingType = "standalone"  // Independent lounge visit
+	LoungeBookingPreTrip    LoungeBookingType = "pre_trip"   // Before bus departure
+	LoungeBookingPostTrip   LoungeBookingType = "post_trip"  // After bus arrival
+	LoungeBookingStandalone LoungeBookingType = "standalone" // Independent lounge visit
+)
+
+// LoungeBookingLoungeType represents the lounge type ENUM
+type LoungeBookingLoungeType string
+
+const (
+	LoungeBookingLoungeTypeHourly  LoungeBookingLoungeType = "hourly"
+	LoungeBookingLoungeTypeDayPass LoungeBookingLoungeType = "day_pass"
+	LoungeBookingLoungeTypePremium LoungeBookingLoungeType = "premium"
+)
+
+// LoungeBookingDurationType represents the duration type ENUM
+type LoungeBookingDurationType string
+
+const (
+	LoungeBookingDurationTypeHours   LoungeBookingDurationType = "hours"
+	LoungeBookingDurationTypeDays    LoungeBookingDurationType = "days"
+	LoungeBookingDurationTypeMinutes LoungeBookingDurationType = "minutes"
 )
 
 // LoungeBookingStatus represents the status of a lounge booking
@@ -28,26 +46,71 @@ const (
 	LoungeBookingStatusPending    LoungeBookingStatus = "pending"
 	LoungeBookingStatusConfirmed  LoungeBookingStatus = "confirmed"
 	LoungeBookingStatusCheckedIn  LoungeBookingStatus = "checked_in"
+	LoungeBookingStatusInLounge   LoungeBookingStatus = "in_lounge"
+	LoungeBookingStatusCheckedOut LoungeBookingStatus = "checked_out"
 	LoungeBookingStatusCompleted  LoungeBookingStatus = "completed"
 	LoungeBookingStatusCancelled  LoungeBookingStatus = "cancelled"
 	LoungeBookingStatusNoShow     LoungeBookingStatus = "no_show"
-	LoungeBookingStatusExpired    LoungeBookingStatus = "expired"
+)
+
+// LoungeBookingPreOrderStatus represents the pre-order status ENUM
+type LoungeBookingPreOrderStatus string
+
+const (
+	LoungeBookingPreOrderStatusPending   LoungeBookingPreOrderStatus = "pending"
+	LoungeBookingPreOrderStatusConfirmed LoungeBookingPreOrderStatus = "confirmed"
+	LoungeBookingPreOrderStatusPreparing LoungeBookingPreOrderStatus = "preparing"
+	LoungeBookingPreOrderStatusReady     LoungeBookingPreOrderStatus = "ready"
+	LoungeBookingPreOrderStatusDelivered LoungeBookingPreOrderStatus = "delivered"
+	LoungeBookingPreOrderStatusCancelled LoungeBookingPreOrderStatus = "cancelled"
+)
+
+// LoungeBookingDeliveryPreference represents the delivery preference ENUM
+type LoungeBookingDeliveryPreference string
+
+const (
+	LoungeBookingDeliveryPreferenceOnArrival  LoungeBookingDeliveryPreference = "on_arrival"
+	LoungeBookingDeliveryPreferenceScheduled  LoungeBookingDeliveryPreference = "scheduled"
+	LoungeBookingDeliveryPreferenceImmediate  LoungeBookingDeliveryPreference = "immediate"
 )
 
 // LoungeOrderStatus represents the status of an in-lounge order
 type LoungeOrderStatus string
 
 const (
-	LoungeOrderStatusPending    LoungeOrderStatus = "pending"
-	LoungeOrderStatusConfirmed  LoungeOrderStatus = "confirmed"
-	LoungeOrderStatusPreparing  LoungeOrderStatus = "preparing"
-	LoungeOrderStatusReady      LoungeOrderStatus = "ready"
-	LoungeOrderStatusServed     LoungeOrderStatus = "served"
-	LoungeOrderStatusCompleted  LoungeOrderStatus = "completed"
-	LoungeOrderStatusCancelled  LoungeOrderStatus = "cancelled"
+	LoungeOrderStatusPending   LoungeOrderStatus = "pending"
+	LoungeOrderStatusConfirmed LoungeOrderStatus = "confirmed"
+	LoungeOrderStatusPreparing LoungeOrderStatus = "preparing"
+	LoungeOrderStatusReady     LoungeOrderStatus = "ready"
+	LoungeOrderStatusServed    LoungeOrderStatus = "served"
+	LoungeOrderStatusCompleted LoungeOrderStatus = "completed"
+	LoungeOrderStatusCancelled LoungeOrderStatus = "cancelled"
 )
 
-// LoungePaymentStatus represents payment status for lounge services
+// LoungeOrderPaymentStatus represents payment status ENUM for lounge orders
+type LoungeOrderPaymentStatus string
+
+const (
+	LoungeOrderPaymentStatusPending  LoungeOrderPaymentStatus = "pending"
+	LoungeOrderPaymentStatusPaid     LoungeOrderPaymentStatus = "paid"
+	LoungeOrderPaymentStatusFailed   LoungeOrderPaymentStatus = "failed"
+	LoungeOrderPaymentStatusRefunded LoungeOrderPaymentStatus = "refunded"
+	LoungeOrderPaymentStatusPartial  LoungeOrderPaymentStatus = "partial"
+)
+
+// LoungeOrderItemStatus represents the order item status ENUM
+type LoungeOrderItemStatus string
+
+const (
+	LoungeOrderItemStatusPending   LoungeOrderItemStatus = "pending"
+	LoungeOrderItemStatusConfirmed LoungeOrderItemStatus = "confirmed"
+	LoungeOrderItemStatusPreparing LoungeOrderItemStatus = "preparing"
+	LoungeOrderItemStatusReady     LoungeOrderItemStatus = "ready"
+	LoungeOrderItemStatusServed    LoungeOrderItemStatus = "served"
+	LoungeOrderItemStatusCancelled LoungeOrderItemStatus = "cancelled"
+)
+
+// LoungePaymentStatus represents payment status for lounge services (legacy, use LoungeOrderPaymentStatus)
 type LoungePaymentStatus string
 
 const (
@@ -79,19 +142,43 @@ type LoungeMarketplaceCategory struct {
 // LOUNGE PRODUCT (lounge_products table)
 // ============================================================================
 
+// LoungeProductStockStatus represents the stock status ENUM
+type LoungeProductStockStatus string
+
+const (
+	LoungeProductStockStatusInStock      LoungeProductStockStatus = "in_stock"
+	LoungeProductStockStatusLowStock     LoungeProductStockStatus = "low_stock"
+	LoungeProductStockStatusOutOfStock   LoungeProductStockStatus = "out_of_stock"
+	LoungeProductStockStatusDiscontinued LoungeProductStockStatus = "discontinued"
+)
+
+// LoungeProductType represents the product type ENUM
+type LoungeProductType string
+
+const (
+	LoungeProductTypeFood     LoungeProductType = "food"
+	LoungeProductTypeBeverage LoungeProductType = "beverage"
+	LoungeProductTypeSnack    LoungeProductType = "snack"
+	LoungeProductTypeMeal     LoungeProductType = "meal"
+	LoungeProductTypeDessert  LoungeProductType = "dessert"
+	LoungeProductTypeService  LoungeProductType = "service"
+)
+
 // LoungeProduct represents a product/service offered by a lounge
 type LoungeProduct struct {
-	ID          uuid.UUID      `db:"id" json:"id"`
-	LoungeID    uuid.UUID      `db:"lounge_id" json:"lounge_id"`
-	CategoryID  uuid.UUID      `db:"category_id" json:"category_id"`
-	Name        string         `db:"name" json:"name"`
-	Description sql.NullString `db:"description" json:"description,omitempty"`
-	Price       string         `db:"price" json:"price"` // DECIMAL(10,2) as string
-	ImageURL    sql.NullString `db:"image_url" json:"image_url,omitempty"`
-	IsAvailable bool           `db:"is_available" json:"is_available"`
-	SortOrder   int            `db:"sort_order" json:"sort_order"`
-	CreatedAt   time.Time      `db:"created_at" json:"created_at"`
-	UpdatedAt   time.Time      `db:"updated_at" json:"updated_at"`
+	ID          uuid.UUID                `db:"id" json:"id"`
+	LoungeID    uuid.UUID                `db:"lounge_id" json:"lounge_id"`
+	CategoryID  uuid.UUID                `db:"category_id" json:"category_id"`
+	Name        string                   `db:"name" json:"name"`
+	Description sql.NullString           `db:"description" json:"description,omitempty"`
+	Price       string                   `db:"price" json:"price"` // DECIMAL(10,2) as string
+	ImageURL    sql.NullString           `db:"image_url" json:"image_url,omitempty"`
+	StockStatus LoungeProductStockStatus `db:"stock_status" json:"stock_status"`
+	ProductType LoungeProductType        `db:"product_type" json:"product_type"`
+	IsAvailable bool                     `db:"is_available" json:"is_available"`
+	SortOrder   int                      `db:"sort_order" json:"sort_order"`
+	CreatedAt   time.Time                `db:"created_at" json:"created_at"`
+	UpdatedAt   time.Time                `db:"updated_at" json:"updated_at"`
 
 	// Populated via JOINs
 	CategoryName string `db:"-" json:"category_name,omitempty"`
@@ -107,7 +194,7 @@ type LoungePromotion struct {
 	LoungeID          *uuid.UUID     `db:"lounge_id" json:"lounge_id,omitempty"` // NULL = applies to all lounges
 	Code              string         `db:"code" json:"code"`
 	Description       sql.NullString `db:"description" json:"description,omitempty"`
-	DiscountType      string         `db:"discount_type" json:"discount_type"` // 'percentage' or 'fixed'
+	DiscountType      string         `db:"discount_type" json:"discount_type"`   // 'percentage' or 'fixed'
 	DiscountValue     string         `db:"discount_value" json:"discount_value"` // DECIMAL(10,2)
 	MinOrderAmount    sql.NullString `db:"min_order_amount" json:"min_order_amount,omitempty"`
 	MaxDiscountAmount sql.NullString `db:"max_discount_amount" json:"max_discount_amount,omitempty"`
@@ -126,56 +213,56 @@ type LoungePromotion struct {
 
 // LoungeBooking represents a lounge reservation
 type LoungeBooking struct {
-	ID                 uuid.UUID           `db:"id" json:"id"`
-	BookingReference   string              `db:"booking_reference" json:"booking_reference"`
-	UserID             uuid.UUID           `db:"user_id" json:"user_id"`
-	LoungeID           uuid.UUID           `db:"lounge_id" json:"lounge_id"`
-	MasterBookingID    *uuid.UUID          `db:"master_booking_id" json:"master_booking_id,omitempty"`
-	BusBookingID       *uuid.UUID          `db:"bus_booking_id" json:"bus_booking_id,omitempty"`
-	BookingType        LoungeBookingType   `db:"booking_type" json:"booking_type"`
-	
+	ID               uuid.UUID         `db:"id" json:"id"`
+	BookingReference string            `db:"booking_reference" json:"booking_reference"`
+	UserID           uuid.UUID         `db:"user_id" json:"user_id"`
+	LoungeID         uuid.UUID         `db:"lounge_id" json:"lounge_id"`
+	MasterBookingID  *uuid.UUID        `db:"master_booking_id" json:"master_booking_id,omitempty"`
+	BusBookingID     *uuid.UUID        `db:"bus_booking_id" json:"bus_booking_id,omitempty"`
+	BookingType      LoungeBookingType `db:"booking_type" json:"booking_type"`
+
 	// Timing
-	ScheduledArrival   time.Time           `db:"scheduled_arrival" json:"scheduled_arrival"`
-	ScheduledDeparture sql.NullTime        `db:"scheduled_departure" json:"scheduled_departure,omitempty"`
-	ActualArrival      sql.NullTime        `db:"actual_arrival" json:"actual_arrival,omitempty"`
-	ActualDeparture    sql.NullTime        `db:"actual_departure" json:"actual_departure,omitempty"`
-	
+	ScheduledArrival   time.Time    `db:"scheduled_arrival" json:"scheduled_arrival"`
+	ScheduledDeparture sql.NullTime `db:"scheduled_departure" json:"scheduled_departure,omitempty"`
+	ActualArrival      sql.NullTime `db:"actual_arrival" json:"actual_arrival,omitempty"`
+	ActualDeparture    sql.NullTime `db:"actual_departure" json:"actual_departure,omitempty"`
+
 	// Guests
-	NumberOfGuests     int                 `db:"number_of_guests" json:"number_of_guests"`
-	
+	NumberOfGuests int `db:"number_of_guests" json:"number_of_guests"`
+
 	// Pricing
-	PricingType        string              `db:"pricing_type" json:"pricing_type"` // '1_hour', '2_hours', '3_hours', 'until_bus'
-	BasePrice          string              `db:"base_price" json:"base_price"` // DECIMAL
-	PreOrderTotal      string              `db:"pre_order_total" json:"pre_order_total"`
-	DiscountAmount     string              `db:"discount_amount" json:"discount_amount"`
-	TotalAmount        string              `db:"total_amount" json:"total_amount"`
-	
+	PricingType    string `db:"pricing_type" json:"pricing_type"` // '1_hour', '2_hours', '3_hours', 'until_bus'
+	BasePrice      string `db:"base_price" json:"base_price"`     // DECIMAL
+	PreOrderTotal  string `db:"pre_order_total" json:"pre_order_total"`
+	DiscountAmount string `db:"discount_amount" json:"discount_amount"`
+	TotalAmount    string `db:"total_amount" json:"total_amount"`
+
 	// Status & Payment
-	Status             LoungeBookingStatus `db:"status" json:"status"`
-	PaymentStatus      LoungePaymentStatus `db:"payment_status" json:"payment_status"`
-	
+	Status        LoungeBookingStatus `db:"status" json:"status"`
+	PaymentStatus LoungePaymentStatus `db:"payment_status" json:"payment_status"`
+
 	// Contact
-	PrimaryGuestName   string              `db:"primary_guest_name" json:"primary_guest_name"`
-	PrimaryGuestPhone  string              `db:"primary_guest_phone" json:"primary_guest_phone"`
-	
+	PrimaryGuestName  string `db:"primary_guest_name" json:"primary_guest_name"`
+	PrimaryGuestPhone string `db:"primary_guest_phone" json:"primary_guest_phone"`
+
 	// Promo
-	PromoCode          sql.NullString      `db:"promo_code" json:"promo_code,omitempty"`
-	
+	PromoCode sql.NullString `db:"promo_code" json:"promo_code,omitempty"`
+
 	// Notes
-	SpecialRequests    sql.NullString      `db:"special_requests" json:"special_requests,omitempty"`
-	InternalNotes      sql.NullString      `db:"internal_notes" json:"internal_notes,omitempty"`
-	
+	SpecialRequests sql.NullString `db:"special_requests" json:"special_requests,omitempty"`
+	InternalNotes   sql.NullString `db:"internal_notes" json:"internal_notes,omitempty"`
+
 	// Timestamps
-	CancelledAt        sql.NullTime        `db:"cancelled_at" json:"cancelled_at,omitempty"`
-	CancellationReason sql.NullString      `db:"cancellation_reason" json:"cancellation_reason,omitempty"`
-	CreatedAt          time.Time           `db:"created_at" json:"created_at"`
-	UpdatedAt          time.Time           `db:"updated_at" json:"updated_at"`
-	
+	CancelledAt        sql.NullTime   `db:"cancelled_at" json:"cancelled_at,omitempty"`
+	CancellationReason sql.NullString `db:"cancellation_reason" json:"cancellation_reason,omitempty"`
+	CreatedAt          time.Time      `db:"created_at" json:"created_at"`
+	UpdatedAt          time.Time      `db:"updated_at" json:"updated_at"`
+
 	// Populated via JOINs (not in DB)
-	LoungeName         string              `db:"-" json:"lounge_name,omitempty"`
-	LoungeAddress      string              `db:"-" json:"lounge_address,omitempty"`
-	Guests             []LoungeBookingGuest `db:"-" json:"guests,omitempty"`
-	PreOrders          []LoungeBookingPreOrder `db:"-" json:"pre_orders,omitempty"`
+	LoungeName    string                  `db:"-" json:"lounge_name,omitempty"`
+	LoungeAddress string                  `db:"-" json:"lounge_address,omitempty"`
+	Guests        []LoungeBookingGuest    `db:"-" json:"guests,omitempty"`
+	PreOrders     []LoungeBookingPreOrder `db:"-" json:"pre_orders,omitempty"`
 }
 
 // ============================================================================
@@ -200,14 +287,14 @@ type LoungeBookingGuest struct {
 
 // LoungeBookingPreOrder represents a pre-ordered item with a booking
 type LoungeBookingPreOrder struct {
-	ID              uuid.UUID  `db:"id" json:"id"`
-	LoungeBookingID uuid.UUID  `db:"lounge_booking_id" json:"lounge_booking_id"`
-	ProductID       uuid.UUID  `db:"product_id" json:"product_id"`
-	ProductName     string     `db:"product_name" json:"product_name"` // Snapshot at booking time
-	Quantity        int        `db:"quantity" json:"quantity"`
-	UnitPrice       string     `db:"unit_price" json:"unit_price"` // DECIMAL - snapshot
-	TotalPrice      string     `db:"total_price" json:"total_price"` // DECIMAL
-	CreatedAt       time.Time  `db:"created_at" json:"created_at"`
+	ID              uuid.UUID `db:"id" json:"id"`
+	LoungeBookingID uuid.UUID `db:"lounge_booking_id" json:"lounge_booking_id"`
+	ProductID       uuid.UUID `db:"product_id" json:"product_id"`
+	ProductName     string    `db:"product_name" json:"product_name"` // Snapshot at booking time
+	Quantity        int       `db:"quantity" json:"quantity"`
+	UnitPrice       string    `db:"unit_price" json:"unit_price"`   // DECIMAL - snapshot
+	TotalPrice      string    `db:"total_price" json:"total_price"` // DECIMAL
+	CreatedAt       time.Time `db:"created_at" json:"created_at"`
 }
 
 // ============================================================================
@@ -216,24 +303,24 @@ type LoungeBookingPreOrder struct {
 
 // LoungeOrder represents an order placed while inside the lounge
 type LoungeOrder struct {
-	ID              uuid.UUID         `db:"id" json:"id"`
-	LoungeBookingID uuid.UUID         `db:"lounge_booking_id" json:"lounge_booking_id"`
-	LoungeID        uuid.UUID         `db:"lounge_id" json:"lounge_id"`
-	OrderNumber     string            `db:"order_number" json:"order_number"`
-	Subtotal        string            `db:"subtotal" json:"subtotal"` // DECIMAL
-	DiscountAmount  string            `db:"discount_amount" json:"discount_amount"`
-	TotalAmount     string            `db:"total_amount" json:"total_amount"`
-	Status          LoungeOrderStatus `db:"status" json:"status"`
-	PaymentStatus   LoungePaymentStatus `db:"payment_status" json:"payment_status"`
-	PaymentMethod   sql.NullString    `db:"payment_method" json:"payment_method,omitempty"`
-	Notes           sql.NullString    `db:"notes" json:"notes,omitempty"`
-	PreparedByStaff *uuid.UUID        `db:"prepared_by_staff" json:"prepared_by_staff,omitempty"`
-	ServedByStaff   *uuid.UUID        `db:"served_by_staff" json:"served_by_staff,omitempty"`
-	CreatedAt       time.Time         `db:"created_at" json:"created_at"`
-	UpdatedAt       time.Time         `db:"updated_at" json:"updated_at"`
-	
+	ID              uuid.UUID           `db:"id" json:"id"`
+	LoungeBookingID uuid.UUID           `db:"lounge_booking_id" json:"lounge_booking_id"`
+	LoungeID        uuid.UUID           `db:"lounge_id" json:"lounge_id"`
+	OrderNumber     string              `db:"order_number" json:"order_number"`
+	Subtotal        string              `db:"subtotal" json:"subtotal"` // DECIMAL
+	DiscountAmount  string              `db:"discount_amount" json:"discount_amount"`
+	TotalAmount     string              `db:"total_amount" json:"total_amount"`
+	Status          LoungeOrderStatus        `db:"status" json:"status"`
+	PaymentStatus   LoungeOrderPaymentStatus `db:"payment_status" json:"payment_status"`
+	PaymentMethod   sql.NullString      `db:"payment_method" json:"payment_method,omitempty"`
+	Notes           sql.NullString      `db:"notes" json:"notes,omitempty"`
+	PreparedByStaff *uuid.UUID          `db:"prepared_by_staff" json:"prepared_by_staff,omitempty"`
+	ServedByStaff   *uuid.UUID          `db:"served_by_staff" json:"served_by_staff,omitempty"`
+	CreatedAt       time.Time           `db:"created_at" json:"created_at"`
+	UpdatedAt       time.Time           `db:"updated_at" json:"updated_at"`
+
 	// Populated via JOINs
-	Items           []LoungeOrderItem `db:"-" json:"items,omitempty"`
+	Items []LoungeOrderItem `db:"-" json:"items,omitempty"`
 }
 
 // ============================================================================
@@ -247,7 +334,7 @@ type LoungeOrderItem struct {
 	ProductID   uuid.UUID `db:"product_id" json:"product_id"`
 	ProductName string    `db:"product_name" json:"product_name"` // Snapshot
 	Quantity    int       `db:"quantity" json:"quantity"`
-	UnitPrice   string    `db:"unit_price" json:"unit_price"` // DECIMAL - snapshot
+	UnitPrice   string    `db:"unit_price" json:"unit_price"`   // DECIMAL - snapshot
 	TotalPrice  string    `db:"total_price" json:"total_price"` // DECIMAL
 	CreatedAt   time.Time `db:"created_at" json:"created_at"`
 }
@@ -267,10 +354,10 @@ type LoungeProductReview struct {
 	IsVerified      bool           `db:"is_verified" json:"is_verified"`
 	CreatedAt       time.Time      `db:"created_at" json:"created_at"`
 	UpdatedAt       time.Time      `db:"updated_at" json:"updated_at"`
-	
+
 	// Populated via JOINs
-	UserName        string         `db:"-" json:"user_name,omitempty"`
-	ProductName     string         `db:"-" json:"product_name,omitempty"`
+	UserName    string `db:"-" json:"user_name,omitempty"`
+	ProductName string `db:"-" json:"product_name,omitempty"`
 }
 
 // ============================================================================
@@ -279,33 +366,33 @@ type LoungeProductReview struct {
 
 // CreateLoungeBookingRequest is the request to create a lounge booking
 type CreateLoungeBookingRequest struct {
-	LoungeID          string `json:"lounge_id" binding:"required"`
-	BusBookingID      *string `json:"bus_booking_id,omitempty"` // For pre_trip/post_trip
-	BookingType       string `json:"booking_type" binding:"required"` // pre_trip, post_trip, standalone
-	
+	LoungeID     string  `json:"lounge_id" binding:"required"`
+	BusBookingID *string `json:"bus_booking_id,omitempty"`        // For pre_trip/post_trip
+	BookingType  string  `json:"booking_type" binding:"required"` // pre_trip, post_trip, standalone
+
 	// Timing
-	ScheduledArrival   string `json:"scheduled_arrival" binding:"required"` // ISO 8601
+	ScheduledArrival   string  `json:"scheduled_arrival" binding:"required"` // ISO 8601
 	ScheduledDeparture *string `json:"scheduled_departure,omitempty"`
-	
+
 	// Guests
-	NumberOfGuests    int `json:"number_of_guests" binding:"required,min=1"`
-	Guests            []GuestRequest `json:"guests" binding:"required,min=1"`
-	
+	NumberOfGuests int            `json:"number_of_guests" binding:"required,min=1"`
+	Guests         []GuestRequest `json:"guests" binding:"required,min=1"`
+
 	// Pricing
-	PricingType       string `json:"pricing_type" binding:"required"` // 1_hour, 2_hours, 3_hours, until_bus
-	
+	PricingType string `json:"pricing_type" binding:"required"` // 1_hour, 2_hours, 3_hours, until_bus
+
 	// Pre-orders
-	PreOrders         []PreOrderRequest `json:"pre_orders,omitempty"`
-	
+	PreOrders []PreOrderRequest `json:"pre_orders,omitempty"`
+
 	// Contact
 	PrimaryGuestName  string `json:"primary_guest_name" binding:"required"`
 	PrimaryGuestPhone string `json:"primary_guest_phone" binding:"required"`
-	
+
 	// Promo
-	PromoCode         *string `json:"promo_code,omitempty"`
-	
+	PromoCode *string `json:"promo_code,omitempty"`
+
 	// Special Requests
-	SpecialRequests   *string `json:"special_requests,omitempty"`
+	SpecialRequests *string `json:"special_requests,omitempty"`
 }
 
 // GuestRequest represents a guest to add to a booking
@@ -332,21 +419,21 @@ func (r *CreateLoungeBookingRequest) Validate() error {
 	if r.NumberOfGuests != len(r.Guests) {
 		return errors.New("number_of_guests must match the number of guest details provided")
 	}
-	
+
 	validBookingTypes := map[string]bool{
 		"pre_trip": true, "post_trip": true, "standalone": true,
 	}
 	if !validBookingTypes[r.BookingType] {
 		return errors.New("invalid booking_type: must be pre_trip, post_trip, or standalone")
 	}
-	
+
 	validPricingTypes := map[string]bool{
 		"1_hour": true, "2_hours": true, "3_hours": true, "until_bus": true,
 	}
 	if !validPricingTypes[r.PricingType] {
 		return errors.New("invalid pricing_type")
 	}
-	
+
 	// Ensure at least one primary guest
 	hasPrimary := false
 	for _, g := range r.Guests {
@@ -358,15 +445,15 @@ func (r *CreateLoungeBookingRequest) Validate() error {
 	if !hasPrimary && len(r.Guests) > 0 {
 		r.Guests[0].IsPrimaryGuest = true
 	}
-	
+
 	return nil
 }
 
 // CreateLoungeOrderRequest is the request to create an in-lounge order
 type CreateLoungeOrderRequest struct {
-	LoungeBookingID string `json:"lounge_booking_id" binding:"required"`
+	LoungeBookingID string             `json:"lounge_booking_id" binding:"required"`
 	Items           []OrderItemRequest `json:"items" binding:"required,min=1"`
-	Notes           *string `json:"notes,omitempty"`
+	Notes           *string            `json:"notes,omitempty"`
 }
 
 // OrderItemRequest represents an item to order
@@ -384,17 +471,17 @@ type LoungeBookingResponse struct {
 
 // LoungeBookingListItem is a summary for listing bookings
 type LoungeBookingListItem struct {
-	ID                 uuid.UUID           `json:"id" db:"id"`
-	BookingReference   string              `json:"booking_reference" db:"booking_reference"`
-	LoungeID           uuid.UUID           `json:"lounge_id" db:"lounge_id"`
-	LoungeName         string              `json:"lounge_name" db:"lounge_name"`
-	BookingType        LoungeBookingType   `json:"booking_type" db:"booking_type"`
-	ScheduledArrival   time.Time           `json:"scheduled_arrival" db:"scheduled_arrival"`
-	NumberOfGuests     int                 `json:"number_of_guests" db:"number_of_guests"`
-	TotalAmount        string              `json:"total_amount" db:"total_amount"`
-	Status             LoungeBookingStatus `json:"status" db:"status"`
-	PaymentStatus      LoungePaymentStatus `json:"payment_status" db:"payment_status"`
-	CreatedAt          time.Time           `json:"created_at" db:"created_at"`
+	ID               uuid.UUID           `json:"id" db:"id"`
+	BookingReference string              `json:"booking_reference" db:"booking_reference"`
+	LoungeID         uuid.UUID           `json:"lounge_id" db:"lounge_id"`
+	LoungeName       string              `json:"lounge_name" db:"lounge_name"`
+	BookingType      LoungeBookingType   `json:"booking_type" db:"booking_type"`
+	ScheduledArrival time.Time           `json:"scheduled_arrival" db:"scheduled_arrival"`
+	NumberOfGuests   int                 `json:"number_of_guests" db:"number_of_guests"`
+	TotalAmount      string              `json:"total_amount" db:"total_amount"`
+	Status           LoungeBookingStatus `json:"status" db:"status"`
+	PaymentStatus    LoungePaymentStatus `json:"payment_status" db:"payment_status"`
+	CreatedAt        time.Time           `json:"created_at" db:"created_at"`
 }
 
 // ============================================================================
