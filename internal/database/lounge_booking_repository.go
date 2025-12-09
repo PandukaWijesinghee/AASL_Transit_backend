@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/smarttransit/sms-auth-backend/internal/models"
 )
 
@@ -68,17 +69,23 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 	for rows.Next() {
 		var p models.LoungeProduct
 		var categoryName string
+		var stockStatus, productType string
+		var tags []string
+
 		err := rows.Scan(
 			&p.ID, &p.LoungeID, &p.CategoryID, &p.Name, &p.Description,
-			&p.Price, &p.ImageURL, &p.StockStatus, &p.ProductType,
+			&p.Price, &p.ImageURL, &stockStatus, &productType,
 			&p.IsAvailable, &p.IsPreOrderable, &p.IsVegetarian, &p.IsHalal,
 			&p.DisplayOrder, &p.ServiceDurationMinutes,
-			&p.AvailableFrom, &p.AvailableUntil, &p.Tags,
+			&p.AvailableFrom, &p.AvailableUntil, pq.Array(&tags),
 			&p.CreatedAt, &p.UpdatedAt, &categoryName,
 		)
 		if err != nil {
 			return nil, err
 		}
+		p.StockStatus = models.LoungeProductStockStatus(stockStatus)
+		p.ProductType = models.LoungeProductType(productType)
+		p.Tags = tags
 		p.CategoryName = categoryName
 		products = append(products, p)
 	}
@@ -189,7 +196,7 @@ func (r *LoungeBookingRepository) CreateLoungeBooking(
 		booking.ScheduledArrival, booking.ScheduledDeparture,
 		booking.NumberOfGuests, booking.PricingType, booking.PricePerGuest, booking.BasePrice,
 		booking.PreOrderTotal, booking.DiscountAmount, booking.TotalAmount,
-		booking.Status, booking.PaymentStatus, 
+		booking.Status, booking.PaymentStatus,
 		booking.LoungeName, booking.LoungeAddress, booking.LoungePhone,
 		booking.PrimaryGuestName, booking.PrimaryGuestPhone, booking.PromoCode, booking.SpecialRequests,
 		booking.CreatedAt, booking.UpdatedAt,

@@ -179,9 +179,9 @@ type LoungeProduct struct {
 	IsHalal                bool                     `db:"is_halal" json:"is_halal"`
 	DisplayOrder           int                      `db:"display_order" json:"display_order"`
 	ServiceDurationMinutes sql.NullInt64            `db:"service_duration_minutes" json:"service_duration_minutes,omitempty"`
-	AvailableFrom          sql.NullString           `db:"available_from" json:"available_from,omitempty"` // TIME
+	AvailableFrom          sql.NullString           `db:"available_from" json:"available_from,omitempty"`   // TIME
 	AvailableUntil         sql.NullString           `db:"available_until" json:"available_until,omitempty"` // TIME
-	Tags                   []string                 `db:"tags" json:"tags,omitempty"`                      // TEXT[]
+	Tags                   []string                 `db:"tags" json:"tags,omitempty"`                       // TEXT[]
 	CreatedAt              time.Time                `db:"created_at" json:"created_at"`
 	UpdatedAt              time.Time                `db:"updated_at" json:"updated_at"`
 
