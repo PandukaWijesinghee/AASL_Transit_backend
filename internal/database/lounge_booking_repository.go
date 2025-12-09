@@ -53,7 +53,7 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 		FROM lounge_products p
 		JOIN lounge_marketplace_categories c ON p.category_id = c.id
 		WHERE p.lounge_id = $1 AND p.is_available = TRUE
-		ORDER BY c.sort_order, p.display_order ASC
+		ORDER BY c.display_order, p.display_order ASC
 	`
 
 	rows, err := r.db.Queryx(query, loungeID)

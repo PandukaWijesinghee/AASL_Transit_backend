@@ -129,11 +129,11 @@ const (
 // LoungeMarketplaceCategory represents a product category
 type LoungeMarketplaceCategory struct {
 	ID          uuid.UUID      `db:"id" json:"id"`
-	Name        string         `db:"name" json:"name"`
-	Description sql.NullString `db:"description" json:"description,omitempty"`
-	IconURL     sql.NullString `db:"icon_url" json:"icon_url,omitempty"`
-	SortOrder   int            `db:"sort_order" json:"sort_order"`
-	IsActive    bool           `db:"is_active" json:"is_active"`
+	Name         string         `db:"name" json:"name"`
+	Description  sql.NullString `db:"description" json:"description,omitempty"`
+	IconURL      sql.NullString `db:"icon_url" json:"icon_url,omitempty"`
+	DisplayOrder int            `db:"display_order" json:"display_order"`
+	IsActive     bool           `db:"is_active" json:"is_active"`
 	CreatedAt   time.Time      `db:"created_at" json:"created_at"`
 	UpdatedAt   time.Time      `db:"updated_at" json:"updated_at"`
 }
