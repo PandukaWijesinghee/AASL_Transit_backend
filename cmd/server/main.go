@@ -504,6 +504,10 @@ func main() {
 			lounges.GET("/active", loungeHandler.GetAllActiveLounges)
 			logger.Info("  ✅ GET /api/v1/lounges/states (public)")
 			lounges.GET("/states", loungeHandler.GetDistinctStates)
+			logger.Info("  ✅ GET /api/v1/lounges/by-stop/:stopId (public)")
+			lounges.GET("/by-stop/:stopId", loungeHandler.GetLoungesByStop)
+			logger.Info("  ✅ GET /api/v1/lounges/by-route/:routeId (public)")
+			lounges.GET("/by-route/:routeId", loungeHandler.GetLoungesByRoute)
 
 			// Protected routes (require JWT authentication)
 			loungesProtected := lounges.Group("")

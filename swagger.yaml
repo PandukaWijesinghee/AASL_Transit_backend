@@ -3651,6 +3651,112 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/lounges/by-stop/{stopId}:
+    get:
+      summary: Get lounges by stop ID (Public)
+      description: |
+        Retrieve all active lounges that serve a specific bus stop.
+        Used when passengers book a bus trip and want to find lounges at their boarding or alighting stop.
+        
+        **Use Case:**
+        - Passenger books bus from Colombo Fort to Kandy
+        - App shows lounges near Colombo Fort (pre-trip) and Kandy (post-trip)
+        
+        **Data Source:**
+        - Joins `lounges` with `lounge_routes` table
+        - Matches `stop_before_id` or `stop_after_id` to find relevant lounges
+        
+        **No authentication required** - public endpoint for passengers.
+      operationId: getLoungesByStop
+      tags:
+        - Lounge Marketplace
+      parameters:
+        - name: stopId
+          in: path
+          required: true
+          description: UUID of the bus stop (from master_route_stops table)
+          schema:
+            type: string
+            format: uuid
+            example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        "200":
+          description: Lounges retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lounges:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Lounge"
+                  total:
+                    type: integer
+                    description: Number of lounges found
+                    example: 3
+        "400":
+          description: Invalid stop ID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/lounges/by-route/{routeId}:
+    get:
+      summary: Get lounges by route ID (Public)
+      description: |
+        Retrieve all active lounges that serve stops along a specific bus route.
+        Used to show all lounges available along the entire route.
+        
+        **Use Case:**
+        - Show all lounge options along the Colombo-Kandy route
+        - Help passengers discover lounges they can use during their journey
+        
+        **Data Source:**
+        - Joins `lounges` with `lounge_routes` table
+        - Matches `master_route_id` to find relevant lounges
+        
+        **No authentication required** - public endpoint for passengers.
+      operationId: getLoungesByRoute
+      tags:
+        - Lounge Marketplace
+      parameters:
+        - name: routeId
+          in: path
+          required: true
+          description: UUID of the master route (from master_routes table)
+          schema:
+            type: string
+            format: uuid
+            example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        "200":
+          description: Lounges retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lounges:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Lounge"
+                  total:
+                    type: integer
+                    description: Number of lounges found
+                    example: 5
+        "400":
+          description: Invalid route ID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   # ============================================================================
   # Lounge Staff Management Endpoints
   # ============================================================================

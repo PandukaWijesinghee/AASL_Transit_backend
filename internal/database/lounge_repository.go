@@ -159,6 +159,45 @@ func (r *LoungeRepository) SearchActiveLounges(state string, limit int) ([]model
 	return lounges, nil
 }
 
+// GetLoungesByStopID retrieves all active lounges that serve a specific stop
+// A lounge serves a stop if the stop is either stop_before_id or stop_after_id in lounge_routes
+func (r *LoungeRepository) GetLoungesByStopID(stopID uuid.UUID) ([]models.Lounge, error) {
+	var lounges []models.Lounge
+	query := `
+		SELECT DISTINCT l.* 
+		FROM lounges l
+		INNER JOIN lounge_routes lr ON l.id = lr.lounge_id
+		WHERE l.status = 'approved' 
+		  AND l.is_operational = true
+		  AND (lr.stop_before_id = $1 OR lr.stop_after_id = $1)
+		ORDER BY l.lounge_name
+	`
+	err := r.db.Select(&lounges, query, stopID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get lounges by stop: %w", err)
+	}
+	return lounges, nil
+}
+
+// GetLoungesByRouteID retrieves all active lounges that serve a specific route
+func (r *LoungeRepository) GetLoungesByRouteID(routeID uuid.UUID) ([]models.Lounge, error) {
+	var lounges []models.Lounge
+	query := `
+		SELECT DISTINCT l.* 
+		FROM lounges l
+		INNER JOIN lounge_routes lr ON l.id = lr.lounge_id
+		WHERE l.status = 'approved' 
+		  AND l.is_operational = true
+		  AND lr.master_route_id = $1
+		ORDER BY l.lounge_name
+	`
+	err := r.db.Select(&lounges, query, routeID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get lounges by route: %w", err)
+	}
+	return lounges, nil
+}
+
 // GetDistinctStates retrieves all distinct states from active lounges
 func (r *LoungeRepository) GetDistinctStates() ([]string, error) {
 	var states []string
