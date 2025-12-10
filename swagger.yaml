@@ -4012,6 +4012,8 @@ paths:
                   message:
                     type: string
                     example: "Product updated successfully"
+                  product:
+                    $ref: "#/components/schemas/LoungeProduct"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":

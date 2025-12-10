@@ -90,12 +90,30 @@ func (h *LoungeBookingHandler) GetLoungeProducts(c *gin.Context) {
 
 // CreateProductRequest represents the request to create a product
 type CreateProductRequest struct {
-	CategoryID   string  `json:"category_id" binding:"required"`
-	Name         string  `json:"name" binding:"required"`
-	Description  *string `json:"description,omitempty"`
-	Price        string  `json:"price" binding:"required"`
-	ImageURL     *string `json:"image_url,omitempty"`
-	DisplayOrder int     `json:"display_order"`
+	CategoryID             string   `json:"category_id" binding:"required"`
+	Name                   string   `json:"name" binding:"required"`
+	Description            *string  `json:"description,omitempty"`
+	ProductType            string   `json:"product_type"`
+	Price                  string   `json:"price" binding:"required"`
+	DiscountedPrice        *string  `json:"discounted_price,omitempty"`
+	ImageURL               *string  `json:"image_url,omitempty"`
+	ThumbnailURL           *string  `json:"thumbnail_url,omitempty"`
+	StockStatus            string   `json:"stock_status"`
+	StockQuantity          *int     `json:"stock_quantity,omitempty"`
+	IsAvailable            *bool    `json:"is_available,omitempty"`
+	IsPreOrderable         *bool    `json:"is_pre_orderable,omitempty"`
+	AvailableFrom          *string  `json:"available_from,omitempty"`
+	AvailableUntil         *string  `json:"available_until,omitempty"`
+	AvailableDays          []string `json:"available_days,omitempty"`
+	ServiceDurationMinutes *int     `json:"service_duration_minutes,omitempty"`
+	IsVegetarian           *bool    `json:"is_vegetarian,omitempty"`
+	IsVegan                *bool    `json:"is_vegan,omitempty"`
+	IsHalal                *bool    `json:"is_halal,omitempty"`
+	Allergens              []string `json:"allergens,omitempty"`
+	Calories               *int     `json:"calories,omitempty"`
+	DisplayOrder           int      `json:"display_order"`
+	IsFeatured             *bool    `json:"is_featured,omitempty"`
+	Tags                   []string `json:"tags,omitempty"`
 }
 
 // CreateProduct handles POST /api/v1/lounges/:id/products (lounge owner only)
@@ -169,16 +187,77 @@ func (h *LoungeBookingHandler) CreateProduct(c *gin.Context) {
 		CategoryID:   categoryID,
 		Name:         req.Name,
 		Price:        req.Price,
-		IsAvailable:  true,
 		DisplayOrder: req.DisplayOrder,
 	}
 
+	// Set optional fields
 	if req.Description != nil {
 		product.Description = req.Description
+	}
+	if req.ProductType != "" {
+		product.ProductType = models.LoungeProductType(req.ProductType)
+	} else {
+		product.ProductType = models.LoungeProductTypeProduct
+	}
+	if req.DiscountedPrice != nil {
+		product.DiscountedPrice = req.DiscountedPrice
 	}
 	if req.ImageURL != nil {
 		product.ImageURL = req.ImageURL
 	}
+	if req.ThumbnailURL != nil {
+		product.ThumbnailURL = req.ThumbnailURL
+	}
+	if req.StockStatus != "" {
+		product.StockStatus = models.LoungeProductStockStatus(req.StockStatus)
+	} else {
+		product.StockStatus = models.LoungeProductStockStatusInStock
+	}
+	if req.StockQuantity != nil {
+		product.StockQuantity = req.StockQuantity
+	}
+	if req.IsAvailable != nil {
+		product.IsAvailable = *req.IsAvailable
+	} else {
+		product.IsAvailable = true
+	}
+	if req.IsPreOrderable != nil {
+		product.IsPreOrderable = *req.IsPreOrderable
+	}
+	if req.AvailableFrom != nil {
+		product.AvailableFrom = req.AvailableFrom
+	}
+	if req.AvailableUntil != nil {
+		product.AvailableUntil = req.AvailableUntil
+	}
+	if len(req.AvailableDays) > 0 {
+		product.AvailableDays = req.AvailableDays
+	}
+	if req.ServiceDurationMinutes != nil {
+		product.ServiceDurationMinutes = req.ServiceDurationMinutes
+	}
+	if req.IsVegetarian != nil {
+		product.IsVegetarian = *req.IsVegetarian
+	}
+	if req.IsVegan != nil {
+		product.IsVegan = *req.IsVegan
+	}
+	if req.IsHalal != nil {
+		product.IsHalal = *req.IsHalal
+	}
+	if len(req.Allergens) > 0 {
+		product.Allergens = req.Allergens
+	}
+	if req.Calories != nil {
+		product.Calories = req.Calories
+	}
+	if req.IsFeatured != nil {
+		product.IsFeatured = *req.IsFeatured
+	}
+	if len(req.Tags) > 0 {
+		product.Tags = req.Tags
+	}
+	product.IsActive = true
 
 	if err := h.bookingRepo.CreateProduct(product); err != nil {
 		log.Printf("ERROR: Failed to create product: %v", err)
@@ -189,21 +268,71 @@ func (h *LoungeBookingHandler) CreateProduct(c *gin.Context) {
 		return
 	}
 
+	// Return full product object
 	c.JSON(http.StatusCreated, gin.H{
-		"message":    "Product created successfully",
-		"product_id": product.ID,
+		"message": "Product created successfully",
+		"product": gin.H{
+			"id":                       product.ID.String(),
+			"lounge_id":                product.LoungeID.String(),
+			"category_id":              product.CategoryID.String(),
+			"name":                     product.Name,
+			"description":              product.Description,
+			"product_type":             string(product.ProductType),
+			"price":                    product.Price,
+			"discounted_price":         product.DiscountedPrice,
+			"image_url":                product.ImageURL,
+			"thumbnail_url":            product.ThumbnailURL,
+			"stock_status":             string(product.StockStatus),
+			"stock_quantity":           product.StockQuantity,
+			"is_available":             product.IsAvailable,
+			"is_pre_orderable":         product.IsPreOrderable,
+			"available_from":           product.AvailableFrom,
+			"available_until":          product.AvailableUntil,
+			"available_days":           product.AvailableDays,
+			"service_duration_minutes": product.ServiceDurationMinutes,
+			"is_vegetarian":            product.IsVegetarian,
+			"is_vegan":                 product.IsVegan,
+			"is_halal":                 product.IsHalal,
+			"allergens":                product.Allergens,
+			"calories":                 product.Calories,
+			"display_order":            product.DisplayOrder,
+			"is_featured":              product.IsFeatured,
+			"tags":                     product.Tags,
+			"average_rating":           product.AverageRating,
+			"total_reviews":            product.TotalReviews,
+			"is_active":                product.IsActive,
+			"created_at":               product.CreatedAt,
+			"updated_at":               product.UpdatedAt,
+		},
 	})
 }
 
 // UpdateProductRequest represents the request to update a product
 type UpdateProductRequest struct {
-	CategoryID   string  `json:"category_id"`
-	Name         string  `json:"name"`
-	Description  *string `json:"description,omitempty"`
-	Price        string  `json:"price"`
-	ImageURL     *string `json:"image_url,omitempty"`
-	IsAvailable  *bool   `json:"is_available,omitempty"`
-	DisplayOrder int     `json:"display_order"`
+	CategoryID             string   `json:"category_id"`
+	Name                   string   `json:"name"`
+	Description            *string  `json:"description,omitempty"`
+	ProductType            string   `json:"product_type"`
+	Price                  string   `json:"price"`
+	DiscountedPrice        *string  `json:"discounted_price,omitempty"`
+	ImageURL               *string  `json:"image_url,omitempty"`
+	ThumbnailURL           *string  `json:"thumbnail_url,omitempty"`
+	StockStatus            string   `json:"stock_status"`
+	StockQuantity          *int     `json:"stock_quantity,omitempty"`
+	IsAvailable            *bool    `json:"is_available,omitempty"`
+	IsPreOrderable         *bool    `json:"is_pre_orderable,omitempty"`
+	AvailableFrom          *string  `json:"available_from,omitempty"`
+	AvailableUntil         *string  `json:"available_until,omitempty"`
+	AvailableDays          []string `json:"available_days,omitempty"`
+	ServiceDurationMinutes *int     `json:"service_duration_minutes,omitempty"`
+	IsVegetarian           *bool    `json:"is_vegetarian,omitempty"`
+	IsVegan                *bool    `json:"is_vegan,omitempty"`
+	IsHalal                *bool    `json:"is_halal,omitempty"`
+	Allergens              []string `json:"allergens,omitempty"`
+	Calories               *int     `json:"calories,omitempty"`
+	DisplayOrder           int      `json:"display_order"`
+	IsFeatured             *bool    `json:"is_featured,omitempty"`
+	Tags                   []string `json:"tags,omitempty"`
 }
 
 // UpdateProduct handles PUT /api/v1/lounges/:id/products/:product_id
@@ -305,13 +434,64 @@ func (h *LoungeBookingHandler) UpdateProduct(c *gin.Context) {
 	if req.Description != nil {
 		product.Description = req.Description
 	}
+	if req.ProductType != "" {
+		product.ProductType = models.LoungeProductType(req.ProductType)
+	}
+	if req.DiscountedPrice != nil {
+		product.DiscountedPrice = req.DiscountedPrice
+	}
 	if req.ImageURL != nil {
 		product.ImageURL = req.ImageURL
+	}
+	if req.ThumbnailURL != nil {
+		product.ThumbnailURL = req.ThumbnailURL
+	}
+	if req.StockStatus != "" {
+		product.StockStatus = models.LoungeProductStockStatus(req.StockStatus)
+	}
+	if req.StockQuantity != nil {
+		product.StockQuantity = req.StockQuantity
 	}
 	if req.IsAvailable != nil {
 		product.IsAvailable = *req.IsAvailable
 	}
+	if req.IsPreOrderable != nil {
+		product.IsPreOrderable = *req.IsPreOrderable
+	}
+	if req.AvailableFrom != nil {
+		product.AvailableFrom = req.AvailableFrom
+	}
+	if req.AvailableUntil != nil {
+		product.AvailableUntil = req.AvailableUntil
+	}
+	if len(req.AvailableDays) > 0 {
+		product.AvailableDays = req.AvailableDays
+	}
+	if req.ServiceDurationMinutes != nil {
+		product.ServiceDurationMinutes = req.ServiceDurationMinutes
+	}
+	if req.IsVegetarian != nil {
+		product.IsVegetarian = *req.IsVegetarian
+	}
+	if req.IsVegan != nil {
+		product.IsVegan = *req.IsVegan
+	}
+	if req.IsHalal != nil {
+		product.IsHalal = *req.IsHalal
+	}
+	if len(req.Allergens) > 0 {
+		product.Allergens = req.Allergens
+	}
+	if req.Calories != nil {
+		product.Calories = req.Calories
+	}
 	product.DisplayOrder = req.DisplayOrder
+	if req.IsFeatured != nil {
+		product.IsFeatured = *req.IsFeatured
+	}
+	if len(req.Tags) > 0 {
+		product.Tags = req.Tags
+	}
 
 	if err := h.bookingRepo.UpdateProduct(product); err != nil {
 		log.Printf("ERROR: Failed to update product: %v", err)
@@ -322,7 +502,44 @@ func (h *LoungeBookingHandler) UpdateProduct(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Product updated successfully"})
+	// Return full product object
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Product updated successfully",
+		"product": gin.H{
+			"id":                       product.ID.String(),
+			"lounge_id":                product.LoungeID.String(),
+			"category_id":              product.CategoryID.String(),
+			"category_name":            product.CategoryName,
+			"name":                     product.Name,
+			"description":              product.Description,
+			"product_type":             string(product.ProductType),
+			"price":                    product.Price,
+			"discounted_price":         product.DiscountedPrice,
+			"image_url":                product.ImageURL,
+			"thumbnail_url":            product.ThumbnailURL,
+			"stock_status":             string(product.StockStatus),
+			"stock_quantity":           product.StockQuantity,
+			"is_available":             product.IsAvailable,
+			"is_pre_orderable":         product.IsPreOrderable,
+			"available_from":           product.AvailableFrom,
+			"available_until":          product.AvailableUntil,
+			"available_days":           product.AvailableDays,
+			"service_duration_minutes": product.ServiceDurationMinutes,
+			"is_vegetarian":            product.IsVegetarian,
+			"is_vegan":                 product.IsVegan,
+			"is_halal":                 product.IsHalal,
+			"allergens":                product.Allergens,
+			"calories":                 product.Calories,
+			"display_order":            product.DisplayOrder,
+			"is_featured":              product.IsFeatured,
+			"tags":                     product.Tags,
+			"average_rating":           product.AverageRating,
+			"total_reviews":            product.TotalReviews,
+			"is_active":                product.IsActive,
+			"created_at":               product.CreatedAt,
+			"updated_at":               product.UpdatedAt,
+		},
+	})
 }
 
 // DeleteProduct handles DELETE /api/v1/lounges/:id/products/:product_id
