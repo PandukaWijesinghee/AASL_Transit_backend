@@ -117,14 +117,16 @@ const (
 
 // LoungeMarketplaceCategory represents a product category
 type LoungeMarketplaceCategory struct {
-	ID           uuid.UUID      `db:"id" json:"id"`
-	Name         string         `db:"name" json:"name"`
-	Description  sql.NullString `db:"description" json:"description,omitempty"`
-	IconURL      sql.NullString `db:"icon_url" json:"icon_url,omitempty"`
-	DisplayOrder int            `db:"display_order" json:"display_order"`
-	IsActive     bool           `db:"is_active" json:"is_active"`
-	CreatedAt    time.Time      `db:"created_at" json:"created_at"`
-	UpdatedAt    time.Time      `db:"updated_at" json:"updated_at"`
+	ID               uuid.UUID  `db:"id" json:"id"`
+	Name             string     `db:"name" json:"name"`
+	Description      *string    `db:"description" json:"description,omitempty"`
+	IconName         *string    `db:"icon_name" json:"icon_name,omitempty"`                   // Icon font name (e.g., "restaurant")
+	IconURL          *string    `db:"icon_url" json:"icon_url,omitempty"`                     // Custom icon image URL
+	ParentCategoryID *uuid.UUID `db:"parent_category_id" json:"parent_category_id,omitempty"` // For subcategories
+	DisplayOrder     int        `db:"display_order" json:"display_order"`
+	IsActive         bool       `db:"is_active" json:"is_active"`
+	CreatedAt        time.Time  `db:"created_at" json:"created_at"`
+	UpdatedAt        time.Time  `db:"updated_at" json:"updated_at"`
 }
 
 // ============================================================================
@@ -135,11 +137,10 @@ type LoungeMarketplaceCategory struct {
 type LoungeProductStockStatus string
 
 const (
-	LoungeProductStockStatusInStock      LoungeProductStockStatus = "in_stock"
-	LoungeProductStockStatusLowStock     LoungeProductStockStatus = "low_stock"
-	LoungeProductStockStatusOutOfStock   LoungeProductStockStatus = "out_of_stock"
-	LoungeProductStockStatusDiscontinued LoungeProductStockStatus = "discontinued"
-	LoungeProductStockStatusMadeToOrder  LoungeProductStockStatus = "made_to_order" // Fresh-cooked items
+	LoungeProductStockStatusInStock     LoungeProductStockStatus = "in_stock"
+	LoungeProductStockStatusLowStock    LoungeProductStockStatus = "low_stock"
+	LoungeProductStockStatusOutOfStock  LoungeProductStockStatus = "out_of_stock"
+	LoungeProductStockStatusMadeToOrder LoungeProductStockStatus = "made_to_order" // Fresh-cooked items
 )
 
 // LoungeProductType represents the product type ENUM
@@ -148,7 +149,7 @@ type LoungeProductType string
 const (
 	LoungeProductTypeProduct LoungeProductType = "product" // Food, beverages, snacks, etc.
 	LoungeProductTypeService LoungeProductType = "service" // Storage, WiFi, shower, etc.
-	LoungeProductTypePackage LoungeProductType = "package" // Bundled offerings
+	LoungeProductTypeCombo   LoungeProductType = "combo"   // Bundled offerings (matches DB ENUM)
 )
 
 // LoungeProduct represents a product/service offered by a lounge
@@ -158,20 +159,30 @@ type LoungeProduct struct {
 	CategoryID             uuid.UUID                `db:"category_id" json:"category_id"`
 	Name                   string                   `db:"name" json:"name"`
 	Description            *string                  `db:"description" json:"description,omitempty"`
-	Price                  string                   `db:"price" json:"price"` // DECIMAL(10,2) as string
-	ImageURL               *string                  `db:"image_url" json:"image_url,omitempty"`
-	StockStatus            LoungeProductStockStatus `db:"stock_status" json:"stock_status"`
 	ProductType            LoungeProductType        `db:"product_type" json:"product_type"`
+	Price                  string                   `db:"price" json:"price"`                                 // DECIMAL(10,2) as string
+	DiscountedPrice        *string                  `db:"discounted_price" json:"discounted_price,omitempty"` // Sale price
+	ImageURL               *string                  `db:"image_url" json:"image_url,omitempty"`
+	ThumbnailURL           *string                  `db:"thumbnail_url" json:"thumbnail_url,omitempty"`
+	StockStatus            LoungeProductStockStatus `db:"stock_status" json:"stock_status"`
+	StockQuantity          *int                     `db:"stock_quantity" json:"stock_quantity,omitempty"` // Current stock level
 	IsAvailable            bool                     `db:"is_available" json:"is_available"`
 	IsPreOrderable         bool                     `db:"is_pre_orderable" json:"is_pre_orderable"`
+	AvailableFrom          *string                  `db:"available_from" json:"available_from,omitempty"`   // TIME
+	AvailableUntil         *string                  `db:"available_until" json:"available_until,omitempty"` // TIME
+	AvailableDays          []string                 `db:"available_days" json:"available_days,omitempty"`   // TEXT[] e.g., ["mon","tue","wed"]
+	ServiceDurationMinutes *int                     `db:"service_duration_minutes" json:"service_duration_minutes,omitempty"`
 	IsVegetarian           bool                     `db:"is_vegetarian" json:"is_vegetarian"`
 	IsVegan                bool                     `db:"is_vegan" json:"is_vegan"`
 	IsHalal                bool                     `db:"is_halal" json:"is_halal"`
+	Allergens              []string                 `db:"allergens" json:"allergens,omitempty"` // TEXT[] e.g., ["nuts","dairy"]
+	Calories               *int                     `db:"calories" json:"calories,omitempty"`
 	DisplayOrder           int                      `db:"display_order" json:"display_order"`
-	ServiceDurationMinutes *int                     `db:"service_duration_minutes" json:"service_duration_minutes,omitempty"`
-	AvailableFrom          *string                  `db:"available_from" json:"available_from,omitempty"`   // TIME
-	AvailableUntil         *string                  `db:"available_until" json:"available_until,omitempty"` // TIME
-	Tags                   []string                 `db:"tags" json:"tags,omitempty"`                       // TEXT[]
+	IsFeatured             bool                     `db:"is_featured" json:"is_featured"`
+	Tags                   []string                 `db:"tags" json:"tags,omitempty"`                     // TEXT[]
+	AverageRating          *string                  `db:"average_rating" json:"average_rating,omitempty"` // DECIMAL(3,2)
+	TotalReviews           int                      `db:"total_reviews" json:"total_reviews"`
+	IsActive               bool                     `db:"is_active" json:"is_active"`
 	CreatedAt              time.Time                `db:"created_at" json:"created_at"`
 	UpdatedAt              time.Time                `db:"updated_at" json:"updated_at"`
 

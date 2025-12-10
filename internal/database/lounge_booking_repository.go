@@ -27,15 +27,51 @@ func NewLoungeBookingRepository(db *sqlx.DB) *LoungeBookingRepository {
 
 // GetAllCategories returns all active marketplace categories
 func (r *LoungeBookingRepository) GetAllCategories() ([]models.LoungeMarketplaceCategory, error) {
-	var categories []models.LoungeMarketplaceCategory
 	query := `
-		SELECT id, name, description, icon_url, display_order, is_active, created_at, updated_at
+		SELECT id, name, description, icon_name, icon_url, parent_category_id, 
+		       display_order, is_active, created_at, updated_at
 		FROM lounge_marketplace_categories
 		WHERE is_active = TRUE
 		ORDER BY display_order ASC
 	`
-	err := r.db.Select(&categories, query)
-	return categories, err
+
+	rows, err := r.db.Queryx(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var categories []models.LoungeMarketplaceCategory
+	for rows.Next() {
+		var c models.LoungeMarketplaceCategory
+		var description, iconName, iconURL sql.NullString
+		var parentCategoryID uuid.NullUUID
+
+		err := rows.Scan(
+			&c.ID, &c.Name, &description, &iconName, &iconURL, &parentCategoryID,
+			&c.DisplayOrder, &c.IsActive, &c.CreatedAt, &c.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if description.Valid {
+			c.Description = &description.String
+		}
+		if iconName.Valid {
+			c.IconName = &iconName.String
+		}
+		if iconURL.Valid {
+			c.IconURL = &iconURL.String
+		}
+		if parentCategoryID.Valid {
+			c.ParentCategoryID = &parentCategoryID.UUID
+		}
+
+		categories = append(categories, c)
+	}
+
+	return categories, nil
 }
 
 // ============================================================================
@@ -48,15 +84,17 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 	query := `
 		SELECT 
 			p.id, p.lounge_id, p.category_id, p.name, p.description, 
-			p.price, p.image_url, p.stock_status, p.product_type,
-			p.is_available, p.is_pre_orderable, p.is_vegetarian, p.is_vegan, p.is_halal,
-			p.display_order, p.service_duration_minutes, 
-			p.available_from, p.available_until, p.tags,
+			p.product_type, p.price, p.discounted_price, p.image_url, p.thumbnail_url,
+			p.stock_status, p.stock_quantity, p.is_available, p.is_pre_orderable,
+			p.available_from, p.available_until, p.available_days,
+			p.service_duration_minutes, p.is_vegetarian, p.is_vegan, p.is_halal,
+			p.allergens, p.calories, p.display_order, p.is_featured, p.tags,
+			p.average_rating, p.total_reviews, p.is_active,
 			p.created_at, p.updated_at,
 			c.name as category_name
 		FROM lounge_products p
 		JOIN lounge_marketplace_categories c ON p.category_id = c.id
-		WHERE p.lounge_id = $1 AND p.is_available = TRUE
+		WHERE p.lounge_id = $1 AND p.is_active = TRUE AND p.is_available = TRUE
 		ORDER BY c.display_order, p.display_order ASC
 	`
 
@@ -70,18 +108,21 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 		var p models.LoungeProduct
 		var categoryName string
 		var stockStatus, productType string
-		var tags []string
+		var tags, availableDays, allergens []string
 
 		// Use sql.Null* types for scanning, then convert to pointers
-		var description, imageURL, availableFrom, availableUntil sql.NullString
-		var serviceDurationMinutes sql.NullInt64
+		var description, discountedPrice, imageURL, thumbnailURL sql.NullString
+		var availableFrom, availableUntil, averageRating sql.NullString
+		var serviceDurationMinutes, stockQuantity, calories sql.NullInt64
 
 		err := rows.Scan(
 			&p.ID, &p.LoungeID, &p.CategoryID, &p.Name, &description,
-			&p.Price, &imageURL, &stockStatus, &productType,
-			&p.IsAvailable, &p.IsPreOrderable, &p.IsVegetarian, &p.IsVegan, &p.IsHalal,
-			&p.DisplayOrder, &serviceDurationMinutes,
-			&availableFrom, &availableUntil, pq.Array(&tags),
+			&productType, &p.Price, &discountedPrice, &imageURL, &thumbnailURL,
+			&stockStatus, &stockQuantity, &p.IsAvailable, &p.IsPreOrderable,
+			&availableFrom, &availableUntil, pq.Array(&availableDays),
+			&serviceDurationMinutes, &p.IsVegetarian, &p.IsVegan, &p.IsHalal,
+			pq.Array(&allergens), &calories, &p.DisplayOrder, &p.IsFeatured, pq.Array(&tags),
+			&averageRating, &p.TotalReviews, &p.IsActive,
 			&p.CreatedAt, &p.UpdatedAt, &categoryName,
 		)
 		if err != nil {
@@ -92,8 +133,18 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 		if description.Valid {
 			p.Description = &description.String
 		}
+		if discountedPrice.Valid {
+			p.DiscountedPrice = &discountedPrice.String
+		}
 		if imageURL.Valid {
 			p.ImageURL = &imageURL.String
+		}
+		if thumbnailURL.Valid {
+			p.ThumbnailURL = &thumbnailURL.String
+		}
+		if stockQuantity.Valid {
+			val := int(stockQuantity.Int64)
+			p.StockQuantity = &val
 		}
 		if serviceDurationMinutes.Valid {
 			val := int(serviceDurationMinutes.Int64)
@@ -105,10 +156,19 @@ func (r *LoungeBookingRepository) GetProductsByLoungeID(loungeID uuid.UUID) ([]m
 		if availableUntil.Valid {
 			p.AvailableUntil = &availableUntil.String
 		}
+		if calories.Valid {
+			val := int(calories.Int64)
+			p.Calories = &val
+		}
+		if averageRating.Valid {
+			p.AverageRating = &averageRating.String
+		}
 
 		p.StockStatus = models.LoungeProductStockStatus(stockStatus)
 		p.ProductType = models.LoungeProductType(productType)
 		p.Tags = tags
+		p.AvailableDays = availableDays
+		p.Allergens = allergens
 		p.CategoryName = categoryName
 		products = append(products, p)
 	}
@@ -122,10 +182,12 @@ func (r *LoungeBookingRepository) GetProductByID(productID uuid.UUID) (*models.L
 	query := `
 		SELECT 
 			p.id, p.lounge_id, p.category_id, p.name, p.description, 
-			p.price, p.image_url, p.stock_status, p.product_type,
-			p.is_available, p.is_pre_orderable, p.display_order,
-			p.service_duration_minutes, p.available_from, p.available_until,
-			p.is_vegetarian, p.is_vegan, p.is_halal, p.tags,
+			p.product_type, p.price, p.discounted_price, p.image_url, p.thumbnail_url,
+			p.stock_status, p.stock_quantity, p.is_available, p.is_pre_orderable,
+			p.available_from, p.available_until, p.available_days,
+			p.service_duration_minutes, p.is_vegetarian, p.is_vegan, p.is_halal,
+			p.allergens, p.calories, p.display_order, p.is_featured, p.tags,
+			p.average_rating, p.total_reviews, p.is_active,
 			p.created_at, p.updated_at,
 			c.name as category_name
 		FROM lounge_products p
@@ -134,17 +196,20 @@ func (r *LoungeBookingRepository) GetProductByID(productID uuid.UUID) (*models.L
 	`
 
 	// Scan with proper type handling
-	var description, imageURL, availableFrom, availableUntil sql.NullString
-	var serviceDurationMinutes sql.NullInt64
-	var tags []string
+	var description, discountedPrice, imageURL, thumbnailURL sql.NullString
+	var availableFrom, availableUntil, averageRating sql.NullString
+	var serviceDurationMinutes, stockQuantity, calories sql.NullInt64
+	var tags, availableDays, allergens []string
 	var stockStatus, productType, categoryName string
 
 	err := r.db.QueryRow(query, productID).Scan(
 		&p.ID, &p.LoungeID, &p.CategoryID, &p.Name, &description,
-		&p.Price, &imageURL, &stockStatus, &productType,
-		&p.IsAvailable, &p.IsPreOrderable, &p.DisplayOrder,
-		&serviceDurationMinutes, &availableFrom, &availableUntil,
-		&p.IsVegetarian, &p.IsVegan, &p.IsHalal, pq.Array(&tags),
+		&productType, &p.Price, &discountedPrice, &imageURL, &thumbnailURL,
+		&stockStatus, &stockQuantity, &p.IsAvailable, &p.IsPreOrderable,
+		&availableFrom, &availableUntil, pq.Array(&availableDays),
+		&serviceDurationMinutes, &p.IsVegetarian, &p.IsVegan, &p.IsHalal,
+		pq.Array(&allergens), &calories, &p.DisplayOrder, &p.IsFeatured, pq.Array(&tags),
+		&averageRating, &p.TotalReviews, &p.IsActive,
 		&p.CreatedAt, &p.UpdatedAt,
 		&categoryName,
 	)
@@ -160,8 +225,18 @@ func (r *LoungeBookingRepository) GetProductByID(productID uuid.UUID) (*models.L
 	if description.Valid {
 		p.Description = &description.String
 	}
+	if discountedPrice.Valid {
+		p.DiscountedPrice = &discountedPrice.String
+	}
 	if imageURL.Valid {
 		p.ImageURL = &imageURL.String
+	}
+	if thumbnailURL.Valid {
+		p.ThumbnailURL = &thumbnailURL.String
+	}
+	if stockQuantity.Valid {
+		val := int(stockQuantity.Int64)
+		p.StockQuantity = &val
 	}
 	if serviceDurationMinutes.Valid {
 		val := int(serviceDurationMinutes.Int64)
@@ -173,11 +248,20 @@ func (r *LoungeBookingRepository) GetProductByID(productID uuid.UUID) (*models.L
 	if availableUntil.Valid {
 		p.AvailableUntil = &availableUntil.String
 	}
+	if calories.Valid {
+		val := int(calories.Int64)
+		p.Calories = &val
+	}
+	if averageRating.Valid {
+		p.AverageRating = &averageRating.String
+	}
 
 	// Set ENUM types and other fields
 	p.StockStatus = models.LoungeProductStockStatus(stockStatus)
 	p.ProductType = models.LoungeProductType(productType)
 	p.Tags = tags
+	p.AvailableDays = availableDays
+	p.Allergens = allergens
 	p.CategoryName = categoryName
 
 	return &p, nil
@@ -189,16 +273,38 @@ func (r *LoungeBookingRepository) CreateProduct(product *models.LoungeProduct) e
 	product.CreatedAt = time.Now()
 	product.UpdatedAt = time.Now()
 
+	// Set defaults
+	if product.StockStatus == "" {
+		product.StockStatus = models.LoungeProductStockStatusInStock
+	}
+	if product.ProductType == "" {
+		product.ProductType = models.LoungeProductTypeProduct
+	}
+	product.IsActive = true
+
 	query := `
 		INSERT INTO lounge_products (
-			id, lounge_id, category_id, name, description, price, 
-			image_url, is_available, display_order, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			id, lounge_id, category_id, name, description, product_type,
+			price, discounted_price, image_url, thumbnail_url,
+			stock_status, stock_quantity, is_available, is_pre_orderable,
+			available_from, available_until, available_days,
+			service_duration_minutes, is_vegetarian, is_vegan, is_halal,
+			allergens, calories, display_order, is_featured, tags,
+			is_active, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+			$11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+			$21, $22, $23, $24, $25, $26, $27, $28, $29
+		)
 	`
 	_, err := r.db.Exec(query,
-		product.ID, product.LoungeID, product.CategoryID, product.Name, product.Description,
-		product.Price, product.ImageURL, product.IsAvailable, product.DisplayOrder,
-		product.CreatedAt, product.UpdatedAt,
+		product.ID, product.LoungeID, product.CategoryID, product.Name, product.Description, product.ProductType,
+		product.Price, product.DiscountedPrice, product.ImageURL, product.ThumbnailURL,
+		product.StockStatus, product.StockQuantity, product.IsAvailable, product.IsPreOrderable,
+		product.AvailableFrom, product.AvailableUntil, pq.Array(product.AvailableDays),
+		product.ServiceDurationMinutes, product.IsVegetarian, product.IsVegan, product.IsHalal,
+		pq.Array(product.Allergens), product.Calories, product.DisplayOrder, product.IsFeatured, pq.Array(product.Tags),
+		product.IsActive, product.CreatedAt, product.UpdatedAt,
 	)
 	return err
 }
@@ -208,13 +314,23 @@ func (r *LoungeBookingRepository) UpdateProduct(product *models.LoungeProduct) e
 	product.UpdatedAt = time.Now()
 	query := `
 		UPDATE lounge_products
-		SET name = $2, description = $3, price = $4, image_url = $5, 
-		    is_available = $6, display_order = $7, category_id = $8, updated_at = $9
+		SET category_id = $2, name = $3, description = $4, product_type = $5,
+		    price = $6, discounted_price = $7, image_url = $8, thumbnail_url = $9,
+		    stock_status = $10, stock_quantity = $11, is_available = $12, is_pre_orderable = $13,
+		    available_from = $14, available_until = $15, available_days = $16,
+		    service_duration_minutes = $17, is_vegetarian = $18, is_vegan = $19, is_halal = $20,
+		    allergens = $21, calories = $22, display_order = $23, is_featured = $24, tags = $25,
+		    updated_at = $26
 		WHERE id = $1
 	`
 	_, err := r.db.Exec(query,
-		product.ID, product.Name, product.Description, product.Price, product.ImageURL,
-		product.IsAvailable, product.DisplayOrder, product.CategoryID, product.UpdatedAt,
+		product.ID, product.CategoryID, product.Name, product.Description, product.ProductType,
+		product.Price, product.DiscountedPrice, product.ImageURL, product.ThumbnailURL,
+		product.StockStatus, product.StockQuantity, product.IsAvailable, product.IsPreOrderable,
+		product.AvailableFrom, product.AvailableUntil, pq.Array(product.AvailableDays),
+		product.ServiceDurationMinutes, product.IsVegetarian, product.IsVegan, product.IsHalal,
+		pq.Array(product.Allergens), product.Calories, product.DisplayOrder, product.IsFeatured, pq.Array(product.Tags),
+		product.UpdatedAt,
 	)
 	return err
 }

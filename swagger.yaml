@@ -9765,15 +9765,32 @@ components:
           type: string
           nullable: true
           example: "Hot and cold drinks"
+        icon_name:
+          type: string
+          nullable: true
+          example: "restaurant"
+          description: "Icon font name (e.g., Material Icons name)"
         icon_url:
           type: string
           nullable: true
+          description: "Custom icon image URL"
+        parent_category_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: "Parent category ID for subcategories"
         display_order:
           type: integer
           example: 1
         is_active:
           type: boolean
           example: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
 
     LoungeProduct:
       type: object
@@ -9800,20 +9817,35 @@ components:
           type: string
           nullable: true
           example: "Premium Ceylon black tea"
+        product_type:
+          type: string
+          enum: [product, service, combo]
+          example: "product"
+          description: "Type of item: product (food/beverage), service (wifi/storage), combo (bundle)"
         price:
           type: string
           example: "150.00"
+        discounted_price:
+          type: string
+          nullable: true
+          example: "120.00"
+          description: "Sale price when applicable"
         image_url:
           type: string
           nullable: true
+        thumbnail_url:
+          type: string
+          nullable: true
+          description: "Smaller image for list views"
         stock_status:
           type: string
-          enum: [in_stock, low_stock, out_of_stock, discontinued, made_to_order]
+          enum: [in_stock, low_stock, out_of_stock, made_to_order]
           example: "in_stock"
-        product_type:
-          type: string
-          enum: [product, service, package]
-          example: "product"
+        stock_quantity:
+          type: integer
+          nullable: true
+          example: 50
+          description: "Current stock level"
         is_available:
           type: boolean
           example: true
@@ -9821,6 +9853,27 @@ components:
           type: boolean
           example: false
           description: "Whether the product can be pre-ordered before arrival"
+        available_from:
+          type: string
+          nullable: true
+          example: "06:00:00"
+          description: "Time-based availability start (HH:MM:SS)"
+        available_until:
+          type: string
+          nullable: true
+          example: "10:30:00"
+          description: "Time-based availability end (HH:MM:SS)"
+        available_days:
+          type: array
+          items:
+            type: string
+          example: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+          description: "Days of the week when available"
+        service_duration_minutes:
+          type: integer
+          nullable: true
+          example: 60
+          description: "Duration in minutes for services (WiFi, storage, etc.)"
         is_vegetarian:
           type: boolean
           example: false
@@ -9828,6 +9881,55 @@ components:
         is_vegan:
           type: boolean
           example: false
+          description: "Dietary information - vegan"
+        is_halal:
+          type: boolean
+          example: false
+          description: "Dietary information - halal"
+        allergens:
+          type: array
+          items:
+            type: string
+          example: ["nuts", "dairy"]
+          description: "List of allergens in the product"
+        calories:
+          type: integer
+          nullable: true
+          example: 150
+          description: "Calorie count per serving"
+        display_order:
+          type: integer
+          example: 1
+          description: "Sort order for displaying products"
+        is_featured:
+          type: boolean
+          example: false
+          description: "Featured products shown prominently"
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["popular", "traditional"]
+          description: "Product tags for filtering/display"
+        average_rating:
+          type: string
+          nullable: true
+          example: "4.50"
+          description: "Average customer rating (0-5)"
+        total_reviews:
+          type: integer
+          example: 25
+          description: "Total number of reviews"
+        is_active:
+          type: boolean
+          example: true
+          description: "Whether product is active (not soft-deleted)"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
           description: "Dietary information - vegan"
         is_halal:
           type: boolean
@@ -9880,17 +9982,70 @@ components:
         description:
           type: string
           example: "Premium Ceylon black tea"
+        product_type:
+          type: string
+          enum: [product, service, combo]
+          default: "product"
         price:
           type: string
           example: "150.00"
+        discounted_price:
+          type: string
+          nullable: true
         image_url:
           type: string
+        thumbnail_url:
+          type: string
+        stock_status:
+          type: string
+          enum: [in_stock, low_stock, out_of_stock, made_to_order]
+          default: "in_stock"
+        stock_quantity:
+          type: integer
         is_available:
           type: boolean
           default: true
-        preparation_time_mins:
+        is_pre_orderable:
+          type: boolean
+          default: false
+        available_from:
+          type: string
+          example: "06:00:00"
+        available_until:
+          type: string
+          example: "22:00:00"
+        available_days:
+          type: array
+          items:
+            type: string
+          example: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+        service_duration_minutes:
           type: integer
-          example: 5
+        is_vegetarian:
+          type: boolean
+          default: false
+        is_vegan:
+          type: boolean
+          default: false
+        is_halal:
+          type: boolean
+          default: false
+        allergens:
+          type: array
+          items:
+            type: string
+        calories:
+          type: integer
+        display_order:
+          type: integer
+          default: 0
+        is_featured:
+          type: boolean
+          default: false
+        tags:
+          type: array
+          items:
+            type: string
 
     UpdateLoungeProductRequest:
       type: object
@@ -9902,14 +10057,57 @@ components:
           type: string
         description:
           type: string
+        product_type:
+          type: string
+          enum: [product, service, combo]
         price:
           type: string
+        discounted_price:
+          type: string
+          nullable: true
         image_url:
           type: string
+        thumbnail_url:
+          type: string
+        stock_status:
+          type: string
+          enum: [in_stock, low_stock, out_of_stock, made_to_order]
+        stock_quantity:
+          type: integer
         is_available:
           type: boolean
-        preparation_time_mins:
+        is_pre_orderable:
+          type: boolean
+        available_from:
+          type: string
+        available_until:
+          type: string
+        available_days:
+          type: array
+          items:
+            type: string
+        service_duration_minutes:
           type: integer
+        is_vegetarian:
+          type: boolean
+        is_vegan:
+          type: boolean
+        is_halal:
+          type: boolean
+        allergens:
+          type: array
+          items:
+            type: string
+        calories:
+          type: integer
+        display_order:
+          type: integer
+        is_featured:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
 
     LoungeBooking:
       type: object
@@ -11095,16 +11293,13 @@ components:
       - in_stock
       - low_stock
       - out_of_stock
-      - discontinued
-    description: Product availability status
+      - made_to_order
+    description: Product availability status (made_to_order for fresh-cooked items)
     
   LoungeProductType:
     type: string
     enum:
-      - food
-      - beverage
-      - snack
-      - meal
-      - dessert
+      - product
       - service
-    description: Category of lounge product
+      - combo
+    description: Type of lounge item - product (food/beverage), service (wifi/storage), combo (bundle)
