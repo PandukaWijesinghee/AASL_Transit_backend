@@ -125,7 +125,12 @@ func (s *SearchService) SearchTrips(
 
 	// Step 4: Fetch route stops for each trip (for passenger to select boarding/alighting)
 	for i := range trips {
+		// Debug: Log master_route_id for each trip
 		if trips[i].MasterRouteID != nil {
+			s.logger.WithFields(logrus.Fields{
+				"trip_id":         trips[i].TripID,
+				"master_route_id": *trips[i].MasterRouteID,
+			}).Info("Trip has master_route_id")
 			stops, err := s.repo.GetRouteStopsForTrip(*trips[i].MasterRouteID, trips[i].BusOwnerRouteID)
 			if err != nil {
 				s.logger.WithError(err).WithField("trip_id", trips[i].TripID).Warn("Failed to fetch route stops for trip")
@@ -133,6 +138,8 @@ func (s *SearchService) SearchTrips(
 			} else {
 				trips[i].RouteStops = stops
 			}
+		} else {
+			s.logger.WithField("trip_id", trips[i].TripID).Warn("Trip has NULL master_route_id!")
 		}
 	}
 

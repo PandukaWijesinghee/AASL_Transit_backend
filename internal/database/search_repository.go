@@ -199,7 +199,7 @@ func (r *SearchRepository) FindDirectTrips(
 			st.is_bookable,
 			-- Route info for fetching stops
 			bor.id as bus_owner_route_id,
-			bor.master_route_id as master_route_id
+			COALESCE(bor.master_route_id, check_from.master_route_id)::text as master_route_id
 		FROM scheduled_trips st
 		-- Join bus owner route
 		LEFT JOIN bus_owner_routes bor ON st.bus_owner_route_id = bor.id
