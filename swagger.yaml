@@ -3777,6 +3777,7 @@ paths:
       operationId: getLoungesNearStop
       tags:
         - Lounge Marketplace
+      security: []
       parameters:
         - name: routeId
           in: path
@@ -10160,42 +10161,6 @@ components:
           type: boolean
           example: true
           description: "Whether product is active (not soft-deleted)"
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-          description: "Dietary information - vegan"
-        is_halal:
-          type: boolean
-          example: false
-          description: "Dietary information - halal"
-        display_order:
-          type: integer
-          example: 1
-          description: "Sort order for displaying products"
-        service_duration_minutes:
-          type: integer
-          nullable: true
-          example: 60
-          description: "Duration in minutes for services (WiFi, storage, etc.)"
-        available_from:
-          type: string
-          nullable: true
-          example: "06:00:00"
-          description: "Time-based availability start (HH:MM:SS)"
-        available_until:
-          type: string
-          nullable: true
-          example: "10:30:00"
-          description: "Time-based availability end (HH:MM:SS)"
-        tags:
-          type: array
-          items:
-            type: string
-          example: ["popular", "traditional"]
-          description: "Product tags for filtering/display"
         created_at:
           type: string
           format: date-time
