@@ -897,3 +897,111 @@ func (h *LoungeHandler) GetLoungesByRoute(c *gin.Context) {
 		"total":    len(response),
 	})
 }
+
+// GetLoungesNearStop handles GET /api/v1/lounges/near-stop/:routeId/:stopId
+// @Summary Get lounges near a passenger's selected stop
+// @Description Returns all active lounges where the passenger's stop is within 2 stops of the lounge's location
+// @Tags Lounges
+// @Produce json
+// @Param routeId path string true "Master Route ID (UUID)"
+// @Param stopId path string true "Passenger's selected stop ID (UUID)"
+// @Param distance query int false "Max stop distance (default 2)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /lounges/near-stop/{routeId}/{stopId} [get]
+func (h *LoungeHandler) GetLoungesNearStop(c *gin.Context) {
+	routeIDStr := c.Param("routeId")
+	routeID, err := uuid.Parse(routeIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid_id",
+			Message: "Invalid route ID format",
+		})
+		return
+	}
+
+	stopIDStr := c.Param("stopId")
+	stopID, err := uuid.Parse(stopIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "invalid_id",
+			Message: "Invalid stop ID format",
+		})
+		return
+	}
+
+	// Default max distance is 2 stops
+	maxDistance := 2
+	if distStr := c.Query("distance"); distStr != "" {
+		if dist, err := strconv.Atoi(distStr); err == nil && dist > 0 {
+			maxDistance = dist
+		}
+	}
+
+	log.Printf("INFO: Finding lounges near stop %s on route %s (max distance: %d stops)", stopID, routeID, maxDistance)
+
+	lounges, err := h.loungeRepo.GetLoungesNearStop(routeID, stopID, maxDistance)
+	if err != nil {
+		log.Printf("ERROR: Failed to get lounges near stop %s on route %s: %v", stopID, routeID, err)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "database_error",
+			Message: "Failed to retrieve lounges",
+		})
+		return
+	}
+
+	log.Printf("INFO: Found %d lounges near stop %s", len(lounges), stopID)
+
+	// Build response with parsed JSON fields
+	response := make([]gin.H, 0)
+	for _, lounge := range lounges {
+		// Parse amenities JSON
+		var amenities []string
+		if len(lounge.Amenities) > 0 {
+			json.Unmarshal(lounge.Amenities, &amenities)
+		}
+		if amenities == nil {
+			amenities = []string{}
+		}
+
+		// Parse images JSON
+		var images []string
+		if len(lounge.Images) > 0 {
+			json.Unmarshal(lounge.Images, &images)
+		}
+		if images == nil {
+			images = []string{}
+		}
+
+		response = append(response, gin.H{
+			"id":              lounge.ID,
+			"lounge_owner_id": lounge.LoungeOwnerID,
+			"lounge_name":     lounge.LoungeName,
+			"description":     lounge.Description.String,
+			"address":         lounge.Address,
+			"contact_phone":   lounge.ContactPhone.String,
+			"latitude":        lounge.Latitude.String,
+			"longitude":       lounge.Longitude.String,
+			"capacity":        lounge.Capacity.Int64,
+			"price_1_hour":    lounge.Price1Hour.String,
+			"price_2_hours":   lounge.Price2Hours.String,
+			"price_3_hours":   lounge.Price3Hours.String,
+			"price_until_bus": lounge.PriceUntilBus.String,
+			"status":          lounge.Status,
+			"is_operational":  lounge.IsOperational,
+			"amenities":       amenities,
+			"images":          images,
+			"average_rating":  lounge.AverageRating.String,
+			"state":           lounge.State.String,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"lounges":      response,
+		"route_id":     routeID,
+		"stop_id":      stopID,
+		"max_distance": maxDistance,
+		"total":        len(response),
+	})
+}

@@ -209,6 +209,51 @@ func (r *LoungeRepository) GetLoungesByRouteID(routeID uuid.UUID) ([]models.Loun
 	return lounges, nil
 }
 
+// GetLoungesNearStop retrieves lounges where passenger's stop is within N stops of the lounge's location
+// The lounge is located between stop_before_id and stop_after_id on the route
+// We check if the passenger's stop_order is within 'maxStopDistance' of either lounge stop
+func (r *LoungeRepository) GetLoungesNearStop(masterRouteID uuid.UUID, passengerStopID uuid.UUID, maxStopDistance int) ([]models.Lounge, error) {
+	var lounges []models.Lounge
+	query := `
+		WITH passenger_stop AS (
+			-- Get the passenger's selected stop order
+			SELECT stop_order 
+			FROM master_route_stops 
+			WHERE id = $2 AND master_route_id = $1
+		),
+		lounge_stops AS (
+			-- Get lounges on this route with their stop orders
+			SELECT 
+				lr.lounge_id,
+				mrs_before.stop_order as stop_before_order,
+				mrs_after.stop_order as stop_after_order
+			FROM lounge_routes lr
+			LEFT JOIN master_route_stops mrs_before ON lr.stop_before_id = mrs_before.id
+			LEFT JOIN master_route_stops mrs_after ON lr.stop_after_id = mrs_after.id
+			WHERE lr.master_route_id = $1
+		)
+		SELECT DISTINCT l.* 
+		FROM lounges l
+		INNER JOIN lounge_stops ls ON l.id = ls.lounge_id
+		CROSS JOIN passenger_stop ps
+		WHERE l.status = 'approved' 
+		  AND l.is_operational = true
+		  AND (
+		      -- Passenger stop is within N stops of stop_before
+		      ABS(ps.stop_order - COALESCE(ls.stop_before_order, 0)) <= $3
+		      OR
+		      -- Passenger stop is within N stops of stop_after  
+		      ABS(ps.stop_order - COALESCE(ls.stop_after_order, 0)) <= $3
+		  )
+		ORDER BY l.lounge_name
+	`
+	err := r.db.Select(&lounges, query, masterRouteID, passengerStopID, maxStopDistance)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get lounges near stop: %w", err)
+	}
+	return lounges, nil
+}
+
 // GetDistinctStates retrieves all distinct states from active lounges
 func (r *LoungeRepository) GetDistinctStates() ([]string, error) {
 	var states []string

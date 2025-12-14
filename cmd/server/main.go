@@ -508,6 +508,8 @@ func main() {
 			lounges.GET("/by-stop/:stopId", loungeHandler.GetLoungesByStop)
 			logger.Info("  ✅ GET /api/v1/lounges/by-route/:routeId (public)")
 			lounges.GET("/by-route/:routeId", loungeHandler.GetLoungesByRoute)
+			logger.Info("  ✅ GET /api/v1/lounges/near-stop/:routeId/:stopId (public)")
+			lounges.GET("/near-stop/:routeId/:stopId", loungeHandler.GetLoungesNearStop)
 
 			// Protected routes (require JWT authentication)
 			loungesProtected := lounges.Group("")

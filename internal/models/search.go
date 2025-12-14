@@ -68,9 +68,10 @@ type TripResult struct {
 	IsBookable    bool        `json:"is_bookable" db:"is_bookable"`
 	// Route stops for passenger to select boarding/alighting points
 	RouteStops []RouteStop `json:"route_stops,omitempty"`
-	// Internal fields for building route stops (not in JSON)
+	// Route IDs for lounge lookup
+	MasterRouteID   *string `json:"master_route_id,omitempty" db:"master_route_id"`
+	// Internal field for building route stops (not in JSON)
 	BusOwnerRouteID *string `json:"-" db:"bus_owner_route_id"`
-	MasterRouteID   *string `json:"-" db:"master_route_id"`
 }
 
 // MarshalJSON implements custom JSON marshaling to handle timestamps without timezone

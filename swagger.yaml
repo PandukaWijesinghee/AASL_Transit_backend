@@ -3757,6 +3757,90 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/lounges/near-stop/{routeId}/{stopId}:
+    get:
+      summary: Get lounges near a passenger's stop (Public)
+      description: |
+        Retrieve lounges where the passenger's selected stop is within N stops of the lounge's location.
+        
+        **How it works:**
+        - Lounge is registered with `stop_before_id` and `stop_after_id` (where lounge is located)
+        - Query compares passenger's stop `stop_order` with lounge's stops `stop_order`
+        - Returns lounges where `|passenger_stop_order - lounge_stop_order| <= distance`
+        
+        **Use Case:**
+        - Passenger selects boarding stop "Colombo Fort" (stop_order: 1)
+        - Lounge is between "Pettah" (stop_order: 2) and "Maradana" (stop_order: 3)
+        - Distance = 2, so |1 - 2| = 1 ≤ 2 → Lounge is shown!
+        
+        **No authentication required** - public endpoint for passengers.
+      operationId: getLoungesNearStop
+      tags:
+        - Lounge Marketplace
+      parameters:
+        - name: routeId
+          in: path
+          required: true
+          description: UUID of the master route
+          schema:
+            type: string
+            format: uuid
+            example: "550e8400-e29b-41d4-a716-446655440000"
+        - name: stopId
+          in: path
+          required: true
+          description: UUID of the passenger's selected stop (boarding or alighting)
+          schema:
+            type: string
+            format: uuid
+            example: "660e8400-e29b-41d4-a716-446655440001"
+        - name: distance
+          in: query
+          required: false
+          description: Maximum stop distance (default 2)
+          schema:
+            type: integer
+            default: 2
+            minimum: 1
+            maximum: 10
+            example: 2
+      responses:
+        "200":
+          description: Lounges near stop retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lounges:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Lounge"
+                  route_id:
+                    type: string
+                    format: uuid
+                    description: The route ID queried
+                  stop_id:
+                    type: string
+                    format: uuid
+                    description: The passenger's stop ID queried
+                  max_distance:
+                    type: integer
+                    description: Max stop distance used
+                    example: 2
+                  total:
+                    type: integer
+                    description: Number of lounges found
+                    example: 3
+        "400":
+          description: Invalid route ID or stop ID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   # ============================================================================
   # Lounge Staff Management Endpoints
   # ============================================================================
