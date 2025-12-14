@@ -133,6 +133,7 @@ paths:
       operationId: getHealth
       tags:
         - Health
+      security: []
       responses:
         "200":
           description: Service is healthy
@@ -189,6 +190,7 @@ paths:
       operationId: debugHeaders
       tags:
         - Health
+      security: []
       responses:
         "200":
           description: Debug information
@@ -854,6 +856,7 @@ paths:
       operationId: adminLogin
       tags:
         - Admin Authentication
+      security: []
       requestBody:
         required: true
         content:
@@ -908,6 +911,7 @@ paths:
       operationId: adminRefreshToken
       tags:
         - Admin Authentication
+      security: []
       requestBody:
         required: true
         content:
@@ -947,6 +951,7 @@ paths:
       operationId: adminLogout
       tags:
         - Admin Authentication
+      security: []
       requestBody:
         required: true
         content:
@@ -3586,6 +3591,7 @@ paths:
       operationId: getAllActiveLounges
       tags:
         - Lounge Marketplace
+      security: []
       parameters:
         - name: state
           in: query
@@ -3630,6 +3636,7 @@ paths:
       operationId: getDistinctStates
       tags:
         - Lounge Marketplace
+      security: []
       responses:
         "200":
           description: States retrieved successfully
@@ -3670,6 +3677,7 @@ paths:
       operationId: getLoungesByStop
       tags:
         - Lounge Marketplace
+      security: []
       parameters:
         - name: stopId
           in: path
@@ -3723,6 +3731,7 @@ paths:
       operationId: getLoungesByRoute
       tags:
         - Lounge Marketplace
+      security: []
       parameters:
         - name: routeId
           in: path
@@ -4060,6 +4069,7 @@ paths:
       operationId: getLoungeCategories
       tags:
         - Lounge Marketplace
+      security: []
       responses:
         "200":
           description: Categories retrieved successfully
@@ -4084,6 +4094,7 @@ paths:
       operationId: getLoungeProducts
       tags:
         - Lounge Products
+      security: []
       parameters:
         - name: lounge_id
           in: path
@@ -6301,6 +6312,7 @@ paths:
       operationId: getBookableTrips
       tags:
         - Scheduled Trips
+      security: []
       parameters:
         - name: start_date
           in: query
@@ -7590,6 +7602,7 @@ paths:
       operationId: searchTrips
       tags:
         - Search
+      security: []
       requestBody:
         required: true
         content:
@@ -7636,6 +7649,7 @@ paths:
       operationId: getPopularRoutes
       tags:
         - Search
+      security: []
       parameters:
         - name: limit
           in: query
@@ -7664,6 +7678,7 @@ paths:
       operationId: getStopAutocomplete
       tags:
         - Search
+      security: []
       parameters:
         - name: q
           in: query
@@ -7697,6 +7712,7 @@ paths:
       operationId: searchHealthCheck
       tags:
         - Search
+      security: []
       responses:
         "200":
           description: Search service is healthy
@@ -7709,7 +7725,7 @@ paths:
         - Search
         - Admin Authentication
       security:
-        - bearerAuth: []
+        - BearerAuth: []
       parameters:
         - name: days
           in: query
@@ -11361,146 +11377,3 @@ components:
               value:
                 error: Internal server error
                 details: An unexpected error occurred
-
-  # =============================================================================
-  # LOUNGE ENUMS - Must match PostgreSQL ENUM types and Go backend constants
-  # =============================================================================
-  
-  # Lounge Owner ENUMs
-  LoungeOwnerVerificationStatus:
-    type: string
-    enum:
-      - pending
-      - approved
-      - rejected
-      - suspended
-    description: Lounge owner verification status by admin
-    
-  LoungeOwnerRegistrationStep:
-    type: string
-    enum:
-      - phone_verified
-      - profile_submitted
-      - lounge_added
-      - completed
-    description: Lounge owner registration progress tracking
-    
-  # Lounge ENUMs
-  LoungeStatus:
-    type: string
-    enum:
-      - pending
-      - approved
-      - suspended
-      - rejected
-    description: Lounge approval status by admin
-    
-  # Lounge Staff ENUMs
-  LoungeStaffEmploymentStatus:
-    type: string
-    enum:
-      - active
-      - terminated
-      - suspended
-    description: Lounge staff employment status
-    
-  # Lounge Booking ENUMs
-  LoungeBookingStatus:
-    type: string
-    enum:
-      - pending
-      - confirmed
-      - checked_in
-      - in_lounge
-      - checked_out
-      - completed
-      - cancelled
-      - no_show
-    description: Lounge booking lifecycle status
-    
-  LoungeBookingLoungeType:
-    type: string
-    enum:
-      - hourly
-      - day_pass
-      - premium
-    description: Type of lounge booking package
-    
-  LoungeBookingDurationType:
-    type: string
-    enum:
-      - hours
-      - days
-      - minutes
-    description: Duration measurement unit for lounge booking
-    
-  LoungeBookingPreOrderStatus:
-    type: string
-    enum:
-      - pending
-      - confirmed
-      - preparing
-      - ready
-      - delivered
-      - cancelled
-    description: Pre-order item status
-    
-  LoungeBookingDeliveryPreference:
-    type: string
-    enum:
-      - on_arrival
-      - scheduled
-      - immediate
-    description: When to deliver pre-ordered items
-    
-  # Lounge Order ENUMs
-  LoungeOrderStatus:
-    type: string
-    enum:
-      - pending
-      - confirmed
-      - preparing
-      - ready
-      - served
-      - completed
-      - cancelled
-    description: In-lounge order status
-    
-  LoungeOrderPaymentStatus:
-    type: string
-    enum:
-      - pending
-      - paid
-      - failed
-      - refunded
-      - partial
-    description: Payment status for lounge orders
-    
-  LoungeOrderItemStatus:
-    type: string
-    enum:
-      - pending
-      - confirmed
-      - preparing
-      - ready
-      - served
-      - cancelled
-    description: Individual order item status
-    
-  # Lounge Product ENUMs
-  LoungeProductStockStatus:
-    type: string
-    enum:
-      - in_stock
-      - low_stock
-      - out_of_stock
-      - made_to_order
-    description: Product availability status (made_to_order for fresh-cooked items)
-    
-  LoungeProductType:
-    type: string
-    enum:
-      - product
-      - service
-      - combo
-    description: Type of lounge item - product (food/beverage), service (wifi/storage), combo (bundle)
