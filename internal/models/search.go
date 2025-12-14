@@ -39,6 +39,17 @@ type StopInfo struct {
 	OriginalInput string     `json:"original_input"` // What user typed
 }
 
+// RouteStop represents a stop on the route for boarding/alighting selection
+type RouteStop struct {
+	ID                       string   `json:"id"`
+	StopName                 string   `json:"stop_name"`
+	StopOrder                int      `json:"stop_order"`
+	Latitude                 *float64 `json:"latitude,omitempty"`
+	Longitude                *float64 `json:"longitude,omitempty"`
+	ArrivalTimeOffsetMinutes *int     `json:"arrival_time_offset_minutes,omitempty"`
+	IsMajorStop              bool     `json:"is_major_stop"`
+}
+
 // TripResult represents a single trip in search results
 type TripResult struct {
 	TripID           uuid.UUID `json:"trip_id" db:"trip_id"`
@@ -55,6 +66,11 @@ type TripResult struct {
 	DroppingPoint string      `json:"dropping_point" db:"dropping_point"`
 	BusFeatures   BusFeatures `json:"bus_features"`
 	IsBookable    bool        `json:"is_bookable" db:"is_bookable"`
+	// Route stops for passenger to select boarding/alighting points
+	RouteStops []RouteStop `json:"route_stops,omitempty"`
+	// Internal fields for building route stops (not in JSON)
+	BusOwnerRouteID *string `json:"-" db:"bus_owner_route_id"`
+	MasterRouteID   *string `json:"-" db:"master_route_id"`
 }
 
 // MarshalJSON implements custom JSON marshaling to handle timestamps without timezone

@@ -123,9 +123,22 @@ func (s *SearchService) SearchTrips(
 
 	s.logger.WithField("trips_found", len(trips)).Info("Database query completed successfully")
 
+	// Step 4: Fetch route stops for each trip (for passenger to select boarding/alighting)
+	for i := range trips {
+		if trips[i].MasterRouteID != nil {
+			stops, err := s.repo.GetRouteStopsForTrip(*trips[i].MasterRouteID, trips[i].BusOwnerRouteID)
+			if err != nil {
+				s.logger.WithError(err).WithField("trip_id", trips[i].TripID).Warn("Failed to fetch route stops for trip")
+				// Continue without stops - not a fatal error
+			} else {
+				trips[i].RouteStops = stops
+			}
+		}
+	}
+
 	response.Results = trips
 
-	// Step 4: Build appropriate message
+	// Step 5: Build appropriate message
 	if len(trips) == 0 {
 		response.Status = "success"
 		response.Message = fmt.Sprintf(

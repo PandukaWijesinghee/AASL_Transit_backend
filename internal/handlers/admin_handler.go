@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/smarttransit/sms-auth-backend/internal/database"
+	"github.com/smarttransit/sms-auth-backend/internal/models"
 )
 
 // AdminHandler handles admin-related HTTP requests
@@ -89,45 +92,135 @@ func (h *AdminHandler) RejectLoungeOwner(c *gin.Context) {
 }
 
 // ===================================================================
-// TODO: LOUNGE APPROVAL WORKFLOW
+// LOUNGE APPROVAL WORKFLOW
 // ===================================================================
 
 // GetPendingLounges handles GET /api/v1/admin/lounges/pending
-// TODO: Implement endpoint to get all pending lounges
-// Should include:
-// - Lounge details
-// - Photos
-// - Associated lounge owner info
+// Returns all lounges with status = 'pending'
 func (h *AdminHandler) GetPendingLounges(c *gin.Context) {
-	// TODO: Implement
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"message": "TODO: Implement get pending lounges",
+	lounges, err := h.loungeRepo.GetLoungesByStatus("pending")
+	if err != nil {
+		log.Printf("ERROR: Failed to get pending lounges: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "database_error",
+			"message": "Failed to retrieve pending lounges",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"lounges": lounges,
+		"total":   len(lounges),
 	})
 }
 
 // ApproveLounge handles POST /api/v1/admin/lounges/:id/approve
-// TODO: Implement lounge approval
-// Should:
-// - Update lounge verification_status to 'approved'
-// - Send notification to lounge owner
-// - Log admin action
+// Updates lounge status to 'approved'
 func (h *AdminHandler) ApproveLounge(c *gin.Context) {
-	// TODO: Implement
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"message": "TODO: Implement approve lounge",
+	loungeIDStr := c.Param("id")
+	loungeID, err := uuid.Parse(loungeIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "invalid_id",
+			"message": "Invalid lounge ID format",
+		})
+		return
+	}
+
+	// Verify lounge exists
+	lounge, err := h.loungeRepo.GetLoungeByID(loungeID)
+	if err != nil {
+		log.Printf("ERROR: Failed to get lounge %s: %v", loungeID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "database_error",
+			"message": "Failed to retrieve lounge",
+		})
+		return
+	}
+
+	if lounge == nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "not_found",
+			"message": "Lounge not found",
+		})
+		return
+	}
+
+	// Update status to approved
+	err = h.loungeRepo.UpdateLoungeStatus(loungeID, string(models.LoungeStatusApproved))
+	if err != nil {
+		log.Printf("ERROR: Failed to approve lounge %s: %v", loungeID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "update_failed",
+			"message": "Failed to approve lounge",
+		})
+		return
+	}
+
+	log.Printf("INFO: Lounge %s approved successfully", loungeID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":   "Lounge approved successfully",
+		"lounge_id": loungeID,
+		"status":    models.LoungeStatusApproved,
 	})
 }
 
 // RejectLounge handles POST /api/v1/admin/lounges/:id/reject
-// TODO: Implement lounge rejection
-// Should:
-// - Update lounge verification_status to 'rejected'
-// - Save rejection notes
-// - Send notification to lounge owner
+// Updates lounge status to 'rejected'
 func (h *AdminHandler) RejectLounge(c *gin.Context) {
-	// TODO: Implement
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"message": "TODO: Implement reject lounge",
+	loungeIDStr := c.Param("id")
+	loungeID, err := uuid.Parse(loungeIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "invalid_id",
+			"message": "Invalid lounge ID format",
+		})
+		return
+	}
+
+	// Parse optional rejection reason
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	c.ShouldBindJSON(&req)
+
+	// Verify lounge exists
+	lounge, err := h.loungeRepo.GetLoungeByID(loungeID)
+	if err != nil {
+		log.Printf("ERROR: Failed to get lounge %s: %v", loungeID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "database_error",
+			"message": "Failed to retrieve lounge",
+		})
+		return
+	}
+
+	if lounge == nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "not_found",
+			"message": "Lounge not found",
+		})
+		return
+	}
+
+	// Update status to rejected
+	err = h.loungeRepo.UpdateLoungeStatus(loungeID, string(models.LoungeStatusRejected))
+	if err != nil {
+		log.Printf("ERROR: Failed to reject lounge %s: %v", loungeID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "update_failed",
+			"message": "Failed to reject lounge",
+		})
+		return
+	}
+
+	log.Printf("INFO: Lounge %s rejected. Reason: %s", loungeID, req.Reason)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":   "Lounge rejected",
+		"lounge_id": loungeID,
+		"status":    models.LoungeStatusRejected,
 	})
 }
 

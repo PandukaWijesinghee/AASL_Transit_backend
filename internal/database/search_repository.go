@@ -196,7 +196,10 @@ func (r *SearchRepository) FindDirectTrips(
 			COALESCE(b.has_charging_ports, false) as has_charging_ports,
 			COALESCE(b.has_entertainment, false) as has_entertainment,
 			COALESCE(b.has_refreshments, false) as has_refreshments,
-			st.is_bookable
+			st.is_bookable,
+			-- Route info for fetching stops
+			bor.id as bus_owner_route_id,
+			bor.master_route_id as master_route_id
 		FROM scheduled_trips st
 		-- Join bus owner route
 		LEFT JOIN bus_owner_routes bor ON st.bus_owner_route_id = bor.id
@@ -255,6 +258,9 @@ func (r *SearchRepository) FindDirectTrips(
 		HasEntertainment bool      `db:"has_entertainment"`
 		HasRefreshments  bool      `db:"has_refreshments"`
 		IsBookable       bool      `db:"is_bookable"`
+		// Route info for fetching stops
+		BusOwnerRouteID *string `db:"bus_owner_route_id"`
+		MasterRouteID   *string `db:"master_route_id"`
 	}
 
 	var tempTrips []tripWithFeatures
@@ -303,7 +309,9 @@ func (r *SearchRepository) FindDirectTrips(
 				HasEntertainment: temp.HasEntertainment,
 				HasRefreshments:  temp.HasRefreshments,
 			},
-			IsBookable: temp.IsBookable,
+			IsBookable:      temp.IsBookable,
+			BusOwnerRouteID: temp.BusOwnerRouteID,
+			MasterRouteID:   temp.MasterRouteID,
 		}
 	}
 
@@ -440,4 +448,54 @@ func (r *SearchRepository) GetSearchAnalytics(days int) (map[string]interface{},
 	analytics["success_rate"] = successRate
 
 	return analytics, nil
+}
+
+// GetRouteStopsForTrip fetches the route stops for a trip based on bus_owner_route_id
+// Returns stops ordered by stop_order for passenger to select boarding/alighting points
+func (r *SearchRepository) GetRouteStopsForTrip(masterRouteID string, busOwnerRouteID *string) ([]models.RouteStop, error) {
+	var stops []models.RouteStop
+
+	if busOwnerRouteID != nil && *busOwnerRouteID != "" {
+		// Bus owner has selected specific stops - only return those
+		query := `
+			SELECT 
+				mrs.id,
+				mrs.stop_name,
+				mrs.stop_order,
+				mrs.latitude,
+				mrs.longitude,
+				mrs.arrival_time_offset_minutes,
+				mrs.is_major_stop
+			FROM master_route_stops mrs
+			JOIN bus_owner_routes bor ON bor.id = $1
+			WHERE mrs.master_route_id = $2
+			  AND mrs.id = ANY(bor.selected_stop_ids)
+			ORDER BY mrs.stop_order ASC
+		`
+		err := r.db.Select(&stops, query, *busOwnerRouteID, masterRouteID)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching route stops with bus owner route: %w", err)
+		}
+	} else {
+		// No bus owner route - return all stops on master route
+		query := `
+			SELECT 
+				id,
+				stop_name,
+				stop_order,
+				latitude,
+				longitude,
+				arrival_time_offset_minutes,
+				is_major_stop
+			FROM master_route_stops
+			WHERE master_route_id = $1
+			ORDER BY stop_order ASC
+		`
+		err := r.db.Select(&stops, query, masterRouteID)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching route stops: %w", err)
+		}
+	}
+
+	return stops, nil
 }

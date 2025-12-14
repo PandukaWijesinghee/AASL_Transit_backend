@@ -9340,6 +9340,50 @@ components:
         is_bookable:
           type: boolean
           example: true
+        route_stops:
+          type: array
+          description: "List of stops on this route for passenger to select boarding/alighting points"
+          items:
+            $ref: "#/components/schemas/RouteStop"
+
+    RouteStop:
+      type: object
+      description: A stop on the route for boarding/alighting selection
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440001"
+          description: "Stop ID (master_route_stops.id)"
+        stop_name:
+          type: string
+          example: "Kadawatha"
+          description: "Name of the stop"
+        stop_order:
+          type: integer
+          example: 3
+          description: "Order of this stop in the route"
+        latitude:
+          type: number
+          format: float
+          nullable: true
+          example: 7.0011
+          description: "GPS latitude"
+        longitude:
+          type: number
+          format: float
+          nullable: true
+          example: 79.9535
+          description: "GPS longitude"
+        arrival_time_offset_minutes:
+          type: integer
+          nullable: true
+          example: 30
+          description: "Minutes from departure to reach this stop"
+        is_major_stop:
+          type: boolean
+          example: true
+          description: "Whether this is a major stop (city/town)"
 
     BusFeatures:
       type: object

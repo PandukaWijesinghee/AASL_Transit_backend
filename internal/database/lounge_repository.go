@@ -129,6 +129,17 @@ func (r *LoungeRepository) GetAllActiveLounges() ([]models.Lounge, error) {
 	return lounges, nil
 }
 
+// GetLoungesByStatus retrieves all lounges with a specific status
+func (r *LoungeRepository) GetLoungesByStatus(status string) ([]models.Lounge, error) {
+	var lounges []models.Lounge
+	query := `SELECT * FROM lounges WHERE status = $1 ORDER BY created_at DESC`
+	err := r.db.Select(&lounges, query, status)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get lounges by status: %w", err)
+	}
+	return lounges, nil
+}
+
 // SearchActiveLounges retrieves active lounges with optional state filter and limit
 func (r *LoungeRepository) SearchActiveLounges(state string, limit int) ([]models.Lounge, error) {
 	var lounges []models.Lounge
