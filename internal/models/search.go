@@ -41,13 +41,13 @@ type StopInfo struct {
 
 // RouteStop represents a stop on the route for boarding/alighting selection
 type RouteStop struct {
-	ID                       string   `json:"id"`
-	StopName                 string   `json:"stop_name"`
-	StopOrder                int      `json:"stop_order"`
-	Latitude                 *float64 `json:"latitude,omitempty"`
-	Longitude                *float64 `json:"longitude,omitempty"`
-	ArrivalTimeOffsetMinutes *int     `json:"arrival_time_offset_minutes,omitempty"`
-	IsMajorStop              bool     `json:"is_major_stop"`
+	ID                       string   `json:"id" db:"id"`
+	StopName                 string   `json:"stop_name" db:"stop_name"`
+	StopOrder                int      `json:"stop_order" db:"stop_order"`
+	Latitude                 *float64 `json:"latitude,omitempty" db:"latitude"`
+	Longitude                *float64 `json:"longitude,omitempty" db:"longitude"`
+	ArrivalTimeOffsetMinutes *int     `json:"arrival_time_offset_minutes,omitempty" db:"arrival_time_offset_minutes"`
+	IsMajorStop              bool     `json:"is_major_stop" db:"is_major_stop"`
 }
 
 // TripResult represents a single trip in search results
