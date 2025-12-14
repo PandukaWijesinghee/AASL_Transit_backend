@@ -98,10 +98,10 @@ func (s *SearchService) SearchTrips(
 	}
 
 	s.logger.WithFields(logrus.Fields{
-		"from_stop":  stopPair.FromStop.Name,
-		"to_stop":    stopPair.ToStop.Name,
-		"route":      stopPair.RouteName,
-		"route_id":   stopPair.RouteID,
+		"from_stop": stopPair.FromStop.Name,
+		"to_stop":   stopPair.ToStop.Name,
+		"route":     stopPair.RouteName,
+		"route_id":  stopPair.RouteID,
 	}).Info("Found stop pair on same route")
 
 	// Step 2: Get search datetime (default to now if not provided)
@@ -171,10 +171,10 @@ func (s *SearchService) SearchTrips(
 	s.logSearch(req, response, userID, &ipAddress, responseTime)
 
 	s.logger.WithFields(logrus.Fields{
-		"from":         req.From,
-		"to":           req.To,
-		"results":      len(trips),
-		"response_ms":  response.SearchTimeMs,
+		"from":        req.From,
+		"to":          req.To,
+		"results":     len(trips),
+		"response_ms": response.SearchTimeMs,
 	}).Info("Search completed successfully")
 
 	s.logger.Info("=== SearchService: Returning response (JSON marshaling will happen next) ===")
