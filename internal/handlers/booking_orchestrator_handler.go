@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"github.com/smarttransit/sms-auth-backend/internal/middleware"
 	"github.com/smarttransit/sms-auth-backend/internal/models"
 	"github.com/smarttransit/sms-auth-backend/internal/services"
 )
@@ -46,18 +47,14 @@ func NewBookingOrchestratorHandler(
 // @Failure 409 {object} models.PartialAvailabilityError "Partial availability"
 // @Router /booking/intent [post]
 func (h *BookingOrchestratorHandler) CreateIntent(c *gin.Context) {
-	// Get user ID from context
-	userIDStr, exists := c.Get("user_id")
+	// Get user context from middleware
+	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
 		return
 	}
 
-	userID, err := uuid.Parse(userIDStr.(string))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
-		return
-	}
+	userID := userCtx.UserID
 
 	// Parse request body
 	var req models.CreateBookingIntentRequest
@@ -106,18 +103,14 @@ func (h *BookingOrchestratorHandler) CreateIntent(c *gin.Context) {
 // @Failure 404 {object} map[string]interface{} "Intent not found"
 // @Router /booking/intent/{intent_id}/initiate-payment [post]
 func (h *BookingOrchestratorHandler) InitiatePayment(c *gin.Context) {
-	// Get user ID from context
-	userIDStr, exists := c.Get("user_id")
+	// Get user context from middleware
+	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
 		return
 	}
 
-	userID, err := uuid.Parse(userIDStr.(string))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
-		return
-	}
+	userID := userCtx.UserID
 
 	// Parse intent ID from URL
 	intentIDStr := c.Param("intent_id")
@@ -165,18 +158,14 @@ func (h *BookingOrchestratorHandler) InitiatePayment(c *gin.Context) {
 // @Failure 409 {object} map[string]interface{} "Seats no longer available"
 // @Router /booking/confirm [post]
 func (h *BookingOrchestratorHandler) ConfirmBooking(c *gin.Context) {
-	// Get user ID from context
-	userIDStr, exists := c.Get("user_id")
+	// Get user context from middleware
+	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
 		return
 	}
 
-	userID, err := uuid.Parse(userIDStr.(string))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
-		return
-	}
+	userID := userCtx.UserID
 
 	// Parse request body
 	var req models.ConfirmBookingRequest
@@ -235,18 +224,14 @@ func (h *BookingOrchestratorHandler) ConfirmBooking(c *gin.Context) {
 // @Failure 404 {object} map[string]interface{} "Intent not found"
 // @Router /booking/intent/{intent_id} [get]
 func (h *BookingOrchestratorHandler) GetIntentStatus(c *gin.Context) {
-	// Get user ID from context
-	userIDStr, exists := c.Get("user_id")
+	// Get user context from middleware
+	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
 		return
 	}
 
-	userID, err := uuid.Parse(userIDStr.(string))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
-		return
-	}
+	userID := userCtx.UserID
 
 	// Parse intent ID from URL
 	intentIDStr := c.Param("intent_id")
@@ -291,18 +276,14 @@ func (h *BookingOrchestratorHandler) GetIntentStatus(c *gin.Context) {
 // @Failure 404 {object} map[string]interface{} "Intent not found"
 // @Router /booking/intent/{intent_id}/cancel [post]
 func (h *BookingOrchestratorHandler) CancelIntent(c *gin.Context) {
-	// Get user ID from context
-	userIDStr, exists := c.Get("user_id")
+	// Get user context from middleware
+	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
 		return
 	}
 
-	userID, err := uuid.Parse(userIDStr.(string))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
-		return
-	}
+	userID := userCtx.UserID
 
 	// Parse intent ID from URL
 	intentIDStr := c.Param("intent_id")
@@ -404,18 +385,14 @@ func (h *BookingOrchestratorHandler) PaymentWebhook(c *gin.Context) {
 // @Failure 401 {object} map[string]interface{} "Unauthorized"
 // @Router /booking/intents [get]
 func (h *BookingOrchestratorHandler) GetMyIntents(c *gin.Context) {
-	// Get user ID from context
-	userIDStr, exists := c.Get("user_id")
+	// Get user context from middleware
+	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
 		return
 	}
 
-	userID, err := uuid.Parse(userIDStr.(string))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
-		return
-	}
+	userID := userCtx.UserID
 
 	// Parse pagination
 	limit := 20
