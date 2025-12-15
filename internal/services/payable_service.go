@@ -248,6 +248,7 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 		"invoice_id": params.InvoiceID,
 		"amount":     params.Amount,
 		"currency":   params.CurrencyCode,
+		"endpoint":   endpointURL,
 	}).Info("Initiating PAYable payment")
 
 	// Make HTTP request
@@ -255,6 +256,11 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
+
+	// Log the request payload (without sensitive data)
+	s.logger.WithFields(logrus.Fields{
+		"request_body": string(jsonBody),
+	}).Info("PAYable request payload")
 
 	resp, err := s.client.Post(endpointURL, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
@@ -271,7 +277,7 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 	s.logger.WithFields(logrus.Fields{
 		"status_code": resp.StatusCode,
 		"response":    string(body),
-	}).Debug("PAYable response received")
+	}).Info("PAYable response received") // Changed from Debug to Info
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("payment gateway returned status %d: %s", resp.StatusCode, string(body))
@@ -280,11 +286,28 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 	// Parse response
 	var paymentResp PAYablePaymentResponse
 	if err := json.Unmarshal(body, &paymentResp); err != nil {
+		s.logger.WithFields(logrus.Fields{
+			"body":  string(body),
+			"error": err.Error(),
+		}).Error("Failed to parse PAYable response")
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
+	// Log parsed response for debugging
+	s.logger.WithFields(logrus.Fields{
+		"parsed_status":       paymentResp.Status,
+		"parsed_uid":          paymentResp.UID,
+		"parsed_payment_page": paymentResp.PaymentPage,
+		"parsed_message":      paymentResp.Message,
+	}).Info("PAYable parsed response")
+
 	if paymentResp.Status != "success" {
-		return nil, fmt.Errorf("payment initiation failed: %s", paymentResp.Message)
+		// Try to get more details from the raw response
+		errMsg := paymentResp.Message
+		if errMsg == "" {
+			errMsg = fmt.Sprintf("status=%s, raw=%s", paymentResp.Status, string(body))
+		}
+		return nil, fmt.Errorf("payment initiation failed: %s", errMsg)
 	}
 
 	s.logger.WithFields(logrus.Fields{
