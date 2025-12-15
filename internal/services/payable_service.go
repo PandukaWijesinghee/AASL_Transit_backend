@@ -301,13 +301,20 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 		"parsed_message":      paymentResp.Message,
 	}).Info("PAYable parsed response")
 
-	if paymentResp.Status != "success" {
+	// PAYable returns "PENDING" when payment is ready for user, or "success" in some cases
+	// Both are valid successful responses
+	if paymentResp.Status != "success" && paymentResp.Status != "PENDING" {
 		// Try to get more details from the raw response
 		errMsg := paymentResp.Message
 		if errMsg == "" {
 			errMsg = fmt.Sprintf("status=%s, raw=%s", paymentResp.Status, string(body))
 		}
 		return nil, fmt.Errorf("payment initiation failed: %s", errMsg)
+	}
+
+	// Validate we got a payment page URL
+	if paymentResp.PaymentPage == "" {
+		return nil, fmt.Errorf("payment initiation failed: no payment page URL returned")
 	}
 
 	s.logger.WithFields(logrus.Fields{
