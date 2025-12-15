@@ -253,6 +253,43 @@ func (r *BookingIntentRepository) UpdateIntentPaymentSuccess(intentID uuid.UUID)
 	return err
 }
 
+// UpdateIntentPaymentUID stores PAYable UID and status indicator for webhook verification
+func (r *BookingIntentRepository) UpdateIntentPaymentUID(intentID uuid.UUID, uid, statusIndicator string) error {
+	query := `
+		UPDATE booking_intents 
+		SET payment_uid = $2,
+		    payment_status_indicator = $3,
+		    updated_at = NOW()
+		WHERE id = $1`
+	_, err := r.db.Exec(query, intentID, uid, statusIndicator)
+	return err
+}
+
+// GetIntentByPaymentUID retrieves an intent by its PAYable payment UID (for webhook handling)
+func (r *BookingIntentRepository) GetIntentByPaymentUID(uid string) (*models.BookingIntent, error) {
+	query := `
+		SELECT id, user_id, intent_type, status, 
+		       bus_intent, pre_trip_lounge_intent, post_trip_lounge_intent,
+		       bus_fare, pre_lounge_fare, post_lounge_fare, total_amount, currency,
+		       pricing_snapshot, payment_reference, payment_status, payment_gateway,
+		       payment_uid, payment_status_indicator,
+		       bus_booking_id, pre_lounge_booking_id, post_lounge_booking_id,
+		       expires_at, payment_initiated_at, confirmed_at, expired_at, created_at, updated_at,
+		       idempotency_key, passenger_name, passenger_phone
+		FROM booking_intents 
+		WHERE payment_uid = $1`
+	
+	var intent models.BookingIntent
+	err := r.db.Get(&intent, query, uid)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &intent, nil
+}
+
 // UpdateIntentConfirmed marks intent as confirmed with booking IDs
 func (r *BookingIntentRepository) UpdateIntentConfirmed(
 	intentID uuid.UUID,

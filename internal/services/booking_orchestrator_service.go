@@ -35,6 +35,7 @@ type BookingOrchestratorService struct {
 	loungeBookingRepo *database.LoungeBookingRepository
 	loungeRepo        *database.LoungeRepository
 	busOwnerRouteRepo *database.BusOwnerRouteRepository
+	payableService    *PAYableService
 	config            BookingOrchestratorConfig
 	logger            *logrus.Logger
 }
@@ -48,6 +49,7 @@ func NewBookingOrchestratorService(
 	loungeBookingRepo *database.LoungeBookingRepository,
 	loungeRepo *database.LoungeRepository,
 	busOwnerRouteRepo *database.BusOwnerRouteRepository,
+	payableService *PAYableService,
 	config BookingOrchestratorConfig,
 	logger *logrus.Logger,
 ) *BookingOrchestratorService {
@@ -59,6 +61,7 @@ func NewBookingOrchestratorService(
 		loungeBookingRepo: loungeBookingRepo,
 		loungeRepo:        loungeRepo,
 		busOwnerRouteRepo: busOwnerRouteRepo,
+		payableService:    payableService,
 		config:            config,
 		logger:            logger,
 	}
@@ -472,6 +475,7 @@ func (s *BookingOrchestratorService) InitiatePayment(
 
 	// 4. Generate payment reference (using intent ID as invoice ID)
 	paymentRef := fmt.Sprintf("INT-%s", intent.ID.String()[:8])
+	amountStr := fmt.Sprintf("%.2f", intent.TotalAmount)
 
 	// 5. Update intent to payment_pending
 	if err := s.intentRepo.UpdateIntentPaymentPending(intent.ID, paymentRef); err != nil {
@@ -479,20 +483,68 @@ func (s *BookingOrchestratorService) InitiatePayment(
 	}
 
 	// 6. Build payment response
-	// In production, this would integrate with PAYable API
-	response := &models.InitiatePaymentResponse{
-		PaymentURL: fmt.Sprintf("https://gateway.payable.lk/pay/%s", paymentRef),
-		InvoiceID:  paymentRef,
-		Amount:     fmt.Sprintf("%.2f", intent.TotalAmount),
-		Currency:   intent.Currency,
-		ExpiresAt:  intent.ExpiresAt,
-	}
+	var response *models.InitiatePaymentResponse
 
-	s.logger.WithFields(logrus.Fields{
-		"intent_id":   intentID,
-		"payment_ref": paymentRef,
-		"amount":      intent.TotalAmount,
-	}).Info("Payment initiated for booking intent")
+	// Check if PAYable service is configured
+	if s.payableService != nil && s.payableService.IsConfigured() {
+		// Use real PAYable integration
+		payableParams := &InitiatePaymentParams{
+			InvoiceID:        paymentRef,
+			Amount:           amountStr,
+			CurrencyCode:     intent.Currency,
+			CustomerName:     intent.PassengerName,
+			CustomerPhone:    intent.PassengerPhone,
+			OrderDescription: fmt.Sprintf("Bus Booking - %s", paymentRef),
+		}
+
+		payableResp, err := s.payableService.InitiatePayment(payableParams)
+		if err != nil {
+			s.logger.WithError(err).Error("Failed to initiate PAYable payment")
+			// Don't fail completely - return a response that allows retry
+			return nil, fmt.Errorf("payment gateway error: %w", err)
+		}
+
+		response = &models.InitiatePaymentResponse{
+			PaymentURL:      payableResp.PaymentPage,
+			InvoiceID:       paymentRef,
+			Amount:          amountStr,
+			Currency:        intent.Currency,
+			UID:             payableResp.UID,
+			StatusIndicator: payableResp.StatusIndicator,
+			ExpiresAt:       intent.ExpiresAt,
+		}
+
+		// Store UID and StatusIndicator for webhook verification
+		if err := s.intentRepo.UpdateIntentPaymentUID(intent.ID, payableResp.UID, payableResp.StatusIndicator); err != nil {
+			s.logger.WithError(err).Warn("Failed to store payment UID - webhook verification may fail")
+		}
+
+		s.logger.WithFields(logrus.Fields{
+			"intent_id":        intentID,
+			"payment_ref":      paymentRef,
+			"amount":           intent.TotalAmount,
+			"uid":              payableResp.UID,
+			"payment_page":     payableResp.PaymentPage,
+			"environment":      s.payableService.GetEnvironment(),
+		}).Info("PAYable payment initiated for booking intent")
+	} else {
+		// Development mode - return placeholder URL
+		s.logger.Warn("PAYable service not configured - using placeholder payment URL")
+		response = &models.InitiatePaymentResponse{
+			PaymentURL: fmt.Sprintf("https://gateway.payable.lk/pay/%s", paymentRef),
+			InvoiceID:  paymentRef,
+			Amount:     amountStr,
+			Currency:   intent.Currency,
+			ExpiresAt:  intent.ExpiresAt,
+		}
+
+		s.logger.WithFields(logrus.Fields{
+			"intent_id":   intentID,
+			"payment_ref": paymentRef,
+			"amount":      intent.TotalAmount,
+			"mode":        "placeholder",
+		}).Info("Payment initiated for booking intent (placeholder mode)")
+	}
 
 	return response, nil
 }
@@ -784,6 +836,15 @@ func (s *BookingOrchestratorService) GetIntentStatus(
 	}
 
 	return response, nil
+}
+
+// ============================================================================
+// GET INTENT BY PAYMENT UID (for webhook processing)
+// ============================================================================
+
+// GetIntentByPaymentUID retrieves an intent by its PAYable payment UID
+func (s *BookingOrchestratorService) GetIntentByPaymentUID(uid string) (*models.BookingIntent, error) {
+	return s.intentRepo.GetIntentByPaymentUID(uid)
 }
 
 // ============================================================================

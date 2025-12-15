@@ -222,9 +222,15 @@ type BookingIntent struct {
 	PricingSnapshot PricingSnapshot `json:"pricing_snapshot" db:"pricing_snapshot"`
 
 	// Payment tracking
-	PaymentReference *string              `json:"payment_reference,omitempty" db:"payment_reference"`
-	PaymentStatus    *IntentPaymentStatus `json:"payment_status,omitempty" db:"payment_status"`
-	PaymentGateway   string               `json:"payment_gateway" db:"payment_gateway"`
+	PaymentReference       *string              `json:"payment_reference,omitempty" db:"payment_reference"`
+	PaymentStatus          *IntentPaymentStatus `json:"payment_status,omitempty" db:"payment_status"`
+	PaymentGateway         string               `json:"payment_gateway" db:"payment_gateway"`
+	PaymentUID             *string              `json:"payment_uid,omitempty" db:"payment_uid"`              // PAYable unique transaction ID
+	PaymentStatusIndicator *string              `json:"payment_status_indicator,omitempty" db:"payment_status_indicator"` // PAYable status check token
+	
+	// Passenger info (extracted from bus_intent for convenience)
+	PassengerName  string `json:"passenger_name,omitempty" db:"passenger_name"`
+	PassengerPhone string `json:"passenger_phone,omitempty" db:"passenger_phone"`
 
 	// Result references (filled AFTER confirmation)
 	BusBookingID       *uuid.UUID `json:"bus_booking_id,omitempty" db:"bus_booking_id"`
@@ -251,8 +257,9 @@ func (i *BookingIntent) IsExpired() bool {
 }
 
 // CanInitiatePayment checks if payment can be initiated
+// Allows both 'held' (first time) and 'payment_pending' (retry)
 func (i *BookingIntent) CanInitiatePayment() bool {
-	return i.Status == IntentStatusHeld && !i.IsExpired()
+	return (i.Status == IntentStatusHeld || i.Status == IntentStatusPaymentPending) && !i.IsExpired()
 }
 
 // CanConfirm checks if the intent can be confirmed
@@ -425,13 +432,13 @@ type PriceBreakdown struct {
 
 // InitiatePaymentResponse is returned when initiating payment
 type InitiatePaymentResponse struct {
-	PaymentURL   string  `json:"payment_url"`
-	InvoiceID    string  `json:"invoice_id"`
-	Amount       string  `json:"amount"`
-	Currency     string  `json:"currency"`
-	MerchantKey  *string `json:"merchant_key,omitempty"`
-	CheckValue   *string `json:"check_value,omitempty"` // For PAYable signature
-	ExpiresAt    time.Time `json:"expires_at"`
+	PaymentURL      string    `json:"payment_url"`
+	InvoiceID       string    `json:"invoice_id"`
+	Amount          string    `json:"amount"`
+	Currency        string    `json:"currency"`
+	UID             string    `json:"uid,omitempty"`              // PAYable unique transaction ID
+	StatusIndicator string    `json:"status_indicator,omitempty"` // PAYable status check token
+	ExpiresAt       time.Time `json:"expires_at"`
 }
 
 // ConfirmBookingRequest is the request to confirm a booking after payment

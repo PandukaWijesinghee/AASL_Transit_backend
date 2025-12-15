@@ -35,6 +35,19 @@ type Config struct {
 
 	// Security configuration
 	Security SecurityConfig
+
+	// Payment gateway configuration
+	Payment PaymentConfig
+}
+
+// PaymentConfig holds PAYable IPG configuration
+type PaymentConfig struct {
+	Environment   string // "sandbox" or "production"
+	MerchantKey   string // PAYable merchant key
+	MerchantToken string // PAYable merchant token (SECRET - never expose to client)
+	LogoURL       string // Merchant logo URL for payment page
+	ReturnURL     string // URL to redirect after payment (app deep link)
+	WebhookURL    string // Server webhook URL for payment notifications
 }
 
 // ServerConfig holds server-related configuration
@@ -163,6 +176,14 @@ func Load() (*Config, error) {
 			BcryptCost:       getEnvAsInt("BCRYPT_COST", 12),
 			EnableRequestLog: getEnvAsBool("ENABLE_REQUEST_LOGGING", true),
 			EnableAuditLog:   getEnvAsBool("ENABLE_AUDIT_LOGGING", true),
+		},
+		Payment: PaymentConfig{
+			Environment:   getEnv("PAYABLE_ENVIRONMENT", "sandbox"),
+			MerchantKey:   getEnv("PAYABLE_MERCHANT_KEY", ""),
+			MerchantToken: getEnv("PAYABLE_MERCHANT_TOKEN", ""),
+			LogoURL:       getEnv("PAYABLE_LOGO_URL", ""),
+			ReturnURL:     getEnv("PAYABLE_RETURN_URL", ""),
+			WebhookURL:    getEnv("PAYABLE_WEBHOOK_URL", ""),
 		},
 	}
 

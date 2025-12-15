@@ -7825,10 +7825,26 @@ paths:
 
   /api/v1/payments/webhook:
     post:
-      summary: Payment gateway webhook
+      summary: PAYable payment gateway webhook
       description: |
-        Called by payment gateway (PAYable) to notify of payment status.
-        **Note:** This endpoint has no authentication - webhook signature verification is done internally.
+        Called by PAYable IPG to notify of payment status.
+        
+        **Security:**
+        - No JWT authentication (public endpoint)
+        - Signature verification using SHA-512 checkValue
+        - Validates: SHA512(merchantToken) -> hash1, then SHA512(merchantKey|invoiceId|amount|currencyCode|hash1) == checkValue
+        
+        **Payment Status Codes:**
+        - `2`: Payment successful (triggers booking confirmation)
+        - `0`: Payment pending
+        - `-1` to `-3`: Payment failed
+        
+        **Auto-Confirmation:**
+        When status=2 (success), the system automatically:
+        1. Finds the booking intent by payment_uid
+        2. Updates payment status to 'success'
+        3. Creates confirmed bookings
+        4. Releases held seats
       operationId: paymentWebhook
       tags:
         - Booking Orchestration
@@ -7839,32 +7855,61 @@ paths:
           application/json:
             schema:
               type: object
+              description: PAYable IPG webhook payload
               required:
+                - uid
+                - statusIndicator
                 - invoiceId
-                - status
+                - resultIndicator
               properties:
+                uid:
+                  type: string
+                  description: PAYable unique payment identifier
+                  example: "PAYABLE-UID-123456"
+                statusIndicator:
+                  type: string
+                  description: PAYable status indicator
+                  example: "STATUS-IND-789"
                 invoiceId:
                   type: string
-                  description: Invoice/Payment reference
-                status:
+                  description: Original invoice/payment reference (INV-xxx)
+                  example: "INV-1234567890"
+                resultIndicator:
+                  type: integer
+                  description: |
+                    Payment result code:
+                    - 2: Success
+                    - 0: Pending
+                    - -1 to -3: Failed
+                  enum: [2, 0, -1, -2, -3]
+                  example: 2
+                amountPaid:
                   type: string
-                  enum: [SUCCESS, FAILED, PENDING]
-                  description: Payment status
-                transactionId:
-                  type: string
-                  description: Gateway transaction ID
-                amount:
-                  type: string
-                  description: Paid amount
-                currency:
+                  description: Amount paid (as string from gateway)
+                  example: "1500.00"
+                currencyCode:
                   type: string
                   description: Currency code
-                signature:
+                  example: "LKR"
+                paymentMethod:
                   type: string
-                  description: HMAC signature for verification
+                  description: Payment method used
+                  example: "CARD"
+                cardType:
+                  type: string
+                  description: Card type if card payment
+                  example: "VISA"
+                maskedCardNumber:
+                  type: string
+                  description: Masked card number
+                  example: "4111****1111"
+                checkValue:
+                  type: string
+                  description: SHA-512 signature for verification
+                  example: "abc123..."
       responses:
         "200":
-          description: Webhook processed
+          description: Webhook processed successfully
           content:
             application/json:
               schema:
@@ -7875,9 +7920,65 @@ paths:
                     example: "webhook processed"
                   status:
                     type: string
-                    example: "acknowledged"
+                    enum: [acknowledged, booking_confirmed, payment_failed]
+                    example: "booking_confirmed"
+                  booking_reference:
+                    type: string
+                    description: Master booking reference (if confirmed)
+                    example: "BK-20250610-ABC123"
         "400":
-          description: Invalid webhook payload
+          description: Invalid webhook payload or signature verification failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "invalid signature"
+
+  /api/v1/payments/return:
+    get:
+      summary: PAYable payment return URL
+      description: |
+        Redirect URL after PAYable payment completion.
+        This endpoint handles the user redirect from PAYable after payment.
+        
+        **Note:** Payment confirmation is handled via webhook, not this endpoint.
+        This is primarily for user experience (showing success/failure page).
+      operationId: paymentReturn
+      tags:
+        - Booking Orchestration
+      security: []
+      parameters:
+        - name: invoiceId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Original invoice ID
+        - name: uid
+          in: query
+          required: false
+          schema:
+            type: string
+          description: PAYable payment UID
+        - name: resultIndicator
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Payment result code
+      responses:
+        "200":
+          description: Return page rendered or redirect issued
+          content:
+            text/html:
+              schema:
+                type: string
+                description: HTML page showing payment result
+        "302":
+          description: Redirect to Flutter app or web dashboard
 
   # ============================================================================
   # SEARCH ENDPOINTS (Phase 1 MVP - Trip Discovery)
@@ -11283,28 +11384,68 @@ components:
 
     InitiatePaymentResponse:
       type: object
+      description: |
+        Payment initiation response with PAYable IPG integration.
+        The `payment_url` is the complete PAYable hosted checkout URL.
+        Flutter WebView should navigate to this URL for payment.
       properties:
         intent_id:
           type: string
           format: uuid
+          description: The booking intent ID
         payment_reference:
           type: string
-          description: Unique payment reference (INV-xxx format)
+          description: Unique payment reference (INV-xxx format) used as invoiceId
         payment_gateway:
           type: string
           example: "PAYable"
+          description: Payment gateway identifier
         payment_url:
           type: string
           format: uri
-          description: URL to redirect user for payment
+          description: |
+            Complete PAYable hosted checkout URL.
+            Flutter should open this in WebView for the user to complete payment.
+            Example: https://payable.lk/pay?...
         amount:
           type: number
           format: double
+          description: Total amount to pay
         currency:
           type: string
+          description: Currency code (LKR)
+          example: "LKR"
         expires_at:
           type: string
           format: date-time
+          description: When the intent/payment session expires
+        uid:
+          type: string
+          description: |
+            PAYable unique identifier for this payment.
+            Used to query payment status via PAYable API.
+          example: "PAYABLE-UID-123456"
+        status_indicator:
+          type: string
+          description: |
+            PAYable status indicator.
+            Used together with uid to query payment status.
+          example: "STATUS-IND-789"
+        merchant_key:
+          type: string
+          description: PAYable merchant key (for reference only)
+          example: "MK123456"
+        check_value:
+          type: string
+          description: |
+            SHA-512 checkValue generated server-side.
+            Already included in payment_url, provided here for reference.
+          example: "abc123def456..."
+        logo_url:
+          type: string
+          format: uri
+          description: Merchant logo URL displayed on PAYable checkout page
+          example: "https://example.com/logo.png"
 
     ConfirmBookingRequest:
       type: object
@@ -11364,7 +11505,7 @@ components:
 
     BookingIntent:
       type: object
-      description: Full booking intent record
+      description: Full booking intent record with PAYable integration fields
       properties:
         id:
           type: string
@@ -11395,10 +11536,27 @@ components:
         payment_reference:
           type: string
           nullable: true
+          description: Invoice ID sent to PAYable (INV-xxx format)
         payment_status:
           type: string
           enum: [pending, processing, success, failed]
           nullable: true
+        payment_uid:
+          type: string
+          nullable: true
+          description: PAYable unique identifier for tracking payment
+        payment_status_indicator:
+          type: string
+          nullable: true
+          description: PAYable status indicator for querying payment status
+        passenger_name:
+          type: string
+          nullable: true
+          description: Passenger name for payment record
+        passenger_phone:
+          type: string
+          nullable: true
+          description: Passenger phone for payment record
         expires_at:
           type: string
           format: date-time
