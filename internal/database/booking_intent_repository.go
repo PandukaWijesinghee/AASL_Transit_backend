@@ -31,32 +31,40 @@ func (r *BookingIntentRepository) CreateIntent(intent *models.BookingIntent) err
 	intent.CreatedAt = time.Now()
 	intent.UpdatedAt = time.Now()
 
-	// Marshal JSONB fields
-	var busIntentJSON, preLoungeJSON, postLoungeJSON, pricingSnapshotJSON interface{}
+	// Marshal JSONB fields - use *string to properly handle NULL and JSON
+	var busIntentJSON, preLoungeJSON, postLoungeJSON *string
+	var pricingSnapshotJSON string
 	var err error
 
 	if intent.BusIntent != nil {
-		busIntentJSON, err = json.Marshal(intent.BusIntent)
+		jsonBytes, err := json.Marshal(intent.BusIntent)
 		if err != nil {
 			return fmt.Errorf("failed to marshal bus_intent: %w", err)
 		}
+		s := string(jsonBytes)
+		busIntentJSON = &s
 	}
 	if intent.PreTripLoungeIntent != nil {
-		preLoungeJSON, err = json.Marshal(intent.PreTripLoungeIntent)
+		jsonBytes, err := json.Marshal(intent.PreTripLoungeIntent)
 		if err != nil {
 			return fmt.Errorf("failed to marshal pre_trip_lounge_intent: %w", err)
 		}
+		s := string(jsonBytes)
+		preLoungeJSON = &s
 	}
 	if intent.PostTripLoungeIntent != nil {
-		postLoungeJSON, err = json.Marshal(intent.PostTripLoungeIntent)
+		jsonBytes, err := json.Marshal(intent.PostTripLoungeIntent)
 		if err != nil {
 			return fmt.Errorf("failed to marshal post_trip_lounge_intent: %w", err)
 		}
+		s := string(jsonBytes)
+		postLoungeJSON = &s
 	}
-	pricingSnapshotJSON, err = json.Marshal(intent.PricingSnapshot)
+	jsonBytes, err := json.Marshal(intent.PricingSnapshot)
 	if err != nil {
 		return fmt.Errorf("failed to marshal pricing_snapshot: %w", err)
 	}
+	pricingSnapshotJSON = string(jsonBytes)
 
 	query := `
 		INSERT INTO booking_intents (
