@@ -30,15 +30,16 @@ type PAYableService struct {
 }
 
 // PAYablePaymentRequest represents the request sent to PAYable IPG
+// NOTE: merchantToken is NOT sent to PAYable - only used to generate checkValue
 type PAYablePaymentRequest struct {
-	// Merchant credentials
-	MerchantKey   string `json:"merchantKey"`
-	MerchantToken string `json:"merchantToken"`
+	// Merchant credentials (merchantToken is NOT sent - only checkValue)
+	MerchantKey string `json:"merchantKey"`
 
 	// URLs
-	LogoURL    string `json:"logoUrl,omitempty"`
-	ReturnURL  string `json:"returnUrl"`
-	WebhookURL string `json:"webhookUrl,omitempty"`
+	LogoURL         string `json:"logoUrl,omitempty"`
+	ReturnURL       string `json:"returnUrl"`
+	WebhookURL      string `json:"webhookUrl,omitempty"`
+	StatusReturnURL string `json:"statusReturnUrl,omitempty"`
 
 	// Payment details
 	PaymentType  int    `json:"paymentType"` // 1 = one-time, 2 = recurring
@@ -46,28 +47,29 @@ type PAYablePaymentRequest struct {
 	Amount       string `json:"amount"`
 	CurrencyCode string `json:"currencyCode"`
 
-	// Customer details
-	CustomerFirstName   string `json:"customerFirstName,omitempty"`
-	CustomerLastName    string `json:"customerLastName,omitempty"`
-	CustomerEmail       string `json:"customerEmail,omitempty"`
-	CustomerMobilePhone string `json:"customerMobilePhone,omitempty"`
-
-	// Billing address
-	BillingAddressStreet      string `json:"billingAddressStreet,omitempty"`
-	BillingAddressCity        string `json:"billingAddressCity,omitempty"`
-	BillingAddressCountry     string `json:"billingAddressCountry,omitempty"`
-	BillingAddressPostcodeZip string `json:"billingAddressPostcodeZip,omitempty"`
-
 	// Order details
 	OrderDescription string `json:"orderDescription,omitempty"`
+
+	// Customer details (REQUIRED)
+	CustomerFirstName   string `json:"customerFirstName"`
+	CustomerLastName    string `json:"customerLastName"`
+	CustomerEmail       string `json:"customerEmail"`
+	CustomerMobilePhone string `json:"customerMobilePhone"`
+
+	// Billing address (REQUIRED)
+	BillingAddressStreet      string `json:"billingAddressStreet"`
+	BillingAddressCity        string `json:"billingAddressCity"`
+	BillingAddressCountry     string `json:"billingAddressCountry"`
+	BillingAddressPostcodeZip string `json:"billingAddressPostcodeZip"`
 
 	// Security
 	CheckValue string `json:"checkValue"`
 
-	// Integration info
+	// Integration info (REQUIRED)
 	IsMobilePayment    int    `json:"isMobilePayment"`
-	IntegrationType    string `json:"integrationType"`
+	IntegrationType    string `json:"integrationType"`    // Max 20 chars
 	IntegrationVersion string `json:"integrationVersion"`
+	PackageName        string `json:"packageName"` // REQUIRED for mobile payments
 }
 
 // PAYablePaymentResponse represents the response from PAYable IPG
@@ -150,6 +152,12 @@ type InitiatePaymentParams struct {
 	CustomerPhone    string
 	CustomerEmail    string
 	OrderDescription string
+	// Billing address (defaults provided if empty)
+	BillingStreet   string
+	BillingCity     string
+	BillingPostcode string
+	// Package name for mobile apps
+	PackageName string
 }
 
 // InitiatePayment creates a payment request and returns the payment page URL
@@ -164,28 +172,70 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 
 	// Split customer name
 	firstName, lastName := s.splitName(params.CustomerName)
+	if lastName == "" {
+		lastName = "." // PAYable requires last name
+	}
 
-	// Build request
+	// Set default email if not provided
+	customerEmail := params.CustomerEmail
+	if customerEmail == "" {
+		customerEmail = "customer@smarttransit.lk" // Default email for PAYable
+	}
+
+	// Set default billing address if not provided
+	billingStreet := params.BillingStreet
+	if billingStreet == "" {
+		billingStreet = "Sri Lanka"
+	}
+	billingCity := params.BillingCity
+	if billingCity == "" {
+		billingCity = "Colombo"
+	}
+	billingPostcode := params.BillingPostcode
+	if billingPostcode == "" {
+		billingPostcode = "00000"
+	}
+
+	// Set package name (required for mobile)
+	packageName := params.PackageName
+	if packageName == "" {
+		packageName = "lk.smarttransit.passenger" // Default package name
+	}
+
+	// Get endpoint URL
+	endpointURL, ok := PAYableEnvironmentURLs[s.config.Environment]
+	if !ok {
+		endpointURL = PAYableEnvironmentURLs["sandbox"] // Default to sandbox
+	}
+
+	// Build status return URL
+	statusReturnURL := fmt.Sprintf("%s/status-view", endpointURL)
+
+	// Build request - NOTE: merchantToken is NOT included
 	request := &PAYablePaymentRequest{
-		MerchantKey:           s.config.MerchantKey,
-		MerchantToken:         s.config.MerchantToken,
-		LogoURL:               s.config.LogoURL,
-		ReturnURL:             s.config.ReturnURL,
-		WebhookURL:            s.config.WebhookURL,
-		PaymentType:           1, // One-time payment
-		InvoiceID:             params.InvoiceID,
-		Amount:                params.Amount,
-		CurrencyCode:          params.CurrencyCode,
-		CustomerFirstName:     firstName,
-		CustomerLastName:      lastName,
-		CustomerEmail:         params.CustomerEmail,
-		CustomerMobilePhone:   params.CustomerPhone,
-		BillingAddressCountry: "LK", // Sri Lanka
-		OrderDescription:      params.OrderDescription,
-		CheckValue:            checkValue,
-		IsMobilePayment:       1,
-		IntegrationType:       "Smart Transit Backend",
-		IntegrationVersion:    "1.0.0",
+		MerchantKey:               s.config.MerchantKey,
+		LogoURL:                   s.config.LogoURL,
+		ReturnURL:                 s.config.ReturnURL,
+		WebhookURL:                s.config.WebhookURL,
+		StatusReturnURL:           statusReturnURL,
+		PaymentType:               1, // One-time payment
+		InvoiceID:                 params.InvoiceID,
+		Amount:                    params.Amount,
+		CurrencyCode:              params.CurrencyCode,
+		OrderDescription:          params.OrderDescription,
+		CustomerFirstName:         firstName,
+		CustomerLastName:          lastName,
+		CustomerEmail:             customerEmail,
+		CustomerMobilePhone:       params.CustomerPhone,
+		BillingAddressStreet:      billingStreet,
+		BillingAddressCity:        billingCity,
+		BillingAddressCountry:     "LK", // Sri Lanka
+		BillingAddressPostcodeZip: billingPostcode,
+		CheckValue:                checkValue,
+		IsMobilePayment:           1,
+		IntegrationType:           "SmartTransit", // Max 20 chars
+		IntegrationVersion:        "1.0.0",
+		PackageName:               packageName,
 	}
 
 	s.logger.WithFields(logrus.Fields{
@@ -193,12 +243,6 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 		"amount":     params.Amount,
 		"currency":   params.CurrencyCode,
 	}).Info("Initiating PAYable payment")
-
-	// Get endpoint URL
-	endpointURL, ok := PAYableEnvironmentURLs[s.config.Environment]
-	if !ok {
-		endpointURL = PAYableEnvironmentURLs["sandbox"] // Default to sandbox
-	}
 
 	// Make HTTP request
 	jsonBody, err := json.Marshal(request)
