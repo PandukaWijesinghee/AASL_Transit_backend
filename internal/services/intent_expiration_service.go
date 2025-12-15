@@ -113,11 +113,11 @@ func (s *IntentExpirationService) RunOnce() {
 // GetStats returns statistics about expired intents (for admin dashboard)
 func (s *IntentExpirationService) GetStats() map[string]interface{} {
 	stats := make(map[string]interface{})
-	
+
 	// Could add more stats like:
 	// - Total expired today
 	// - Currently held intents
 	// - Average hold duration
-	
+
 	return stats
 }

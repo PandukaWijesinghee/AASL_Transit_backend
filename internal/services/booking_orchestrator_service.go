@@ -12,9 +12,9 @@ import (
 
 // BookingOrchestratorConfig holds configuration for the orchestrator
 type BookingOrchestratorConfig struct {
-	IntentTTL           time.Duration // How long intents are valid (default 10 min)
-	PaymentTimeout      time.Duration // How long to wait for payment (default 15 min)
-	DefaultCurrency     string        // Default currency (default LKR)
+	IntentTTL       time.Duration // How long intents are valid (default 10 min)
+	PaymentTimeout  time.Duration // How long to wait for payment (default 15 min)
+	DefaultCurrency string        // Default currency (default LKR)
 }
 
 // DefaultOrchestratorConfig returns default configuration
@@ -160,19 +160,19 @@ func (s *BookingOrchestratorService) CreateIntent(
 		for i, seat := range req.Bus.Seats {
 			seatIDs[i] = seat.TripSeatID
 		}
-		
+
 		heldCount, err := s.intentRepo.HoldSeatsForIntent(intent.ID, seatIDs, expiresAt)
 		if err != nil {
 			s.rollbackHolds(intent.ID)
 			s.intentRepo.UpdateIntentExpired(intent.ID)
 			return nil, fmt.Errorf("failed to hold seats: %w", err)
 		}
-		
+
 		if heldCount < len(seatIDs) {
 			// Some seats couldn't be held - they were taken
 			s.rollbackHolds(intent.ID)
 			s.intentRepo.UpdateIntentExpired(intent.ID)
-			
+
 			// Find which seats were taken
 			_, unavailable, _ := s.intentRepo.CheckSeatsAvailableForHold(seatIDs)
 			return nil, s.buildPartialAvailabilityError(unavailable, nil, nil)
@@ -282,7 +282,7 @@ func (s *BookingOrchestratorService) processBusIntent(
 	tripInfo := &models.BusIntentTripInfo{
 		DepartureDatetime: trip.DepartureDatetime,
 	}
-	
+
 	// Get route name
 	if trip.BusOwnerRouteID != nil {
 		route, err := s.busOwnerRouteRepo.GetByID(*trip.BusOwnerRouteID)
@@ -339,7 +339,7 @@ func (s *BookingOrchestratorService) processLoungeIntent(
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get lounge price: %w", err)
 	}
-	
+
 	var pricePerGuest float64
 	fmt.Sscanf(priceStr, "%f", &pricePerGuest)
 
@@ -369,10 +369,10 @@ func (s *BookingOrchestratorService) processLoungeIntent(
 		if err != nil || product == nil {
 			continue
 		}
-		
+
 		var unitPrice float64
 		fmt.Sscanf(product.Price, "%f", &unitPrice)
-		
+
 		preOrders = append(preOrders, models.LoungeIntentPreOrder{
 			ProductID:   po.ProductID,
 			ProductName: product.Name,
@@ -520,12 +520,12 @@ func (s *BookingOrchestratorService) InitiatePayment(
 		}
 
 		s.logger.WithFields(logrus.Fields{
-			"intent_id":        intentID,
-			"payment_ref":      paymentRef,
-			"amount":           intent.TotalAmount,
-			"uid":              payableResp.UID,
-			"payment_page":     payableResp.PaymentPage,
-			"environment":      s.payableService.GetEnvironment(),
+			"intent_id":    intentID,
+			"payment_ref":  paymentRef,
+			"amount":       intent.TotalAmount,
+			"uid":          payableResp.UID,
+			"payment_page": payableResp.PaymentPage,
+			"environment":  s.payableService.GetEnvironment(),
 		}).Info("PAYable payment initiated for booking intent")
 	} else {
 		// Development mode - return placeholder URL
@@ -672,13 +672,13 @@ func (s *BookingOrchestratorService) createBusBookingFromIntent(intent *models.B
 
 	// Build master booking
 	masterBooking := &models.MasterBooking{
-		UserID:        intent.UserID.String(),
-		BookingType:   models.BookingTypeBusOnly,
-		BusTotal:      intent.BusFare,
-		Subtotal:      intent.BusFare,
-		TotalAmount:   intent.BusFare,
-		PaymentStatus: models.MasterPaymentPaid, // Paid via intent
-		BookingStatus: models.MasterBookingConfirmed,
+		UserID:         intent.UserID.String(),
+		BookingType:    models.BookingTypeBusOnly,
+		BusTotal:       intent.BusFare,
+		Subtotal:       intent.BusFare,
+		TotalAmount:    intent.BusFare,
+		PaymentStatus:  models.MasterPaymentPaid, // Paid via intent
+		BookingStatus:  models.MasterBookingConfirmed,
 		PassengerName:  busIntent.PassengerName,
 		PassengerPhone: busIntent.PassengerPhone,
 		PassengerEmail: busIntent.PassengerEmail,
@@ -738,20 +738,20 @@ func (s *BookingOrchestratorService) createLoungeBookingFromIntent(
 
 	// Build lounge booking
 	booking := &models.LoungeBooking{
-		UserID:            intent.UserID,
-		LoungeID:          loungeID,
-		BusBookingID:      busBookingID,
-		ScheduledArrival:  time.Now().Add(time.Hour), // Would be calculated from trip time
-		NumberOfGuests:    loungeIntent.GuestCount,
-		PricingType:       loungeIntent.PricingType,
-		PricePerGuest:     fmt.Sprintf("%.2f", loungeIntent.PricePerGuest),
-		BasePrice:         fmt.Sprintf("%.2f", loungeIntent.BasePrice),
-		PreOrderTotal:     fmt.Sprintf("%.2f", loungeIntent.PreOrderTotal),
-		TotalAmount:       fmt.Sprintf("%.2f", loungeIntent.TotalPrice),
-		LoungeName:        loungeIntent.LoungeName,
-		PrimaryGuestName:  loungeIntent.Guests[0].GuestName,
+		UserID:           intent.UserID,
+		LoungeID:         loungeID,
+		BusBookingID:     busBookingID,
+		ScheduledArrival: time.Now().Add(time.Hour), // Would be calculated from trip time
+		NumberOfGuests:   loungeIntent.GuestCount,
+		PricingType:      loungeIntent.PricingType,
+		PricePerGuest:    fmt.Sprintf("%.2f", loungeIntent.PricePerGuest),
+		BasePrice:        fmt.Sprintf("%.2f", loungeIntent.BasePrice),
+		PreOrderTotal:    fmt.Sprintf("%.2f", loungeIntent.PreOrderTotal),
+		TotalAmount:      fmt.Sprintf("%.2f", loungeIntent.TotalPrice),
+		LoungeName:       loungeIntent.LoungeName,
+		PrimaryGuestName: loungeIntent.Guests[0].GuestName,
 	}
-	
+
 	if loungeIntent.Guests[0].GuestPhone != nil {
 		booking.PrimaryGuestPhone = *loungeIntent.Guests[0].GuestPhone
 	}
@@ -971,8 +971,8 @@ func (s *BookingOrchestratorService) buildPartialAvailabilityError(
 	unavailablePostLounge *models.UnavailableReason,
 ) *models.PartialAvailabilityError {
 	err := &models.PartialAvailabilityError{
-		Message: "Some items are no longer available",
-		Available: models.AvailabilityStatus{},
+		Message:     "Some items are no longer available",
+		Available:   models.AvailabilityStatus{},
 		Unavailable: models.UnavailableItems{},
 	}
 

@@ -56,29 +56,29 @@ const (
 
 // BusIntentPayload stores bus booking intent data in JSONB
 type BusIntentPayload struct {
-	ScheduledTripID   string                     `json:"scheduled_trip_id"`
-	BoardingStopID    *string                    `json:"boarding_stop_id,omitempty"`
-	BoardingStopName  string                     `json:"boarding_stop_name"`
-	AlightingStopID   *string                    `json:"alighting_stop_id,omitempty"`
-	AlightingStopName string                     `json:"alighting_stop_name"`
-	Seats             []BusIntentSeat            `json:"seats"`
-	PassengerName     string                     `json:"passenger_name"`
-	PassengerPhone    string                     `json:"passenger_phone"`
-	PassengerEmail    *string                    `json:"passenger_email,omitempty"`
-	SpecialRequests   *string                    `json:"special_requests,omitempty"`
-	TripInfo          *BusIntentTripInfo         `json:"trip_info,omitempty"` // Denormalized for display
+	ScheduledTripID   string             `json:"scheduled_trip_id"`
+	BoardingStopID    *string            `json:"boarding_stop_id,omitempty"`
+	BoardingStopName  string             `json:"boarding_stop_name"`
+	AlightingStopID   *string            `json:"alighting_stop_id,omitempty"`
+	AlightingStopName string             `json:"alighting_stop_name"`
+	Seats             []BusIntentSeat    `json:"seats"`
+	PassengerName     string             `json:"passenger_name"`
+	PassengerPhone    string             `json:"passenger_phone"`
+	PassengerEmail    *string            `json:"passenger_email,omitempty"`
+	SpecialRequests   *string            `json:"special_requests,omitempty"`
+	TripInfo          *BusIntentTripInfo `json:"trip_info,omitempty"` // Denormalized for display
 }
 
 // BusIntentSeat represents a seat selection in bus intent
 type BusIntentSeat struct {
-	TripSeatID     string  `json:"trip_seat_id"`
-	SeatNumber     string  `json:"seat_number"`
-	SeatType       string  `json:"seat_type,omitempty"`
-	SeatPrice      float64 `json:"seat_price"`
-	PassengerName  string  `json:"passenger_name"`
-	PassengerPhone *string `json:"passenger_phone,omitempty"`
+	TripSeatID      string  `json:"trip_seat_id"`
+	SeatNumber      string  `json:"seat_number"`
+	SeatType        string  `json:"seat_type,omitempty"`
+	SeatPrice       float64 `json:"seat_price"`
+	PassengerName   string  `json:"passenger_name"`
+	PassengerPhone  *string `json:"passenger_phone,omitempty"`
 	PassengerGender *string `json:"passenger_gender,omitempty"`
-	IsPrimary      bool    `json:"is_primary"`
+	IsPrimary       bool    `json:"is_primary"`
 }
 
 // BusIntentTripInfo stores trip details for display (denormalized snapshot)
@@ -91,20 +91,20 @@ type BusIntentTripInfo struct {
 
 // LoungeIntentPayload stores lounge booking intent data in JSONB
 type LoungeIntentPayload struct {
-	LoungeID      string               `json:"lounge_id"`
-	LoungeName    string               `json:"lounge_name"`
-	LoungeAddress *string              `json:"lounge_address,omitempty"`
-	PricingType   string               `json:"pricing_type"` // "1_hour", "2_hours", "3_hours", "until_bus"
-	Date          string               `json:"date"`         // "2025-12-15"
-	CheckInTime   string               `json:"check_in_time"` // "09:00"
-	CheckOutTime  *string              `json:"check_out_time,omitempty"`
-	GuestCount    int                  `json:"guest_count"` // Total: primary + additional guests
-	Guests        []LoungeIntentGuest  `json:"guests"`
+	LoungeID      string                 `json:"lounge_id"`
+	LoungeName    string                 `json:"lounge_name"`
+	LoungeAddress *string                `json:"lounge_address,omitempty"`
+	PricingType   string                 `json:"pricing_type"`  // "1_hour", "2_hours", "3_hours", "until_bus"
+	Date          string                 `json:"date"`          // "2025-12-15"
+	CheckInTime   string                 `json:"check_in_time"` // "09:00"
+	CheckOutTime  *string                `json:"check_out_time,omitempty"`
+	GuestCount    int                    `json:"guest_count"` // Total: primary + additional guests
+	Guests        []LoungeIntentGuest    `json:"guests"`
 	PreOrders     []LoungeIntentPreOrder `json:"pre_orders,omitempty"`
-	PricePerGuest float64              `json:"price_per_guest"`
-	BasePrice     float64              `json:"base_price"`     // price_per_guest * guest_count
-	PreOrderTotal float64              `json:"pre_order_total"`
-	TotalPrice    float64              `json:"total_price"`    // base_price + pre_order_total
+	PricePerGuest float64                `json:"price_per_guest"`
+	BasePrice     float64                `json:"base_price"` // price_per_guest * guest_count
+	PreOrderTotal float64                `json:"pre_order_total"`
+	TotalPrice    float64                `json:"total_price"` // base_price + pre_order_total
 }
 
 // LoungeIntentGuest represents a guest in lounge intent
@@ -127,20 +127,20 @@ type LoungeIntentPreOrder struct {
 
 // PricingSnapshot stores server-calculated prices at intent creation
 type PricingSnapshot struct {
-	BusFare        float64                 `json:"bus_fare"`
-	PreLoungeFare  float64                 `json:"pre_lounge_fare"`
-	PostLoungeFare float64                 `json:"post_lounge_fare"`
-	Total          float64                 `json:"total"`
-	Currency       string                  `json:"currency"`
-	CalculatedAt   time.Time               `json:"calculated_at"`
-	SeatPrices     map[string]float64      `json:"seat_prices,omitempty"`     // seat_id -> price
-	DiscountApplied *IntentDiscountInfo    `json:"discount_applied,omitempty"`
+	BusFare         float64             `json:"bus_fare"`
+	PreLoungeFare   float64             `json:"pre_lounge_fare"`
+	PostLoungeFare  float64             `json:"post_lounge_fare"`
+	Total           float64             `json:"total"`
+	Currency        string              `json:"currency"`
+	CalculatedAt    time.Time           `json:"calculated_at"`
+	SeatPrices      map[string]float64  `json:"seat_prices,omitempty"` // seat_id -> price
+	DiscountApplied *IntentDiscountInfo `json:"discount_applied,omitempty"`
 }
 
 // IntentDiscountInfo stores discount information
 type IntentDiscountInfo struct {
 	Code           string  `json:"code"`
-	DiscountType   string  `json:"discount_type"`   // "percentage" or "fixed"
+	DiscountType   string  `json:"discount_type"` // "percentage" or "fixed"
 	DiscountValue  float64 `json:"discount_value"`
 	DiscountAmount float64 `json:"discount_amount"` // Actual amount discounted
 }
@@ -201,40 +201,40 @@ func (p *PricingSnapshot) Scan(value interface{}) error {
 
 // BookingIntent represents a booking intent before payment confirmation
 type BookingIntent struct {
-	ID     uuid.UUID         `json:"id" db:"id"`
-	UserID uuid.UUID         `json:"user_id" db:"user_id"`
+	ID     uuid.UUID `json:"id" db:"id"`
+	UserID uuid.UUID `json:"user_id" db:"user_id"`
 
 	// Intent type
 	IntentType BookingIntentType   `json:"intent_type" db:"intent_type"`
 	Status     BookingIntentStatus `json:"status" db:"status"`
 
 	// JSONB payloads (nullable in DB)
-	BusIntent           *BusIntentPayload    `json:"bus_intent,omitempty" db:"bus_intent"`
-	PreTripLoungeIntent *LoungeIntentPayload `json:"pre_trip_lounge_intent,omitempty" db:"pre_trip_lounge_intent"`
+	BusIntent            *BusIntentPayload    `json:"bus_intent,omitempty" db:"bus_intent"`
+	PreTripLoungeIntent  *LoungeIntentPayload `json:"pre_trip_lounge_intent,omitempty" db:"pre_trip_lounge_intent"`
 	PostTripLoungeIntent *LoungeIntentPayload `json:"post_trip_lounge_intent,omitempty" db:"post_trip_lounge_intent"`
 
 	// Pricing (server-calculated, stored at intent time)
-	BusFare        float64 `json:"bus_fare" db:"bus_fare"`
-	PreLoungeFare  float64 `json:"pre_lounge_fare" db:"pre_lounge_fare"`
-	PostLoungeFare float64 `json:"post_lounge_fare" db:"post_lounge_fare"`
-	TotalAmount    float64 `json:"total_amount" db:"total_amount"`
-	Currency       string  `json:"currency" db:"currency"`
+	BusFare         float64         `json:"bus_fare" db:"bus_fare"`
+	PreLoungeFare   float64         `json:"pre_lounge_fare" db:"pre_lounge_fare"`
+	PostLoungeFare  float64         `json:"post_lounge_fare" db:"post_lounge_fare"`
+	TotalAmount     float64         `json:"total_amount" db:"total_amount"`
+	Currency        string          `json:"currency" db:"currency"`
 	PricingSnapshot PricingSnapshot `json:"pricing_snapshot" db:"pricing_snapshot"`
 
 	// Payment tracking
 	PaymentReference       *string              `json:"payment_reference,omitempty" db:"payment_reference"`
 	PaymentStatus          *IntentPaymentStatus `json:"payment_status,omitempty" db:"payment_status"`
 	PaymentGateway         string               `json:"payment_gateway" db:"payment_gateway"`
-	PaymentUID             *string              `json:"payment_uid,omitempty" db:"payment_uid"`              // PAYable unique transaction ID
+	PaymentUID             *string              `json:"payment_uid,omitempty" db:"payment_uid"`                           // PAYable unique transaction ID
 	PaymentStatusIndicator *string              `json:"payment_status_indicator,omitempty" db:"payment_status_indicator"` // PAYable status check token
-	
+
 	// Passenger info (extracted from bus_intent for convenience)
 	PassengerName  string `json:"passenger_name,omitempty" db:"passenger_name"`
 	PassengerPhone string `json:"passenger_phone,omitempty" db:"passenger_phone"`
 
 	// Result references (filled AFTER confirmation)
-	BusBookingID       *uuid.UUID `json:"bus_booking_id,omitempty" db:"bus_booking_id"`
-	PreLoungeBookingID *uuid.UUID `json:"pre_lounge_booking_id,omitempty" db:"pre_lounge_booking_id"`
+	BusBookingID        *uuid.UUID `json:"bus_booking_id,omitempty" db:"bus_booking_id"`
+	PreLoungeBookingID  *uuid.UUID `json:"pre_lounge_booking_id,omitempty" db:"pre_lounge_booking_id"`
 	PostLoungeBookingID *uuid.UUID `json:"post_lounge_booking_id,omitempty" db:"post_lounge_booking_id"`
 
 	// TTL Management
@@ -306,16 +306,16 @@ type CreateBookingIntentRequest struct {
 
 // BusIntentRequest represents bus booking request data
 type BusIntentRequest struct {
-	ScheduledTripID   string               `json:"scheduled_trip_id" binding:"required"`
-	BoardingStopID    *string              `json:"boarding_stop_id,omitempty"`
-	BoardingStopName  string               `json:"boarding_stop_name" binding:"required"`
-	AlightingStopID   *string              `json:"alighting_stop_id,omitempty"`
-	AlightingStopName string               `json:"alighting_stop_name" binding:"required"`
+	ScheduledTripID   string                 `json:"scheduled_trip_id" binding:"required"`
+	BoardingStopID    *string                `json:"boarding_stop_id,omitempty"`
+	BoardingStopName  string                 `json:"boarding_stop_name" binding:"required"`
+	AlightingStopID   *string                `json:"alighting_stop_id,omitempty"`
+	AlightingStopName string                 `json:"alighting_stop_name" binding:"required"`
 	Seats             []BusIntentSeatRequest `json:"seats" binding:"required,min=1"`
-	PassengerName     string               `json:"passenger_name" binding:"required"`
-	PassengerPhone    string               `json:"passenger_phone" binding:"required"`
-	PassengerEmail    *string              `json:"passenger_email,omitempty"`
-	SpecialRequests   *string              `json:"special_requests,omitempty"`
+	PassengerName     string                 `json:"passenger_name" binding:"required"`
+	PassengerPhone    string                 `json:"passenger_phone" binding:"required"`
+	PassengerEmail    *string                `json:"passenger_email,omitempty"`
+	SpecialRequests   *string                `json:"special_requests,omitempty"`
 }
 
 // BusIntentSeatRequest represents a seat in the request
@@ -330,9 +330,9 @@ type BusIntentSeatRequest struct {
 
 // LoungeIntentRequest represents lounge booking request data
 type LoungeIntentRequest struct {
-	LoungeID    string                     `json:"lounge_id" binding:"required"`
-	PricingType string                     `json:"pricing_type" binding:"required"` // "1_hour", "2_hours", "3_hours", "until_bus"
-	Guests      []LoungeIntentGuestRequest `json:"guests" binding:"required,min=1"`
+	LoungeID    string                        `json:"lounge_id" binding:"required"`
+	PricingType string                        `json:"pricing_type" binding:"required"` // "1_hour", "2_hours", "3_hours", "until_bus"
+	Guests      []LoungeIntentGuestRequest    `json:"guests" binding:"required,min=1"`
 	PreOrders   []LoungeIntentPreOrderRequest `json:"pre_orders,omitempty"`
 }
 
@@ -410,12 +410,12 @@ func (r *CreateBookingIntentRequest) Validate() error {
 
 // BookingIntentResponse is the response after creating an intent
 type BookingIntentResponse struct {
-	IntentID       uuid.UUID `json:"intent_id"`
-	Status         string    `json:"status"`
+	IntentID       uuid.UUID      `json:"intent_id"`
+	Status         string         `json:"status"`
 	PriceBreakdown PriceBreakdown `json:"price_breakdown"`
-	ExpiresAt      time.Time `json:"expires_at"`
-	TTLSeconds     int       `json:"ttl_seconds"` // Remaining TTL for countdown
-	
+	ExpiresAt      time.Time      `json:"expires_at"`
+	TTLSeconds     int            `json:"ttl_seconds"` // Remaining TTL for countdown
+
 	// Availability status
 	SeatAvailabilityChecked   bool `json:"seat_availability_checked"`
 	LoungeAvailabilityChecked bool `json:"lounge_availability_checked"`
@@ -450,11 +450,11 @@ type ConfirmBookingRequest struct {
 // ConfirmBookingResponse is returned after successful confirmation
 type ConfirmBookingResponse struct {
 	MasterReference string `json:"master_reference"` // Overall booking reference
-	
-	BusBooking *ConfirmedBusBooking `json:"bus_booking,omitempty"`
-	PreLoungeBooking *ConfirmedLoungeBooking `json:"pre_lounge_booking,omitempty"`
+
+	BusBooking        *ConfirmedBusBooking    `json:"bus_booking,omitempty"`
+	PreLoungeBooking  *ConfirmedLoungeBooking `json:"pre_lounge_booking,omitempty"`
 	PostLoungeBooking *ConfirmedLoungeBooking `json:"post_lounge_booking,omitempty"`
-	
+
 	TotalPaid float64 `json:"total_paid"`
 	Currency  string  `json:"currency"`
 }
@@ -475,13 +475,13 @@ type ConfirmedLoungeBooking struct {
 
 // GetIntentStatusResponse is the response for getting intent status
 type GetIntentStatusResponse struct {
-	IntentID       uuid.UUID `json:"intent_id"`
-	Status         BookingIntentStatus `json:"status"`
+	IntentID       uuid.UUID            `json:"intent_id"`
+	Status         BookingIntentStatus  `json:"status"`
 	PaymentStatus  *IntentPaymentStatus `json:"payment_status,omitempty"`
-	PriceBreakdown PriceBreakdown `json:"price_breakdown"`
-	ExpiresAt      time.Time `json:"expires_at"`
-	IsExpired      bool `json:"is_expired"`
-	
+	PriceBreakdown PriceBreakdown       `json:"price_breakdown"`
+	ExpiresAt      time.Time            `json:"expires_at"`
+	IsExpired      bool                 `json:"is_expired"`
+
 	// Booking results (if confirmed)
 	Bookings *ConfirmBookingResponse `json:"bookings,omitempty"`
 }
@@ -499,8 +499,8 @@ type PartialAvailabilityError struct {
 
 // AvailabilityStatus shows what is available
 type AvailabilityStatus struct {
-	Bus       *ItemAvailability `json:"bus,omitempty"`
-	PreLounge *ItemAvailability `json:"pre_lounge,omitempty"`
+	Bus        *ItemAvailability `json:"bus,omitempty"`
+	PreLounge  *ItemAvailability `json:"pre_lounge,omitempty"`
 	PostLounge *ItemAvailability `json:"post_lounge,omitempty"`
 }
 
@@ -512,8 +512,8 @@ type ItemAvailability struct {
 
 // UnavailableItems shows what is not available
 type UnavailableItems struct {
-	Bus       *UnavailableReason `json:"bus,omitempty"`
-	PreLounge *UnavailableReason `json:"pre_lounge,omitempty"`
+	Bus        *UnavailableReason `json:"bus,omitempty"`
+	PreLounge  *UnavailableReason `json:"pre_lounge,omitempty"`
 	PostLounge *UnavailableReason `json:"post_lounge,omitempty"`
 }
 

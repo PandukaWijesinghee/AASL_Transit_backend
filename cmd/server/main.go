@@ -311,7 +311,7 @@ func main() {
 	logger.Info("🎯 Initializing Booking Orchestration system...")
 	bookingIntentRepo := database.NewBookingIntentRepository(sqlxDB.DB)
 	bookingOrchestratorConfig := services.DefaultOrchestratorConfig()
-	
+
 	// Initialize PAYable payment service
 	payableService := services.NewPAYableService(&cfg.Payment, logger)
 	if payableService.IsConfigured() {
@@ -319,7 +319,7 @@ func main() {
 	} else {
 		logger.Warn("⚠️ PAYable payment gateway not configured - using placeholder mode")
 	}
-	
+
 	bookingOrchestratorService := services.NewBookingOrchestratorService(
 		bookingIntentRepo,
 		tripSeatRepo,

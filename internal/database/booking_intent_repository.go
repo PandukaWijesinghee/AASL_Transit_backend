@@ -278,7 +278,7 @@ func (r *BookingIntentRepository) GetIntentByPaymentUID(uid string) (*models.Boo
 		       idempotency_key, passenger_name, passenger_phone
 		FROM booking_intents 
 		WHERE payment_uid = $1`
-	
+
 	var intent models.BookingIntent
 	err := r.db.Get(&intent, query, uid)
 	if err != nil {
@@ -425,10 +425,10 @@ func (r *BookingIntentRepository) CheckSeatsAvailableForHold(seatIDs []string) (
 	query = r.db.Rebind(query)
 
 	type seatStatus struct {
-		ID             string       `db:"id"`
-		Status         string       `db:"status"`
-		HeldByIntentID *uuid.UUID   `db:"held_by_intent_id"`
-		HeldUntil      *time.Time   `db:"held_until"`
+		ID             string     `db:"id"`
+		Status         string     `db:"status"`
+		HeldByIntentID *uuid.UUID `db:"held_by_intent_id"`
+		HeldUntil      *time.Time `db:"held_until"`
 	}
 
 	var seats []seatStatus

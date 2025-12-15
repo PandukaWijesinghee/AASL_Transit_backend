@@ -17,9 +17,9 @@ import (
 
 // PAYableEnvironmentURLs maps environment names to their IPG endpoint URLs
 var PAYableEnvironmentURLs = map[string]string{
-	"dev":        "https://endpoint.payable.lk/dev",
-	"sandbox":    "https://endpoint.payable.lk/sandbox",
-	"production": "https://endpoint.payable.lk/prod",
+	"dev":        "https://payable-ipg-dev.web.app/ipg/dev",
+	"sandbox":    "https://sandboxipgpayment.payable.lk/ipg/sandbox",
+	"production": "https://ipgpayment.payable.lk/ipg/pro",
 }
 
 // PAYableService handles payment gateway integration with PAYable IPG
@@ -72,10 +72,10 @@ type PAYablePaymentRequest struct {
 
 // PAYablePaymentResponse represents the response from PAYable IPG
 type PAYablePaymentResponse struct {
-	Status          string `json:"status"`           // "success" or "error"
-	UID             string `json:"uid"`              // Unique transaction ID
-	StatusIndicator string `json:"statusIndicator"`  // Token for status checks
-	PaymentPage     string `json:"paymentPage"`      // URL to redirect user for payment
+	Status          string `json:"status"`            // "success" or "error"
+	UID             string `json:"uid"`               // Unique transaction ID
+	StatusIndicator string `json:"statusIndicator"`   // Token for status checks
+	PaymentPage     string `json:"paymentPage"`       // URL to redirect user for payment
 	Message         string `json:"message,omitempty"` // Error message if status is error
 }
 
@@ -87,12 +87,12 @@ type PAYableStatusRequest struct {
 
 // PAYableStatusResponse represents the response from status check
 type PAYableStatusResponse struct {
-	Status          string `json:"status"`
-	PaymentStatus   string `json:"paymentStatus"`   // "pending", "success", "failed", "cancelled"
-	Amount          string `json:"amount"`
-	InvoiceID       string `json:"invoiceId"`
-	TransactionID   string `json:"transactionId,omitempty"`
-	Message         string `json:"message,omitempty"`
+	Status        string `json:"status"`
+	PaymentStatus string `json:"paymentStatus"` // "pending", "success", "failed", "cancelled"
+	Amount        string `json:"amount"`
+	InvoiceID     string `json:"invoiceId"`
+	TransactionID string `json:"transactionId,omitempty"`
+	Message       string `json:"message,omitempty"`
 }
 
 // PAYableWebhookPayload represents the webhook payload from PAYable
@@ -102,7 +102,7 @@ type PAYableWebhookPayload struct {
 	InvoiceID       string `json:"invoiceId"`
 	Amount          string `json:"amount"`
 	CurrencyCode    string `json:"currencyCode"`
-	PaymentStatus   string `json:"paymentStatus"`   // "SUCCESS", "FAILED", "CANCELLED"
+	PaymentStatus   string `json:"paymentStatus"` // "SUCCESS", "FAILED", "CANCELLED"
 	TransactionID   string `json:"transactionId,omitempty"`
 	PaymentMethod   string `json:"paymentMethod,omitempty"`
 	CardType        string `json:"cardType,omitempty"`
@@ -143,12 +143,12 @@ func (s *PAYableService) GenerateCheckValue(invoiceID, amount, currencyCode stri
 
 // InitiatePaymentParams contains all parameters needed to initiate a payment
 type InitiatePaymentParams struct {
-	InvoiceID       string
-	Amount          string
-	CurrencyCode    string
-	CustomerName    string  // Will be split into first/last name
-	CustomerPhone   string
-	CustomerEmail   string
+	InvoiceID        string
+	Amount           string
+	CurrencyCode     string
+	CustomerName     string // Will be split into first/last name
+	CustomerPhone    string
+	CustomerEmail    string
 	OrderDescription string
 }
 
@@ -167,25 +167,25 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 
 	// Build request
 	request := &PAYablePaymentRequest{
-		MerchantKey:         s.config.MerchantKey,
-		MerchantToken:       s.config.MerchantToken,
-		LogoURL:             s.config.LogoURL,
-		ReturnURL:           s.config.ReturnURL,
-		WebhookURL:          s.config.WebhookURL,
-		PaymentType:         1, // One-time payment
-		InvoiceID:           params.InvoiceID,
-		Amount:              params.Amount,
-		CurrencyCode:        params.CurrencyCode,
-		CustomerFirstName:   firstName,
-		CustomerLastName:    lastName,
-		CustomerEmail:       params.CustomerEmail,
-		CustomerMobilePhone: params.CustomerPhone,
+		MerchantKey:           s.config.MerchantKey,
+		MerchantToken:         s.config.MerchantToken,
+		LogoURL:               s.config.LogoURL,
+		ReturnURL:             s.config.ReturnURL,
+		WebhookURL:            s.config.WebhookURL,
+		PaymentType:           1, // One-time payment
+		InvoiceID:             params.InvoiceID,
+		Amount:                params.Amount,
+		CurrencyCode:          params.CurrencyCode,
+		CustomerFirstName:     firstName,
+		CustomerLastName:      lastName,
+		CustomerEmail:         params.CustomerEmail,
+		CustomerMobilePhone:   params.CustomerPhone,
 		BillingAddressCountry: "LK", // Sri Lanka
-		OrderDescription:    params.OrderDescription,
-		CheckValue:          checkValue,
-		IsMobilePayment:     1,
-		IntegrationType:     "Smart Transit Backend",
-		IntegrationVersion:  "1.0.0",
+		OrderDescription:      params.OrderDescription,
+		CheckValue:            checkValue,
+		IsMobilePayment:       1,
+		IntegrationType:       "Smart Transit Backend",
+		IntegrationVersion:    "1.0.0",
 	}
 
 	s.logger.WithFields(logrus.Fields{

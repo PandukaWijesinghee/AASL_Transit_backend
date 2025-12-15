@@ -312,7 +312,7 @@ func (h *BookingOrchestratorHandler) CancelIntent(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Booking intent cancelled successfully",
+		"message":   "Booking intent cancelled successfully",
 		"intent_id": intentID,
 	})
 }
