@@ -111,6 +111,10 @@ tags:
     description: Passenger app booking endpoints (create, manage, and view bookings)
   - name: Staff Bookings
     description: Conductor/Driver booking operations (verify, check-in, board)
+  - name: Booking Orchestration
+    description: |
+      Intent-based booking flow with TTL seat/lounge holding.
+      Flow: Create Intent → Initiate Payment → Confirm Booking
   - name: Search
     description: Trip search and discovery endpoints (Phase 1 MVP)
   - name: Lounge Marketplace
@@ -7585,6 +7589,297 @@ paths:
           $ref: "#/components/responses/InternalServerError"
 
   # ============================================================================
+  # BOOKING ORCHESTRATION ENDPOINTS (Intent → Payment → Confirm)
+  # ============================================================================
+  /api/v1/booking/intent:
+    post:
+      summary: Create booking intent
+      description: |
+        Creates a booking intent with TTL-based seat/lounge holding.
+        
+        **Flow:**
+        1. Validates seat/lounge availability
+        2. Creates temporary holds (10 min TTL)
+        3. Returns intent ID for payment initiation
+        
+        **Intent Types:**
+        - `bus_only`: Only bus seats
+        - `lounge_only`: Only lounge booking (pre or post trip)
+        - `bus_with_lounge`: Bus + lounge(s)
+        
+        **Important:**
+        - Seats are held for 10 minutes
+        - Payment must be initiated before expiry
+        - Use idempotency_key to prevent duplicates
+      operationId: createBookingIntent
+      tags:
+        - Booking Orchestration
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingIntentRequest"
+      responses:
+        "201":
+          description: Intent created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingIntentResponse"
+        "400":
+          description: Validation error or seats unavailable
+        "409":
+          description: Partial availability - some items unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartialAvailabilityError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/booking/intents:
+    get:
+      summary: Get my booking intents
+      description: Returns all booking intents for the authenticated user
+      operationId: getMyBookingIntents
+      tags:
+        - Booking Orchestration
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+          description: Number of results to return
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Offset for pagination
+      responses:
+        "200":
+          description: Intents retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  intents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BookingIntent"
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/booking/intent/{intent_id}:
+    get:
+      summary: Get intent status
+      description: Returns current status and details of a booking intent
+      operationId: getBookingIntentStatus
+      tags:
+        - Booking Orchestration
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: intent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Booking intent ID
+      responses:
+        "200":
+          description: Intent status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetIntentStatusResponse"
+        "404":
+          description: Intent not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/booking/intent/{intent_id}/initiate-payment:
+    post:
+      summary: Initiate payment for intent
+      description: |
+        Generates payment reference and returns payment gateway details.
+        Must be called before intent expires (10 min TTL).
+      operationId: initiateBookingPayment
+      tags:
+        - Booking Orchestration
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: intent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Booking intent ID
+      responses:
+        "200":
+          description: Payment initiated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InitiatePaymentResponse"
+        "400":
+          description: Intent expired or invalid state
+        "404":
+          description: Intent not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/booking/intent/{intent_id}/cancel:
+    post:
+      summary: Cancel booking intent
+      description: Cancels intent and releases all held seats/lounges
+      operationId: cancelBookingIntent
+      tags:
+        - Booking Orchestration
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: intent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Booking intent ID
+      responses:
+        "200":
+          description: Intent cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Booking intent cancelled successfully"
+                  intent_id:
+                    type: string
+                    format: uuid
+        "400":
+          description: Cannot cancel confirmed intent
+        "404":
+          description: Intent not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/booking/confirm:
+    post:
+      summary: Confirm booking after payment
+      description: |
+        Creates actual bookings from the intent after successful payment.
+        
+        **Process:**
+        1. Verifies payment reference
+        2. Creates bus booking (if applicable)
+        3. Creates lounge booking(s) (if applicable)
+        4. Converts held seats to booked
+        5. Returns booking references
+      operationId: confirmBooking
+      tags:
+        - Booking Orchestration
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmBookingRequest"
+      responses:
+        "200":
+          description: Booking confirmed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfirmBookingResponse"
+        "400":
+          description: Intent expired or invalid state
+        "402":
+          description: Payment not verified
+        "404":
+          description: Intent not found
+        "409":
+          description: Seats no longer available
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/payments/webhook:
+    post:
+      summary: Payment gateway webhook
+      description: |
+        Called by payment gateway (PAYable) to notify of payment status.
+        **Note:** This endpoint has no authentication - webhook signature verification is done internally.
+      operationId: paymentWebhook
+      tags:
+        - Booking Orchestration
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - invoiceId
+                - status
+              properties:
+                invoiceId:
+                  type: string
+                  description: Invoice/Payment reference
+                status:
+                  type: string
+                  enum: [SUCCESS, FAILED, PENDING]
+                  description: Payment status
+                transactionId:
+                  type: string
+                  description: Gateway transaction ID
+                amount:
+                  type: string
+                  description: Paid amount
+                currency:
+                  type: string
+                  description: Currency code
+                signature:
+                  type: string
+                  description: HMAC signature for verification
+      responses:
+        "200":
+          description: Webhook processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "webhook processed"
+                  status:
+                    type: string
+                    example: "acknowledged"
+        "400":
+          description: Invalid webhook payload
+
+  # ============================================================================
   # SEARCH ENDPOINTS (Phase 1 MVP - Trip Discovery)
   # ============================================================================
   /api/v1/search:
@@ -10714,6 +11009,458 @@ components:
                 minimum: 1
               special_instructions:
                 type: string
+
+    # ==========================================================================
+    # BOOKING ORCHESTRATION SCHEMAS (Intent → Payment → Confirm)
+    # ==========================================================================
+    CreateBookingIntentRequest:
+      type: object
+      required:
+        - intent_type
+      properties:
+        intent_type:
+          type: string
+          enum: [bus_only, lounge_only, bus_with_lounge]
+          description: Type of booking
+        bus:
+          $ref: "#/components/schemas/BusIntentRequest"
+        pre_trip_lounge:
+          $ref: "#/components/schemas/LoungeIntentRequest"
+        post_trip_lounge:
+          $ref: "#/components/schemas/LoungeIntentRequest"
+        idempotency_key:
+          type: string
+          description: Unique key to prevent duplicate intents
+          example: "booking-abc123-1702658400"
+
+    BusIntentRequest:
+      type: object
+      required:
+        - scheduled_trip_id
+        - boarding_stop_id
+        - alighting_stop_id
+        - seats
+        - passenger_name
+        - passenger_phone
+      properties:
+        scheduled_trip_id:
+          type: string
+          format: uuid
+        boarding_stop_id:
+          type: string
+        boarding_stop_name:
+          type: string
+        alighting_stop_id:
+          type: string
+        alighting_stop_name:
+          type: string
+        seats:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntentSeatRequest"
+        passenger_name:
+          type: string
+        passenger_phone:
+          type: string
+        passenger_email:
+          type: string
+          nullable: true
+        special_requests:
+          type: string
+          nullable: true
+
+    IntentSeatRequest:
+      type: object
+      required:
+        - trip_seat_id
+        - passenger_name
+      properties:
+        trip_seat_id:
+          type: string
+          format: uuid
+          description: ID of the trip_seat to book
+        passenger_name:
+          type: string
+        passenger_phone:
+          type: string
+          nullable: true
+        passenger_gender:
+          type: string
+          enum: [male, female, other]
+          nullable: true
+        is_primary:
+          type: boolean
+          default: false
+
+    LoungeIntentRequest:
+      type: object
+      required:
+        - lounge_id
+        - guest_count
+        - guests
+      properties:
+        lounge_id:
+          type: string
+          format: uuid
+        guest_count:
+          type: integer
+          minimum: 1
+        scheduled_arrival:
+          type: string
+          format: date-time
+          description: Expected arrival time at lounge
+        guests:
+          type: array
+          items:
+            $ref: "#/components/schemas/LoungeGuestRequest"
+        pre_orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/PreOrderItem"
+
+    LoungeGuestRequest:
+      type: object
+      required:
+        - guest_name
+      properties:
+        guest_name:
+          type: string
+        guest_phone:
+          type: string
+          nullable: true
+
+    PreOrderItem:
+      type: object
+      required:
+        - product_id
+        - quantity
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+        notes:
+          type: string
+          nullable: true
+
+    BookingIntentResponse:
+      type: object
+      properties:
+        intent_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [held, payment_pending, confirming, confirmed, expired, cancelled]
+        expires_at:
+          type: string
+          format: date-time
+          description: Intent expiration time (10 min from creation)
+        pricing:
+          $ref: "#/components/schemas/IntentPricing"
+        bus:
+          $ref: "#/components/schemas/BusIntentSummary"
+        pre_trip_lounge:
+          $ref: "#/components/schemas/LoungeIntentSummary"
+        post_trip_lounge:
+          $ref: "#/components/schemas/LoungeIntentSummary"
+
+    IntentPricing:
+      type: object
+      properties:
+        bus_fare:
+          type: number
+          format: double
+        pre_lounge_fare:
+          type: number
+          format: double
+        post_lounge_fare:
+          type: number
+          format: double
+        total_amount:
+          type: number
+          format: double
+        currency:
+          type: string
+          example: "LKR"
+
+    BusIntentSummary:
+      type: object
+      properties:
+        scheduled_trip_id:
+          type: string
+          format: uuid
+        route_name:
+          type: string
+        departure_datetime:
+          type: string
+          format: date-time
+        boarding_stop:
+          type: string
+        alighting_stop:
+          type: string
+        seat_count:
+          type: integer
+        seats:
+          type: array
+          items:
+            type: object
+            properties:
+              seat_number:
+                type: string
+              seat_type:
+                type: string
+              seat_price:
+                type: number
+                format: double
+
+    LoungeIntentSummary:
+      type: object
+      properties:
+        lounge_id:
+          type: string
+          format: uuid
+        lounge_name:
+          type: string
+        guest_count:
+          type: integer
+        base_price:
+          type: number
+          format: double
+        pre_order_total:
+          type: number
+          format: double
+        total_price:
+          type: number
+          format: double
+
+    GetIntentStatusResponse:
+      type: object
+      properties:
+        intent_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [held, payment_pending, confirming, confirmed, expired, cancelled]
+        expires_at:
+          type: string
+          format: date-time
+        time_remaining_seconds:
+          type: integer
+          description: Seconds until intent expires
+        pricing:
+          $ref: "#/components/schemas/IntentPricing"
+        bus_booking:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            reference:
+              type: string
+        pre_lounge_booking:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            reference:
+              type: string
+        post_lounge_booking:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            reference:
+              type: string
+
+    InitiatePaymentResponse:
+      type: object
+      properties:
+        intent_id:
+          type: string
+          format: uuid
+        payment_reference:
+          type: string
+          description: Unique payment reference (INV-xxx format)
+        payment_gateway:
+          type: string
+          example: "PAYable"
+        payment_url:
+          type: string
+          format: uri
+          description: URL to redirect user for payment
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    ConfirmBookingRequest:
+      type: object
+      required:
+        - intent_id
+        - payment_reference
+      properties:
+        intent_id:
+          type: string
+          format: uuid
+          description: The booking intent to confirm
+        payment_reference:
+          type: string
+          description: Payment reference from gateway
+
+    ConfirmBookingResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Booking confirmed successfully"
+        intent_id:
+          type: string
+          format: uuid
+        master_reference:
+          type: string
+          description: Main booking reference
+        bus_booking:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            reference:
+              type: string
+            qr_code:
+              type: string
+        pre_lounge_booking:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            reference:
+              type: string
+        post_lounge_booking:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            reference:
+              type: string
+
+    BookingIntent:
+      type: object
+      description: Full booking intent record
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        intent_type:
+          type: string
+          enum: [bus_only, lounge_only, bus_with_lounge]
+        status:
+          type: string
+          enum: [held, payment_pending, confirming, confirmed, expired, cancelled]
+        bus_fare:
+          type: number
+          format: double
+        pre_lounge_fare:
+          type: number
+          format: double
+        post_lounge_fare:
+          type: number
+          format: double
+        total_amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        payment_reference:
+          type: string
+          nullable: true
+        payment_status:
+          type: string
+          enum: [pending, processing, success, failed]
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PartialAvailabilityError:
+      type: object
+      description: Returned when some requested items are unavailable
+      properties:
+        error:
+          type: string
+          example: "partial_availability"
+        message:
+          type: string
+          example: "Some items are no longer available"
+        available:
+          type: object
+          properties:
+            bus:
+              type: boolean
+            pre_lounge:
+              type: boolean
+            post_lounge:
+              type: boolean
+        unavailable:
+          type: object
+          properties:
+            bus:
+              type: object
+              nullable: true
+              properties:
+                reason:
+                  type: string
+                  enum: [seats_taken, trip_departed, trip_cancelled]
+                details:
+                  type: string
+                taken_seats:
+                  type: array
+                  items:
+                    type: string
+            pre_lounge:
+              type: object
+              nullable: true
+              properties:
+                reason:
+                  type: string
+                  enum: [capacity_full, lounge_closed]
+                details:
+                  type: string
+            post_lounge:
+              type: object
+              nullable: true
+              properties:
+                reason:
+                  type: string
+                details:
+                  type: string
 
     # ==========================================================================
     # APP BOOKINGS SCHEMAS (Passenger App)

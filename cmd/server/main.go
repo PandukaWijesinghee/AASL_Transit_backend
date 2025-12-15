@@ -305,6 +305,34 @@ func main() {
 	staffBookingHandler := handlers.NewStaffBookingHandler(appBookingRepo)
 	logger.Info("✓ App booking system initialized")
 
+	// ============================================================================
+	// BOOKING ORCHESTRATION SYSTEM (Intent → Payment → Confirm)
+	// ============================================================================
+	logger.Info("🎯 Initializing Booking Orchestration system...")
+	bookingIntentRepo := database.NewBookingIntentRepository(sqlxDB.DB)
+	bookingOrchestratorConfig := services.DefaultOrchestratorConfig()
+	bookingOrchestratorService := services.NewBookingOrchestratorService(
+		bookingIntentRepo,
+		tripSeatRepo,
+		scheduledTripRepo,
+		appBookingRepo,
+		loungeBookingRepo,
+		loungeRepository,
+		busOwnerRouteRepo,
+		bookingOrchestratorConfig,
+		logger,
+	)
+	bookingOrchestratorHandler := handlers.NewBookingOrchestratorHandler(
+		bookingOrchestratorService,
+		logger,
+	)
+	logger.Info("✓ Booking Orchestration system initialized")
+
+	// Start background job for intent expiration
+	intentExpirationService := services.NewIntentExpirationService(bookingIntentRepo, logger)
+	intentExpirationService.Start()
+	defer intentExpirationService.Stop()
+
 	// Initialize Gin router
 	router := gin.New()
 
@@ -764,6 +792,40 @@ func main() {
 			appBookings.GET("/:id/qr", appBookingHandler.GetBookingQR)
 		}
 		logger.Info("📱 App Booking routes registered successfully")
+
+		// ============================================================================
+		// BOOKING ORCHESTRATION ROUTES (Intent → Payment → Confirm)
+		// ============================================================================
+		logger.Info("🎯 Registering Booking Orchestration routes...")
+
+		// Booking Intent routes (protected - requires auth)
+		bookingOrchestration := v1.Group("/booking")
+		bookingOrchestration.Use(middleware.AuthMiddleware(jwtService))
+		{
+			logger.Info("  ✅ POST /api/v1/booking/intent - Create booking intent")
+			bookingOrchestration.POST("/intent", bookingOrchestratorHandler.CreateIntent)
+
+			logger.Info("  ✅ GET /api/v1/booking/intents - Get my intents")
+			bookingOrchestration.GET("/intents", bookingOrchestratorHandler.GetMyIntents)
+
+			logger.Info("  ✅ GET /api/v1/booking/intent/:intent_id - Get intent status")
+			bookingOrchestration.GET("/intent/:intent_id", bookingOrchestratorHandler.GetIntentStatus)
+
+			logger.Info("  ✅ POST /api/v1/booking/intent/:intent_id/initiate-payment - Initiate payment")
+			bookingOrchestration.POST("/intent/:intent_id/initiate-payment", bookingOrchestratorHandler.InitiatePayment)
+
+			logger.Info("  ✅ POST /api/v1/booking/intent/:intent_id/cancel - Cancel intent")
+			bookingOrchestration.POST("/intent/:intent_id/cancel", bookingOrchestratorHandler.CancelIntent)
+
+			logger.Info("  ✅ POST /api/v1/booking/confirm - Confirm booking after payment")
+			bookingOrchestration.POST("/confirm", bookingOrchestratorHandler.ConfirmBooking)
+		}
+
+		// Payment webhook (no auth - called by payment gateway)
+		logger.Info("  ✅ POST /api/v1/payments/webhook - Payment gateway webhook")
+		v1.POST("/payments/webhook", bookingOrchestratorHandler.PaymentWebhook)
+
+		logger.Info("🎯 Booking Orchestration routes registered successfully")
 
 		// ============================================================================
 		// STAFF BOOKING ROUTES (Conductor/Driver operations)
