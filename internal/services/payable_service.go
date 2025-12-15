@@ -67,7 +67,7 @@ type PAYablePaymentRequest struct {
 
 	// Integration info (REQUIRED)
 	IsMobilePayment    int    `json:"isMobilePayment"`
-	IntegrationType    string `json:"integrationType"`    // Max 20 chars
+	IntegrationType    string `json:"integrationType"` // Max 20 chars
 	IntegrationVersion string `json:"integrationVersion"`
 	PackageName        string `json:"packageName"` // REQUIRED for mobile payments
 }
@@ -202,6 +202,12 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 		packageName = "lk.smarttransit.passenger" // Default package name
 	}
 
+	// Set default phone if not provided (required by PAYable)
+	customerPhone := params.CustomerPhone
+	if customerPhone == "" {
+		customerPhone = "0770000000" // Default phone for PAYable
+	}
+
 	// Get endpoint URL
 	endpointURL, ok := PAYableEnvironmentURLs[s.config.Environment]
 	if !ok {
@@ -226,7 +232,7 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 		CustomerFirstName:         firstName,
 		CustomerLastName:          lastName,
 		CustomerEmail:             customerEmail,
-		CustomerMobilePhone:       params.CustomerPhone,
+		CustomerMobilePhone:       customerPhone,
 		BillingAddressStreet:      billingStreet,
 		BillingAddressCity:        billingCity,
 		BillingAddressCountry:     "LK", // Sri Lanka
