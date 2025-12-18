@@ -836,6 +836,10 @@ func main() {
 		logger.Info("  ✅ POST /api/v1/payments/webhook - Payment gateway webhook")
 		v1.POST("/payments/webhook", bookingOrchestratorHandler.PaymentWebhook)
 
+		// Payment return URL (no auth - browser redirect from payment gateway)
+		logger.Info("  ✅ GET /api/v1/payments/return - Payment return page")
+		v1.GET("/payments/return", bookingOrchestratorHandler.PaymentReturn)
+
 		logger.Info("🎯 Booking Orchestration routes registered successfully")
 
 		// ============================================================================

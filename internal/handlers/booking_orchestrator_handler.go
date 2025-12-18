@@ -437,6 +437,59 @@ func (h *BookingOrchestratorHandler) PaymentWebhook(c *gin.Context) {
 }
 
 // ============================================================================
+// PAYMENT RETURN - GET /api/v1/payments/return
+// ============================================================================
+
+// PaymentReturn handles the return URL redirect from PAYable after payment
+// @Summary Payment return handler
+// @Description Called by PAYable to redirect user back after payment completion.
+//
+//	Returns a simple HTML page that tells the WebView payment is complete.
+//
+// @Tags Booking Orchestration
+// @Param uid query string true "Payment UID from PAYable"
+// @Param statusIndicator query string true "Status indicator from PAYable"
+// @Success 200 {string} string "HTML page indicating payment complete"
+// @Router /payments/return [get]
+func (h *BookingOrchestratorHandler) PaymentReturn(c *gin.Context) {
+	uid := c.Query("uid")
+	statusIndicator := c.Query("statusIndicator")
+
+	h.logger.WithFields(logrus.Fields{
+		"uid":              uid,
+		"status_indicator": statusIndicator,
+	}).Info("Payment return page accessed")
+
+	// Return a simple HTML page that the WebView can detect
+	// The Flutter app should intercept this URL before it loads
+	html := `<!DOCTYPE html>
+<html>
+<head>
+    <title>Payment Complete</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
+        .container { background: white; padding: 40px; border-radius: 10px; max-width: 400px; margin: 0 auto; }
+        .success { color: #4CAF50; font-size: 48px; }
+        h1 { color: #333; }
+        p { color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success">✓</div>
+        <h1>Payment Complete</h1>
+        <p>Your payment has been processed successfully.</p>
+        <p>You can close this window and return to the app.</p>
+    </div>
+</body>
+</html>`
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	c.String(http.StatusOK, html)
+}
+
+// ============================================================================
 // GET MY INTENTS - GET /api/v1/booking/intents
 // ============================================================================
 

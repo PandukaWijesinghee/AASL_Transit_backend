@@ -351,13 +351,13 @@ func (s *PAYableService) CheckStatus(uid, statusIndicator string) (*PAYableStatu
 		StatusIndicator: statusIndicator,
 	}
 
-	// Status check endpoint - use same base URL as payment endpoint
+	// Status check endpoint - append /check-status to the base endpoint
+	// e.g., https://sandboxipgpayment.payable.lk/ipg/sandbox/check-status
 	endpointURL, ok := PAYableEnvironmentURLs[s.config.Environment]
 	if !ok {
 		endpointURL = PAYableEnvironmentURLs["sandbox"]
 	}
-	// The check-status endpoint is at the same base URL
-	statusURL := strings.Replace(endpointURL, "/ipg/", "/check-status/", 1)
+	statusURL := endpointURL + "/check-status"
 
 	s.logger.WithFields(logrus.Fields{
 		"uid":         uid,
