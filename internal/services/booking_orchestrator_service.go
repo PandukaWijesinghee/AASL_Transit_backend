@@ -633,7 +633,11 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 	if intent.PreTripLoungeIntent != nil {
 		preLoungeBooking, err := s.createLoungeBookingFromIntent(intent, intent.PreTripLoungeIntent, "pre_trip", busBookingID)
 		if err != nil {
-			s.logger.WithError(err).Error("Failed to create pre-trip lounge booking")
+			s.logger.WithFields(logrus.Fields{
+				"error":     err.Error(),
+				"intent_id": intent.ID,
+				"lounge_id": intent.PreTripLoungeIntent.LoungeID,
+			}).Error("Failed to create pre-trip lounge booking")
 			// Continue - bus booking is created
 		} else {
 			id := preLoungeBooking.ID
@@ -648,7 +652,11 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 	if intent.PostTripLoungeIntent != nil {
 		postLoungeBooking, err := s.createLoungeBookingFromIntent(intent, intent.PostTripLoungeIntent, "post_trip", busBookingID)
 		if err != nil {
-			s.logger.WithError(err).Error("Failed to create post-trip lounge booking")
+			s.logger.WithFields(logrus.Fields{
+				"error":     err.Error(),
+				"intent_id": intent.ID,
+				"lounge_id": intent.PostTripLoungeIntent.LoungeID,
+			}).Error("Failed to create post-trip lounge booking")
 		} else {
 			id := postLoungeBooking.ID
 			postLoungeBookingID = &id
@@ -761,6 +769,7 @@ func (s *BookingOrchestratorService) createLoungeBookingFromIntent(
 		PricePerGuest:    fmt.Sprintf("%.2f", loungeIntent.PricePerGuest),
 		BasePrice:        fmt.Sprintf("%.2f", loungeIntent.BasePrice),
 		PreOrderTotal:    fmt.Sprintf("%.2f", loungeIntent.PreOrderTotal),
+		DiscountAmount:   "0.00", // Default to zero discount
 		TotalAmount:      fmt.Sprintf("%.2f", loungeIntent.TotalPrice),
 		LoungeName:       loungeIntent.LoungeName,
 		PrimaryGuestName: loungeIntent.Guests[0].GuestName,
