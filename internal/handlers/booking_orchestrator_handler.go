@@ -448,7 +448,7 @@ func (h *BookingOrchestratorHandler) PaymentWebhook(c *gin.Context) {
 		}
 
 		// If we got a valid status, we're done
-		if statusResp != nil && statusResp.PaymentStatus != "" {
+		if statusResp != nil && statusResp.GetPaymentStatus() != "" {
 			break
 		}
 
@@ -485,10 +485,11 @@ func (h *BookingOrchestratorHandler) PaymentWebhook(c *gin.Context) {
 
 	// Parse response into audit
 	if statusResp != nil {
-		statusRespAudit.SetPaymentStatus(statusResp.PaymentStatus)
+		statusRespAudit.SetPaymentStatus(statusResp.GetPaymentStatus())
 		statusRespAudit.SetHTTPDetails("POST", "", statusResp.Status)
-		if statusResp.TransactionID != "" {
-			statusRespAudit.GatewayTransactionID = &statusResp.TransactionID
+		txnID := statusResp.GetTransactionID()
+		if txnID != "" {
+			statusRespAudit.GatewayTransactionID = &txnID
 		}
 	}
 	h.logAudit(ctx, statusRespAudit, startTime)
@@ -496,10 +497,10 @@ func (h *BookingOrchestratorHandler) PaymentWebhook(c *gin.Context) {
 	h.logger.WithFields(logrus.Fields{
 		"uid":            uid,
 		"status":         statusResp.Status,
-		"payment_status": statusResp.PaymentStatus,
-		"invoice_id":     statusResp.InvoiceID,
-		"amount":         statusResp.Amount,
-		"transaction_id": statusResp.TransactionID,
+		"payment_status": statusResp.GetPaymentStatus(),
+		"invoice_id":     statusResp.GetInvoiceID(),
+		"amount":         statusResp.GetAmount(),
+		"transaction_id": statusResp.GetTransactionID(),
 		"correlation_id": correlationID,
 	}).Info("PAYable status check response")
 
@@ -533,11 +534,11 @@ func (h *BookingOrchestratorHandler) PaymentWebhook(c *gin.Context) {
 	}
 
 	// Check if payment was successful from PAYable API
-	paymentStatus := strings.ToUpper(statusResp.PaymentStatus)
+	paymentStatus := strings.ToUpper(statusResp.GetPaymentStatus())
 	if paymentStatus != "SUCCESS" {
 		h.logger.WithFields(logrus.Fields{
 			"uid":            uid,
-			"payment_status": statusResp.PaymentStatus,
+			"payment_status": statusResp.GetPaymentStatus(),
 			"correlation_id": correlationID,
 		}).Info("Payment not successful - acknowledging webhook")
 
@@ -554,12 +555,12 @@ func (h *BookingOrchestratorHandler) PaymentWebhook(c *gin.Context) {
 		}
 		failAudit := models.NewPaymentAudit(eventType, models.PaymentSourcePayableAPI)
 		failAudit.SetPaymentUID(uid)
-		failAudit.SetPaymentStatus(statusResp.PaymentStatus)
+		failAudit.SetPaymentStatus(statusResp.GetPaymentStatus())
 		h.logAudit(ctx, failAudit, startTime)
 
 		c.JSON(http.StatusOK, gin.H{
 			"message":        "webhook acknowledged",
-			"status":         statusResp.PaymentStatus,
+			"status":         statusResp.GetPaymentStatus(),
 			"correlation_id": correlationID,
 		})
 		return
@@ -569,7 +570,7 @@ func (h *BookingOrchestratorHandler) PaymentWebhook(c *gin.Context) {
 	if err != nil || intent == nil {
 		h.logger.WithFields(logrus.Fields{
 			"uid":            uid,
-			"invoice_id":     statusResp.InvoiceID,
+			"invoice_id":     statusResp.GetInvoiceID(),
 			"correlation_id": correlationID,
 		}).Warn("Intent not found for webhook - may be duplicate or already processed")
 
@@ -590,19 +591,21 @@ func (h *BookingOrchestratorHandler) PaymentWebhook(c *gin.Context) {
 	// CRITICAL: Verify amount matches what we expect
 	expectedAmount := intent.TotalAmount
 	var receivedAmount float64
-	if statusResp.Amount != "" {
-		receivedAmount, _ = strconv.ParseFloat(statusResp.Amount, 64)
+	receivedAmountStr := statusResp.GetAmount()
+	if receivedAmountStr != "" {
+		receivedAmount, _ = strconv.ParseFloat(receivedAmountStr, 64)
 	}
 
 	// Create success audit BEFORE confirming
 	successAudit := models.NewPaymentAudit(models.PaymentEventSuccess, models.PaymentSourcePayableAPI)
 	successAudit.SetPaymentUID(uid)
 	successAudit.SetIntent(intent.ID)
-	successAudit.SetPaymentReference(statusResp.InvoiceID)
-	successAudit.SetPaymentStatus(statusResp.PaymentStatus)
+	successAudit.SetPaymentReference(statusResp.GetInvoiceID())
+	successAudit.SetPaymentStatus(statusResp.GetPaymentStatus())
 	successAudit.SetIdempotencyKey(fmt.Sprintf("%s-success", uid))
-	if statusResp.TransactionID != "" {
-		successAudit.GatewayTransactionID = &statusResp.TransactionID
+	txnIDForSuccess := statusResp.GetTransactionID()
+	if txnIDForSuccess != "" {
+		successAudit.GatewayTransactionID = &txnIDForSuccess
 	}
 
 	// Verify amounts match

@@ -94,9 +94,11 @@ type PAYableStatusRequest struct {
 }
 
 // PAYableStatusResponse represents the response from status check
-// NOTE: PAYable returns "status" as HTTP status code integer (e.g., 200), and "paymentStatus" as string
+// NOTE: PAYable returns data nested inside a "data" object with different field names
 type PAYableStatusResponse struct {
-	Status          int    `json:"status"`                    // HTTP-like status code (200 = success, etc.)
+	Status int                    `json:"status"` // HTTP-like status code (200 = success, etc.)
+	Data   *PAYableStatusData     `json:"data"`   // Nested data object with payment details
+	// Legacy fields for backward compatibility (may be empty if data is populated)
 	PaymentStatus   string `json:"paymentStatus"`             // "PENDING", "SUCCESS", "FAILED", "CANCELLED"
 	Amount          string `json:"amount"`                    // Amount as string e.g., "1200.00"
 	InvoiceID       string `json:"invoiceId"`                 // Invoice ID
@@ -107,6 +109,75 @@ type PAYableStatusResponse struct {
 	CurrencyCode    string `json:"currencyCode,omitempty"`    // Currency code
 	CardType        string `json:"cardType,omitempty"`        // VISA, MASTERCARD, etc.
 	CardLastFour    string `json:"cardLastFour,omitempty"`    // Last 4 digits of card
+}
+
+// PAYableStatusData represents the nested data object in PAYable status response
+type PAYableStatusData struct {
+	MerchantKey           string `json:"merchantKey"`
+	StatusCode            int    `json:"statusCode"`
+	PayableTransactionID  string `json:"payableTransactionId"`
+	PaymentMethod         int    `json:"paymentMethod"`
+	PayableOrderID        string `json:"payableOrderId"`
+	InvoiceNo             string `json:"invoiceNo"`
+	PayableAmount         string `json:"payableAmount"`
+	PayableCurrency       string `json:"payableCurrency"`
+	StatusMessage         string `json:"statusMessage"` // "SUCCESS", "FAILED", etc.
+	PaymentType           int    `json:"paymentType"`
+	PaymentScheme         string `json:"paymentScheme"` // "VISA", "MASTERCARD", etc.
+	CardHolderName        string `json:"cardHolderName"`
+	CardNumber            string `json:"cardNumber"` // Masked card number
+	PaymentID             string `json:"paymentId"`  // Same as UID
+	Custom1               string `json:"custom1"`
+	Custom2               string `json:"custom2"`
+	CheckValue            string `json:"checkValue"`
+}
+
+// GetPaymentStatus returns the payment status, checking nested data first
+func (r *PAYableStatusResponse) GetPaymentStatus() string {
+	if r.Data != nil && r.Data.StatusMessage != "" {
+		return r.Data.StatusMessage
+	}
+	return r.PaymentStatus
+}
+
+// GetAmount returns the amount, checking nested data first
+func (r *PAYableStatusResponse) GetAmount() string {
+	if r.Data != nil && r.Data.PayableAmount != "" {
+		return r.Data.PayableAmount
+	}
+	return r.Amount
+}
+
+// GetInvoiceID returns the invoice ID, checking nested data first
+func (r *PAYableStatusResponse) GetInvoiceID() string {
+	if r.Data != nil && r.Data.InvoiceNo != "" {
+		return r.Data.InvoiceNo
+	}
+	return r.InvoiceID
+}
+
+// GetTransactionID returns the transaction ID, checking nested data first
+func (r *PAYableStatusResponse) GetTransactionID() string {
+	if r.Data != nil && r.Data.PayableTransactionID != "" {
+		return r.Data.PayableTransactionID
+	}
+	return r.TransactionID
+}
+
+// GetCurrency returns the currency, checking nested data first
+func (r *PAYableStatusResponse) GetCurrency() string {
+	if r.Data != nil && r.Data.PayableCurrency != "" {
+		return r.Data.PayableCurrency
+	}
+	return r.CurrencyCode
+}
+
+// GetCardType returns the card type/scheme, checking nested data first
+func (r *PAYableStatusResponse) GetCardType() string {
+	if r.Data != nil && r.Data.PaymentScheme != "" {
+		return r.Data.PaymentScheme
+	}
+	return r.CardType
 }
 
 // PAYableWebhookPayload represents the webhook payload from PAYable
@@ -418,9 +489,9 @@ func (s *PAYableService) CheckStatusWithRawResponse(uid, statusIndicator string)
 	s.logger.WithFields(logrus.Fields{
 		"uid":            uid,
 		"status":         statusResp.Status,
-		"payment_status": statusResp.PaymentStatus,
-		"amount":         statusResp.Amount,
-		"transaction_id": statusResp.TransactionID,
+		"payment_status": statusResp.GetPaymentStatus(),
+		"amount":         statusResp.GetAmount(),
+		"transaction_id": statusResp.GetTransactionID(),
 	}).Info("PAYable CheckStatus parsed successfully")
 
 	return &statusResp, rawBody, nil
