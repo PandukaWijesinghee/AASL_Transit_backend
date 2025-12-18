@@ -30,10 +30,11 @@ type PAYableService struct {
 }
 
 // PAYablePaymentRequest represents the request sent to PAYable IPG
-// NOTE: merchantToken is NOT sent to PAYable - only used to generate checkValue
+// Both merchantKey and merchantToken are sent as per official SDK
 type PAYablePaymentRequest struct {
-	// Merchant credentials (merchantToken is NOT sent - only checkValue)
-	MerchantKey string `json:"merchantKey"`
+	// Merchant credentials
+	MerchantKey   string `json:"merchantKey"`
+	MerchantToken string `json:"merchantToken"`
 
 	// URLs
 	LogoURL         string `json:"logoUrl,omitempty"`
@@ -217,9 +218,10 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 	// Build status return URL
 	statusReturnURL := fmt.Sprintf("%s/status-view", endpointURL)
 
-	// Build request - NOTE: merchantToken is NOT included
+	// Build request - include both merchantKey and merchantToken as per official SDK
 	request := &PAYablePaymentRequest{
 		MerchantKey:               s.config.MerchantKey,
+		MerchantToken:             s.config.MerchantToken,
 		LogoURL:                   s.config.LogoURL,
 		ReturnURL:                 s.config.ReturnURL,
 		WebhookURL:                s.config.WebhookURL,
@@ -332,8 +334,19 @@ func (s *PAYableService) CheckStatus(uid, statusIndicator string) (*PAYableStatu
 		StatusIndicator: statusIndicator,
 	}
 
-	// Status check endpoint
-	statusURL := "https://endpoint.payable.lk/check-status"
+	// Status check endpoint - use same base URL as payment endpoint
+	endpointURL, ok := PAYableEnvironmentURLs[s.config.Environment]
+	if !ok {
+		endpointURL = PAYableEnvironmentURLs["sandbox"]
+	}
+	// The check-status endpoint is at the same base URL
+	statusURL := strings.Replace(endpointURL, "/ipg/", "/check-status/", 1)
+
+	s.logger.WithFields(logrus.Fields{
+		"uid":         uid,
+		"status_url":  statusURL,
+		"environment": s.config.Environment,
+	}).Info("Checking PAYable payment status")
 
 	jsonBody, err := json.Marshal(request)
 	if err != nil {
