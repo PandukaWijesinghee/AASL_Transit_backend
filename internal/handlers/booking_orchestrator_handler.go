@@ -1,13 +1,17 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"github.com/smarttransit/sms-auth-backend/internal/database"
 	"github.com/smarttransit/sms-auth-backend/internal/middleware"
 	"github.com/smarttransit/sms-auth-backend/internal/models"
 	"github.com/smarttransit/sms-auth-backend/internal/services"
@@ -17,6 +21,7 @@ import (
 type BookingOrchestratorHandler struct {
 	orchestratorService *services.BookingOrchestratorService
 	payableService      *services.PAYableService
+	paymentAuditRepo    *database.PaymentAuditRepository
 	logger              *logrus.Logger
 }
 
@@ -24,11 +29,13 @@ type BookingOrchestratorHandler struct {
 func NewBookingOrchestratorHandler(
 	orchestratorService *services.BookingOrchestratorService,
 	payableService *services.PAYableService,
+	paymentAuditRepo *database.PaymentAuditRepository,
 	logger *logrus.Logger,
 ) *BookingOrchestratorHandler {
 	return &BookingOrchestratorHandler{
 		orchestratorService: orchestratorService,
 		payableService:      payableService,
+		paymentAuditRepo:    paymentAuditRepo,
 		logger:              logger,
 	}
 }
@@ -320,11 +327,20 @@ func (h *BookingOrchestratorHandler) CancelIntent(c *gin.Context) {
 
 // ============================================================================
 // PAYMENT WEBHOOK - POST /api/v1/payments/webhook
+// Industry-standard implementation with:
+// - Audit logging of ALL events
+// - Idempotency (duplicate detection)
+// - Amount verification
+// - Proper error handling without silent failures
 // ============================================================================
 
 // PaymentWebhook handles payment gateway webhook callbacks
 // @Summary Payment webhook callback
-// @Description Called by payment gateway (PAYable) to notify of payment status
+// @Description Called by payment gateway (PAYable) to notify of payment status.
+//
+//	This endpoint verifies payment with the gateway, validates amounts,
+//	and confirms bookings with full audit trail.
+//
 // @Tags Booking Orchestration
 // @Accept json
 // @Produce json
@@ -334,106 +350,312 @@ func (h *BookingOrchestratorHandler) CancelIntent(c *gin.Context) {
 // @Failure 400 {object} map[string]interface{} "Invalid webhook"
 // @Router /payments/webhook [post]
 func (h *BookingOrchestratorHandler) PaymentWebhook(c *gin.Context) {
-	// PAYable sends uid and statusIndicator as query parameters
+	ctx := context.Background()
+	startTime := time.Now()
+
+	// Extract request metadata
 	uid := c.Query("uid")
 	statusIndicator := c.Query("statusIndicator")
+	clientIP := c.ClientIP()
+	userAgent := c.GetHeader("User-Agent")
+	correlationID := c.GetHeader("X-Correlation-ID")
+	if correlationID == "" {
+		correlationID = uuid.New().String()
+	}
+
+	// Create audit entry for webhook receipt
+	webhookAudit := models.NewPaymentAudit(models.PaymentEventWebhookReceived, models.PaymentSourcePayableWebhook)
+	webhookAudit.SetPaymentUID(uid)
+	webhookAudit.SetMetadata(clientIP, userAgent, correlationID)
+	webhookAudit.SetIdempotencyKey(fmt.Sprintf("%s-webhook", uid))
 
 	h.logger.WithFields(logrus.Fields{
 		"uid":              uid,
 		"status_indicator": statusIndicator,
-	}).Info("PAYable webhook received - checking status")
+		"correlation_id":   correlationID,
+	}).Info("PAYable webhook received")
 
 	// Validate query params
 	if uid == "" || statusIndicator == "" {
 		h.logger.Warn("Webhook missing uid or statusIndicator query params")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing uid or statusIndicator"})
+		webhookAudit.SetError("missing uid or statusIndicator", nil)
+		h.logAudit(ctx, webhookAudit, startTime)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":          "missing uid or statusIndicator",
+			"correlation_id": correlationID,
+		})
 		return
 	}
+
+	// Check for duplicate webhook (idempotency)
+	if h.paymentAuditRepo != nil {
+		isDuplicate, err := h.paymentAuditRepo.CheckDuplicate(ctx, uid, models.PaymentEventSuccess, fmt.Sprintf("%s-success", uid))
+		if err != nil {
+			h.logger.WithError(err).Warn("Failed to check for duplicate webhook")
+		} else if isDuplicate {
+			h.logger.WithFields(logrus.Fields{
+				"uid":            uid,
+				"correlation_id": correlationID,
+			}).Info("Duplicate webhook detected - already processed successfully")
+			webhookAudit.MarkAsDuplicate()
+			h.logAudit(ctx, webhookAudit, startTime)
+			c.JSON(http.StatusOK, gin.H{
+				"message":        "webhook already processed",
+				"duplicate":      true,
+				"correlation_id": correlationID,
+			})
+			return
+		}
+	}
+
+	// Log the webhook receipt
+	h.logAudit(ctx, webhookAudit, startTime)
 
 	// Verify PAYable service is configured
 	if h.payableService == nil {
 		h.logger.Error("PAYable service not configured")
-		c.JSON(http.StatusOK, gin.H{"error": "payment service not configured", "acknowledged": true})
+		errorAudit := models.NewPaymentAudit(models.PaymentEventError, models.PaymentSourceBackend)
+		errorAudit.SetPaymentUID(uid)
+		errorAudit.SetError("payment service not configured", nil)
+		h.logAudit(ctx, errorAudit, startTime)
+		c.JSON(http.StatusOK, gin.H{
+			"error":          "payment service not configured",
+			"acknowledged":   true,
+			"correlation_id": correlationID,
+		})
 		return
 	}
 
 	// Call PAYable CheckStatus API to get actual payment result
-	statusResp, err := h.payableService.CheckStatus(uid, statusIndicator)
+	statusCheckAudit := models.NewPaymentAudit(models.PaymentEventStatusCheckRequest, models.PaymentSourceBackend)
+	statusCheckAudit.SetPaymentUID(uid)
+	statusCheckAudit.SetRequestPayload(map[string]interface{}{
+		"uid":             uid,
+		"statusIndicator": statusIndicator,
+	})
+	h.logAudit(ctx, statusCheckAudit, startTime)
+
+	statusResp, rawBody, err := h.payableService.CheckStatusWithRawResponse(uid, statusIndicator)
+
+	// Log the status check response (even if it fails)
+	statusRespAudit := models.NewPaymentAudit(models.PaymentEventStatusCheckResponse, models.PaymentSourcePayableAPI)
+	statusRespAudit.SetPaymentUID(uid)
+	if rawBody != "" {
+		statusRespAudit.SetRawBody(rawBody)
+	}
+
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to check payment status from PAYable")
-		c.JSON(http.StatusOK, gin.H{"error": "failed to verify payment status", "acknowledged": true})
+		statusRespAudit.SetError(err.Error(), nil)
+		h.logAudit(ctx, statusRespAudit, startTime)
+		c.JSON(http.StatusOK, gin.H{
+			"error":          "failed to verify payment status",
+			"acknowledged":   true,
+			"correlation_id": correlationID,
+		})
 		return
 	}
 
+	// Parse response into audit
+	if statusResp != nil {
+		statusRespAudit.SetPaymentStatus(statusResp.PaymentStatus)
+		statusRespAudit.SetHTTPDetails("POST", "", statusResp.Status)
+		if statusResp.TransactionID != "" {
+			statusRespAudit.GatewayTransactionID = &statusResp.TransactionID
+		}
+	}
+	h.logAudit(ctx, statusRespAudit, startTime)
+
 	h.logger.WithFields(logrus.Fields{
 		"uid":            uid,
+		"status":         statusResp.Status,
 		"payment_status": statusResp.PaymentStatus,
 		"invoice_id":     statusResp.InvoiceID,
 		"amount":         statusResp.Amount,
 		"transaction_id": statusResp.TransactionID,
+		"correlation_id": correlationID,
 	}).Info("PAYable status check response")
 
 	// Check if payment was successful
-	if strings.ToUpper(statusResp.PaymentStatus) != "SUCCESS" {
+	paymentStatus := strings.ToUpper(statusResp.PaymentStatus)
+	if paymentStatus != "SUCCESS" {
 		h.logger.WithFields(logrus.Fields{
 			"uid":            uid,
 			"payment_status": statusResp.PaymentStatus,
+			"correlation_id": correlationID,
 		}).Info("Payment not successful - acknowledging webhook")
+
+		// Log the failed/pending payment
+		var eventType models.PaymentEventType
+		switch paymentStatus {
+		case "FAILED":
+			eventType = models.PaymentEventFailed
+		case "CANCELLED":
+			eventType = models.PaymentEventCancelled
+		default:
+			// Still pending or unknown
+			eventType = models.PaymentEventError
+		}
+		failAudit := models.NewPaymentAudit(eventType, models.PaymentSourcePayableAPI)
+		failAudit.SetPaymentUID(uid)
+		failAudit.SetPaymentStatus(statusResp.PaymentStatus)
+		h.logAudit(ctx, failAudit, startTime)
+
 		c.JSON(http.StatusOK, gin.H{
-			"message": "webhook acknowledged",
-			"status":  statusResp.PaymentStatus,
+			"message":        "webhook acknowledged",
+			"status":         statusResp.PaymentStatus,
+			"correlation_id": correlationID,
 		})
 		return
 	}
 
-	// Payment successful - confirm the booking
-	// Look up intent by payment UID
+	// Payment successful - Look up intent by payment UID
 	intent, err := h.orchestratorService.GetIntentByPaymentUID(uid)
 	if err != nil || intent == nil {
 		h.logger.WithFields(logrus.Fields{
-			"uid":        uid,
-			"invoice_id": statusResp.InvoiceID,
-		}).Warn("Intent not found for webhook - may be duplicate or stale")
+			"uid":            uid,
+			"invoice_id":     statusResp.InvoiceID,
+			"correlation_id": correlationID,
+		}).Warn("Intent not found for webhook - may be duplicate or already processed")
+
+		// Log this as a potential issue
+		notFoundAudit := models.NewPaymentAudit(models.PaymentEventError, models.PaymentSourceBackend)
+		notFoundAudit.SetPaymentUID(uid)
+		notFoundAudit.SetError("intent not found - may be duplicate or already processed", nil)
+		h.logAudit(ctx, notFoundAudit, startTime)
+
 		c.JSON(http.StatusOK, gin.H{
-			"message": "webhook acknowledged",
-			"note":    "intent not found",
+			"message":        "webhook acknowledged",
+			"note":           "intent not found or already processed",
+			"correlation_id": correlationID,
 		})
 		return
 	}
+
+	// CRITICAL: Verify amount matches what we expect
+	expectedAmount := intent.TotalAmount
+	var receivedAmount float64
+	if statusResp.Amount != "" {
+		receivedAmount, _ = strconv.ParseFloat(statusResp.Amount, 64)
+	}
+
+	// Create success audit BEFORE confirming
+	successAudit := models.NewPaymentAudit(models.PaymentEventSuccess, models.PaymentSourcePayableAPI)
+	successAudit.SetPaymentUID(uid)
+	successAudit.SetIntent(intent.ID)
+	successAudit.SetPaymentReference(statusResp.InvoiceID)
+	successAudit.SetPaymentStatus(statusResp.PaymentStatus)
+	successAudit.SetIdempotencyKey(fmt.Sprintf("%s-success", uid))
+	if statusResp.TransactionID != "" {
+		successAudit.GatewayTransactionID = &statusResp.TransactionID
+	}
+
+	// Verify amounts match
+	amountsMatch := successAudit.SetAmounts(expectedAmount, receivedAmount, intent.Currency)
+	if !amountsMatch {
+		// CRITICAL: Amount mismatch - DO NOT confirm booking
+		h.logger.WithFields(logrus.Fields{
+			"uid":             uid,
+			"expected_amount": expectedAmount,
+			"received_amount": receivedAmount,
+			"intent_id":       intent.ID,
+			"correlation_id":  correlationID,
+		}).Error("CRITICAL: Amount mismatch in payment - BLOCKING confirmation")
+
+		successAudit.EventType = models.PaymentEventError
+		successAudit.SetError(
+			fmt.Sprintf("amount mismatch: expected %.2f, received %.2f", expectedAmount, receivedAmount),
+			nil,
+		)
+		h.logAudit(ctx, successAudit, startTime)
+
+		c.JSON(http.StatusOK, gin.H{
+			"error":           "amount verification failed",
+			"acknowledged":    true,
+			"requires_review": true,
+			"correlation_id":  correlationID,
+		})
+		return
+	}
+
+	h.logAudit(ctx, successAudit, startTime)
 
 	// Confirm the booking
 	h.logger.WithFields(logrus.Fields{
 		"intent_id":      intent.ID,
 		"uid":            uid,
+		"amount":         receivedAmount,
 		"transaction_id": statusResp.TransactionID,
-	}).Info("Confirming booking from webhook")
+		"correlation_id": correlationID,
+	}).Info("Confirming booking from webhook - amount verified")
 
-	_, err = h.orchestratorService.ConfirmBooking(
+	bookingResult, err := h.orchestratorService.ConfirmBooking(
 		intent.ID,
 		intent.UserID,
 		&statusResp.TransactionID,
 	)
+
 	if err != nil {
-		h.logger.WithError(err).Error("Failed to confirm booking from webhook")
-		// Still acknowledge the webhook to prevent retries
-		// The user can manually confirm or retry
+		h.logger.WithError(err).WithFields(logrus.Fields{
+			"intent_id":      intent.ID,
+			"uid":            uid,
+			"correlation_id": correlationID,
+		}).Error("CRITICAL: Failed to confirm booking from webhook - payment received but booking failed")
+
+		// Log the confirmation failure - THIS NEEDS MANUAL INTERVENTION
+		failAudit := models.NewPaymentAudit(models.PaymentEventBookingConfirmFailed, models.PaymentSourceBackend)
+		failAudit.SetPaymentUID(uid)
+		failAudit.SetIntent(intent.ID)
+		failAudit.SetError(err.Error(), nil)
+		failAudit.SetAmounts(expectedAmount, receivedAmount, intent.Currency)
+		h.logAudit(ctx, failAudit, startTime)
+
 		c.JSON(http.StatusOK, gin.H{
-			"message": "webhook acknowledged",
-			"error":   "confirmation failed",
+			"message":         "webhook acknowledged",
+			"error":           "booking confirmation failed",
+			"requires_refund": true,
+			"correlation_id":  correlationID,
 		})
 		return
 	}
+
+	// Log successful confirmation
+	confirmAudit := models.NewPaymentAudit(models.PaymentEventBookingConfirmed, models.PaymentSourceBackend)
+	confirmAudit.SetPaymentUID(uid)
+	confirmAudit.SetIntent(intent.ID)
+	confirmAudit.SetPaymentStatus("confirmed")
+	confirmAudit.SetAmounts(expectedAmount, receivedAmount, intent.Currency)
+	h.logAudit(ctx, confirmAudit, startTime)
 
 	h.logger.WithFields(logrus.Fields{
 		"intent_id":      intent.ID,
 		"uid":            uid,
 		"transaction_id": statusResp.TransactionID,
-	}).Info("Booking confirmed via webhook")
+		"correlation_id": correlationID,
+	}).Info("Booking confirmed via webhook successfully")
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "webhook processed successfully",
-		"status":  "confirmed",
+		"message":           "webhook processed successfully",
+		"status":            "confirmed",
+		"booking_reference": bookingResult.MasterReference,
+		"correlation_id":    correlationID,
 	})
+}
+
+// logAudit is a helper to log audit entries without blocking
+func (h *BookingOrchestratorHandler) logAudit(ctx context.Context, audit *models.PaymentAudit, startTime time.Time) {
+	if h.paymentAuditRepo == nil {
+		h.logger.Warn("Payment audit repository not configured - audit NOT logged")
+		return
+	}
+
+	audit.SetProcessingTime(startTime)
+	if err := h.paymentAuditRepo.Log(ctx, audit); err != nil {
+		h.logger.WithError(err).WithFields(logrus.Fields{
+			"event_type":  audit.EventType,
+			"payment_uid": audit.PaymentUID,
+		}).Error("CRITICAL: Failed to log payment audit")
+	}
 }
 
 // ============================================================================

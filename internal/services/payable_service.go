@@ -94,13 +94,19 @@ type PAYableStatusRequest struct {
 }
 
 // PAYableStatusResponse represents the response from status check
+// NOTE: PAYable returns "status" as HTTP status code integer (e.g., 200), and "paymentStatus" as string
 type PAYableStatusResponse struct {
-	Status        string `json:"status"`
-	PaymentStatus string `json:"paymentStatus"` // "pending", "success", "failed", "cancelled"
-	Amount        string `json:"amount"`
-	InvoiceID     string `json:"invoiceId"`
-	TransactionID string `json:"transactionId,omitempty"`
-	Message       string `json:"message,omitempty"`
+	Status          int    `json:"status"`                    // HTTP-like status code (200 = success, etc.)
+	PaymentStatus   string `json:"paymentStatus"`             // "PENDING", "SUCCESS", "FAILED", "CANCELLED"
+	Amount          string `json:"amount"`                    // Amount as string e.g., "1200.00"
+	InvoiceID       string `json:"invoiceId"`                 // Invoice ID
+	UID             string `json:"uid"`                       // Payment UID
+	StatusIndicator string `json:"statusIndicator,omitempty"` // Status indicator
+	TransactionID   string `json:"transactionId,omitempty"`   // Transaction ID from gateway
+	Message         string `json:"message,omitempty"`         // Error or info message
+	CurrencyCode    string `json:"currencyCode,omitempty"`    // Currency code
+	CardType        string `json:"cardType,omitempty"`        // VISA, MASTERCARD, etc.
+	CardLastFour    string `json:"cardLastFour,omitempty"`    // Last 4 digits of card
 }
 
 // PAYableWebhookPayload represents the webhook payload from PAYable
@@ -344,8 +350,16 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 	return &paymentResp, nil
 }
 
-// CheckStatus queries the current status of a payment
+// CheckStatus queries the current status of a payment (backward compatible)
 func (s *PAYableService) CheckStatus(uid, statusIndicator string) (*PAYableStatusResponse, error) {
+	resp, _, err := s.CheckStatusWithRawResponse(uid, statusIndicator)
+	return resp, err
+}
+
+// CheckStatusWithRawResponse queries the current status of a payment
+// Returns both the parsed response AND the raw response body for audit logging
+// This is the preferred method for webhook handling to ensure full audit trail
+func (s *PAYableService) CheckStatusWithRawResponse(uid, statusIndicator string) (*PAYableStatusResponse, string, error) {
 	request := &PAYableStatusRequest{
 		UID:             uid,
 		StatusIndicator: statusIndicator,
@@ -367,26 +381,49 @@ func (s *PAYableService) CheckStatus(uid, statusIndicator string) (*PAYableStatu
 
 	jsonBody, err := json.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	resp, err := s.client.Post(statusURL, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return nil, fmt.Errorf("failed to check status: %w", err)
+		return nil, "", fmt.Errorf("failed to check status: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return nil, "", fmt.Errorf("failed to read response: %w", err)
 	}
+
+	rawBody := string(body)
+
+	// Log the raw response for debugging
+	s.logger.WithFields(logrus.Fields{
+		"uid":            uid,
+		"http_status":    resp.StatusCode,
+		"response_body":  rawBody,
+		"content_length": len(body),
+	}).Info("PAYable CheckStatus raw response")
 
 	var statusResp PAYableStatusResponse
 	if err := json.Unmarshal(body, &statusResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+		s.logger.WithFields(logrus.Fields{
+			"uid":           uid,
+			"error":         err.Error(),
+			"response_body": rawBody,
+		}).Error("Failed to unmarshal PAYable CheckStatus response")
+		return nil, rawBody, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	return &statusResp, nil
+	s.logger.WithFields(logrus.Fields{
+		"uid":            uid,
+		"status":         statusResp.Status,
+		"payment_status": statusResp.PaymentStatus,
+		"amount":         statusResp.Amount,
+		"transaction_id": statusResp.TransactionID,
+	}).Info("PAYable CheckStatus parsed successfully")
+
+	return &statusResp, rawBody, nil
 }
 
 // VerifyWebhook validates and parses a webhook payload from PAYable

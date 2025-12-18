@@ -320,6 +320,10 @@ func main() {
 		logger.Warn("⚠️ PAYable payment gateway not configured - using placeholder mode")
 	}
 
+	// Initialize payment audit repository for logging all payment events
+	paymentAuditRepo := database.NewPaymentAuditRepository(sqlxDB.DB, logger)
+	logger.Info("✓ Payment audit repository initialized")
+
 	bookingOrchestratorService := services.NewBookingOrchestratorService(
 		bookingIntentRepo,
 		tripSeatRepo,
@@ -335,6 +339,7 @@ func main() {
 	bookingOrchestratorHandler := handlers.NewBookingOrchestratorHandler(
 		bookingOrchestratorService,
 		payableService,
+		paymentAuditRepo,
 		logger,
 	)
 	logger.Info("✓ Booking Orchestration system initialized")

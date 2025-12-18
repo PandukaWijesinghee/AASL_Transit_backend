@@ -7825,28 +7825,38 @@ paths:
 
   /api/v1/payments/webhook:
     post:
-      summary: PAYable payment gateway webhook
+      summary: PAYable payment gateway webhook (with audit trail)
       description: |
         Called by PAYable IPG to notify of payment status.
         
         PAYable sends the uid and statusIndicator as query parameters.
         The backend then calls PAYable's CheckStatus API to verify the payment result.
         
+        **Industry-Standard Features:**
+        - Full audit trail logged to `payment_audits` table
+        - Idempotency (duplicate webhooks are detected and ignored)
+        - Amount verification (expected vs received)
+        - Correlation ID for request tracing
+        
         **Flow:**
         1. PAYable calls this endpoint with uid and statusIndicator query params
-        2. Backend calls PAYable CheckStatus API to get payment result
-        3. If payment successful, booking is auto-confirmed
+        2. Backend logs webhook receipt to audit table
+        3. Backend calls PAYable CheckStatus API to get payment result
+        4. Amount verification: expected amount must match received amount
+        5. If payment successful AND amounts match, booking is auto-confirmed
+        6. All events logged to payment_audits for compliance/debugging
         
         **Security:**
         - No JWT authentication (public endpoint)
         - Payment verification done via PAYable CheckStatus API
+        - Amount mismatch blocks booking confirmation
         
-        **Auto-Confirmation:**
-        When payment is SUCCESS, the system automatically:
-        1. Finds the booking intent by payment_uid
-        2. Updates payment status to 'success'
-        3. Creates confirmed bookings
-        4. Releases held seats
+        **Audit Events Logged:**
+        - `webhook_received` - Initial webhook receipt
+        - `status_check_request` - Request to PAYable CheckStatus API
+        - `status_check_response` - Response from PAYable (raw body stored)
+        - `payment_success` / `payment_failed` - Payment outcome
+        - `booking_confirmed` / `booking_confirmation_failed` - Booking result
       operationId: paymentWebhook
       tags:
         - Booking Orchestration
@@ -7866,9 +7876,15 @@ paths:
             type: string
           description: PAYable status indicator token for CheckStatus API
           example: "iDDZpzyKgs"
+        - name: X-Correlation-ID
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Optional correlation ID for distributed tracing (auto-generated if not provided)
       responses:
         "200":
-          description: Webhook processed successfully
+          description: Webhook processed (check response body for outcome)
           content:
             application/json:
               schema:
@@ -7881,6 +7897,26 @@ paths:
                     type: string
                     enum: [acknowledged, confirmed, payment_failed]
                     example: "confirmed"
+                  correlation_id:
+                    type: string
+                    description: Unique ID for tracing this request through audit logs
+                    example: "550e8400-e29b-41d4-a716-446655440000"
+                  booking_reference:
+                    type: string
+                    description: Master booking reference (only if status=confirmed)
+                    example: "BK-20251218-ABC123"
+                  duplicate:
+                    type: boolean
+                    description: True if this webhook was already processed
+                    example: false
+                  requires_review:
+                    type: boolean
+                    description: True if amount mismatch detected (needs manual review)
+                    example: false
+                  requires_refund:
+                    type: boolean
+                    description: True if payment succeeded but booking failed
+                    example: false
         "400":
           description: Missing uid or statusIndicator query parameters
           content:
@@ -7890,7 +7926,9 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: "invalid signature"
+                    example: "missing uid or statusIndicator"
+                  correlation_id:
+                    type: string
 
   /api/v1/payments/return:
     get:
