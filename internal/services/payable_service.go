@@ -30,11 +30,10 @@ type PAYableService struct {
 }
 
 // PAYablePaymentRequest represents the request sent to PAYable IPG
-// Both merchantKey and merchantToken are sent as per official SDK
+// NOTE: merchantToken is NOT sent - PAYable rejects it. Only used for checkValue calculation.
 type PAYablePaymentRequest struct {
-	// Merchant credentials
-	MerchantKey   string `json:"merchantKey"`
-	MerchantToken string `json:"merchantToken"`
+	// Merchant credentials (only merchantKey is sent, token used for checkValue)
+	MerchantKey string `json:"merchantKey"`
 
 	// URLs
 	LogoURL         string `json:"logoUrl,omitempty"`
@@ -218,10 +217,10 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 	// Build status return URL
 	statusReturnURL := fmt.Sprintf("%s/status-view", endpointURL)
 
-	// Build request - include both merchantKey and merchantToken as per official SDK
+	// Build request - NOTE: merchantToken is NOT sent (PAYable rejects it)
+	// merchantToken is only used for checkValue calculation
 	request := &PAYablePaymentRequest{
 		MerchantKey:               s.config.MerchantKey,
-		MerchantToken:             s.config.MerchantToken,
 		LogoURL:                   s.config.LogoURL,
 		ReturnURL:                 s.config.ReturnURL,
 		WebhookURL:                s.config.WebhookURL,
