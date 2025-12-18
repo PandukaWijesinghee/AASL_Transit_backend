@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -327,61 +328,71 @@ func (h *BookingOrchestratorHandler) CancelIntent(c *gin.Context) {
 // @Tags Booking Orchestration
 // @Accept json
 // @Produce json
-// @Param request body map[string]interface{} true "Webhook payload from gateway"
+// @Param uid query string true "Payment UID from PAYable"
+// @Param statusIndicator query string true "Status indicator from PAYable"
 // @Success 200 {object} map[string]interface{} "Webhook processed"
 // @Failure 400 {object} map[string]interface{} "Invalid webhook"
 // @Router /payments/webhook [post]
 func (h *BookingOrchestratorHandler) PaymentWebhook(c *gin.Context) {
-	// Read raw body for verification
-	bodyBytes, err := c.GetRawData()
-	if err != nil {
-		h.logger.WithError(err).Error("Failed to read webhook body")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read request body"})
+	// PAYable sends uid and statusIndicator as query parameters
+	uid := c.Query("uid")
+	statusIndicator := c.Query("statusIndicator")
+
+	h.logger.WithFields(logrus.Fields{
+		"uid":              uid,
+		"status_indicator": statusIndicator,
+	}).Info("PAYable webhook received - checking status")
+
+	// Validate query params
+	if uid == "" || statusIndicator == "" {
+		h.logger.Warn("Webhook missing uid or statusIndicator query params")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing uid or statusIndicator"})
 		return
 	}
 
-	// Verify and parse the webhook using PAYable service
+	// Verify PAYable service is configured
 	if h.payableService == nil {
-		h.logger.Warn("PAYable service not configured - accepting webhook without verification")
+		h.logger.Error("PAYable service not configured")
+		c.JSON(http.StatusOK, gin.H{"error": "payment service not configured", "acknowledged": true})
+		return
 	}
 
-	// Parse the webhook payload
-	payload, err := h.payableService.VerifyWebhook(bodyBytes)
+	// Call PAYable CheckStatus API to get actual payment result
+	statusResp, err := h.payableService.CheckStatus(uid, statusIndicator)
 	if err != nil {
-		h.logger.WithError(err).Warn("Failed to verify webhook payload")
-		// Still return 200 to acknowledge receipt (prevents retries)
-		c.JSON(http.StatusOK, gin.H{"error": "invalid webhook payload", "acknowledged": true})
+		h.logger.WithError(err).Error("Failed to check payment status from PAYable")
+		c.JSON(http.StatusOK, gin.H{"error": "failed to verify payment status", "acknowledged": true})
 		return
 	}
 
 	h.logger.WithFields(logrus.Fields{
-		"uid":            payload.UID,
-		"invoice_id":     payload.InvoiceID,
-		"payment_status": payload.PaymentStatus,
-		"amount":         payload.Amount,
-		"transaction_id": payload.TransactionID,
-	}).Info("PAYable webhook received")
+		"uid":            uid,
+		"payment_status": statusResp.PaymentStatus,
+		"invoice_id":     statusResp.InvoiceID,
+		"amount":         statusResp.Amount,
+		"transaction_id": statusResp.TransactionID,
+	}).Info("PAYable status check response")
 
 	// Check if payment was successful
-	if !h.payableService.IsPaymentSuccessful(payload) {
+	if strings.ToUpper(statusResp.PaymentStatus) != "SUCCESS" {
 		h.logger.WithFields(logrus.Fields{
-			"uid":            payload.UID,
-			"payment_status": payload.PaymentStatus,
+			"uid":            uid,
+			"payment_status": statusResp.PaymentStatus,
 		}).Info("Payment not successful - acknowledging webhook")
 		c.JSON(http.StatusOK, gin.H{
 			"message": "webhook acknowledged",
-			"status":  payload.PaymentStatus,
+			"status":  statusResp.PaymentStatus,
 		})
 		return
 	}
 
 	// Payment successful - confirm the booking
 	// Look up intent by payment UID
-	intent, err := h.orchestratorService.GetIntentByPaymentUID(payload.UID)
+	intent, err := h.orchestratorService.GetIntentByPaymentUID(uid)
 	if err != nil || intent == nil {
 		h.logger.WithFields(logrus.Fields{
-			"uid":        payload.UID,
-			"invoice_id": payload.InvoiceID,
+			"uid":        uid,
+			"invoice_id": statusResp.InvoiceID,
 		}).Warn("Intent not found for webhook - may be duplicate or stale")
 		c.JSON(http.StatusOK, gin.H{
 			"message": "webhook acknowledged",
@@ -393,14 +404,14 @@ func (h *BookingOrchestratorHandler) PaymentWebhook(c *gin.Context) {
 	// Confirm the booking
 	h.logger.WithFields(logrus.Fields{
 		"intent_id":      intent.ID,
-		"uid":            payload.UID,
-		"transaction_id": payload.TransactionID,
+		"uid":            uid,
+		"transaction_id": statusResp.TransactionID,
 	}).Info("Confirming booking from webhook")
 
 	_, err = h.orchestratorService.ConfirmBooking(
 		intent.ID,
 		intent.UserID,
-		&payload.TransactionID,
+		&statusResp.TransactionID,
 	)
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to confirm booking from webhook")
@@ -415,8 +426,8 @@ func (h *BookingOrchestratorHandler) PaymentWebhook(c *gin.Context) {
 
 	h.logger.WithFields(logrus.Fields{
 		"intent_id":      intent.ID,
-		"uid":            payload.UID,
-		"transaction_id": payload.TransactionID,
+		"uid":            uid,
+		"transaction_id": statusResp.TransactionID,
 	}).Info("Booking confirmed via webhook")
 
 	c.JSON(http.StatusOK, gin.H{

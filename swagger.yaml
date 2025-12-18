@@ -7829,18 +7829,20 @@ paths:
       description: |
         Called by PAYable IPG to notify of payment status.
         
+        PAYable sends the uid and statusIndicator as query parameters.
+        The backend then calls PAYable's CheckStatus API to verify the payment result.
+        
+        **Flow:**
+        1. PAYable calls this endpoint with uid and statusIndicator query params
+        2. Backend calls PAYable CheckStatus API to get payment result
+        3. If payment successful, booking is auto-confirmed
+        
         **Security:**
         - No JWT authentication (public endpoint)
-        - Signature verification using SHA-512 checkValue
-        - Validates: SHA512(merchantToken) -> hash1, then SHA512(merchantKey|invoiceId|amount|currencyCode|hash1) == checkValue
-        
-        **Payment Status Codes:**
-        - `2`: Payment successful (triggers booking confirmation)
-        - `0`: Payment pending
-        - `-1` to `-3`: Payment failed
+        - Payment verification done via PAYable CheckStatus API
         
         **Auto-Confirmation:**
-        When status=2 (success), the system automatically:
+        When payment is SUCCESS, the system automatically:
         1. Finds the booking intent by payment_uid
         2. Updates payment status to 'success'
         3. Creates confirmed bookings
@@ -7849,64 +7851,21 @@ paths:
       tags:
         - Booking Orchestration
       security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              description: PAYable IPG webhook payload
-              required:
-                - uid
-                - statusIndicator
-                - invoiceId
-                - resultIndicator
-              properties:
-                uid:
-                  type: string
-                  description: PAYable unique payment identifier
-                  example: "PAYABLE-UID-123456"
-                statusIndicator:
-                  type: string
-                  description: PAYable status indicator
-                  example: "STATUS-IND-789"
-                invoiceId:
-                  type: string
-                  description: Original invoice/payment reference (INV-xxx)
-                  example: "INV-1234567890"
-                resultIndicator:
-                  type: integer
-                  description: |
-                    Payment result code:
-                    - 2: Success
-                    - 0: Pending
-                    - -1 to -3: Failed
-                  enum: [2, 0, -1, -2, -3]
-                  example: 2
-                amountPaid:
-                  type: string
-                  description: Amount paid (as string from gateway)
-                  example: "1500.00"
-                currencyCode:
-                  type: string
-                  description: Currency code
-                  example: "LKR"
-                paymentMethod:
-                  type: string
-                  description: Payment method used
-                  example: "CARD"
-                cardType:
-                  type: string
-                  description: Card type if card payment
-                  example: "VISA"
-                maskedCardNumber:
-                  type: string
-                  description: Masked card number
-                  example: "4111****1111"
-                checkValue:
-                  type: string
-                  description: SHA-512 signature for verification
-                  example: "abc123..."
+      parameters:
+        - name: uid
+          in: query
+          required: true
+          schema:
+            type: string
+          description: PAYable unique payment identifier
+          example: "B51811BC-3327-4C7A-8BA5-D7AA6DE46C00"
+        - name: statusIndicator
+          in: query
+          required: true
+          schema:
+            type: string
+          description: PAYable status indicator token for CheckStatus API
+          example: "iDDZpzyKgs"
       responses:
         "200":
           description: Webhook processed successfully
@@ -7917,17 +7876,13 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "webhook processed"
+                    example: "webhook processed successfully"
                   status:
                     type: string
-                    enum: [acknowledged, booking_confirmed, payment_failed]
-                    example: "booking_confirmed"
-                  booking_reference:
-                    type: string
-                    description: Master booking reference (if confirmed)
-                    example: "BK-20250610-ABC123"
+                    enum: [acknowledged, confirmed, payment_failed]
+                    example: "confirmed"
         "400":
-          description: Invalid webhook payload or signature verification failed
+          description: Missing uid or statusIndicator query parameters
           content:
             application/json:
               schema:

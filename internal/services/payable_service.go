@@ -226,33 +226,33 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 	// Build request - NOTE: merchantToken is NOT sent (PAYable rejects it)
 	// merchantToken is only used for checkValue calculation
 	request := &PAYablePaymentRequest{
-		MerchantKey:               s.config.MerchantKey,
-		LogoURL:                   s.config.LogoURL,
-		ReturnURL:                 s.config.ReturnURL,
-		WebhookURL:                s.config.WebhookURL,
-		StatusReturnURL:           statusReturnURL,
-		PaymentType:               1, // One-time payment
-		InvoiceID:                 params.InvoiceID,
-		Amount:                    params.Amount,
-		CurrencyCode:              params.CurrencyCode,
-		OrderDescription:          params.OrderDescription,
-		CustomerFirstName:         firstName,
-		CustomerLastName:          lastName,
-		CustomerEmail:             customerEmail,
-		CustomerMobilePhone:       customerPhone,
+		MerchantKey:                s.config.MerchantKey,
+		LogoURL:                    s.config.LogoURL,
+		ReturnURL:                  s.config.ReturnURL,
+		WebhookURL:                 s.config.WebhookURL,
+		StatusReturnURL:            statusReturnURL,
+		PaymentType:                1, // One-time payment
+		InvoiceID:                  params.InvoiceID,
+		Amount:                     params.Amount,
+		CurrencyCode:               params.CurrencyCode,
+		OrderDescription:           params.OrderDescription,
+		CustomerFirstName:          firstName,
+		CustomerLastName:           lastName,
+		CustomerEmail:              customerEmail,
+		CustomerMobilePhone:        customerPhone,
 		BillingAddressStreet:       billingStreet,
 		BillingAddressCity:         billingCity,
 		BillingAddressCountry:      "LK", // Sri Lanka
 		BillingAddressPostcodeZip:  billingPostcode,
-		ShippingAddressStreet:      billingStreet,  // Same as billing for bus tickets
+		ShippingAddressStreet:      billingStreet, // Same as billing for bus tickets
 		ShippingAddressCity:        billingCity,
 		ShippingAddressCountry:     "LK",
 		ShippingAddressPostcodeZip: billingPostcode,
 		CheckValue:                 checkValue,
-		IsMobilePayment:           1,
-		IntegrationType:           "SmartTransit", // Max 20 chars
-		IntegrationVersion:        "1.0.0",
-		PackageName:               packageName,
+		IsMobilePayment:            1,
+		IntegrationType:            "SmartTransit", // Max 20 chars
+		IntegrationVersion:         "1.0.0",
+		PackageName:                packageName,
 	}
 
 	s.logger.WithFields(logrus.Fields{
@@ -270,7 +270,7 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 
 	// Log the request payload for debugging
 	s.logger.WithFields(logrus.Fields{
-		"invoice_id":           params.InvoiceID,
+		"invoice_id":          params.InvoiceID,
 		"amount":              params.Amount,
 		"currency":            params.CurrencyCode,
 		"customer_email":      customerEmail,
