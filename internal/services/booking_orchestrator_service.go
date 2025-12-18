@@ -853,9 +853,9 @@ func (s *BookingOrchestratorService) GetIntentByPaymentUID(uid string) (*models.
 
 // AddLoungeToIntentRequest represents a request to add lounge(s) to an existing intent
 type AddLoungeToIntentRequest struct {
-	IntentID         uuid.UUID                  `json:"intent_id"`
-	PreTripLounge    *models.LoungeIntentPayload `json:"pre_trip_lounge,omitempty"`
-	PostTripLounge   *models.LoungeIntentPayload `json:"post_trip_lounge,omitempty"`
+	IntentID       uuid.UUID                   `json:"intent_id"`
+	PreTripLounge  *models.LoungeIntentPayload `json:"pre_trip_lounge,omitempty"`
+	PostTripLounge *models.LoungeIntentPayload `json:"post_trip_lounge,omitempty"`
 }
 
 // AddLoungeToIntent adds pre-trip and/or post-trip lounge to an existing bus intent
