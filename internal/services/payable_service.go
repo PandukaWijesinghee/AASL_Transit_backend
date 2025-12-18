@@ -62,6 +62,12 @@ type PAYablePaymentRequest struct {
 	BillingAddressCountry     string `json:"billingAddressCountry"`
 	BillingAddressPostcodeZip string `json:"billingAddressPostcodeZip"`
 
+	// Shipping address (same as billing for digital services)
+	ShippingAddressStreet      string `json:"shippingAddressStreet,omitempty"`
+	ShippingAddressCity        string `json:"shippingAddressCity,omitempty"`
+	ShippingAddressCountry     string `json:"shippingAddressCountry,omitempty"`
+	ShippingAddressPostcodeZip string `json:"shippingAddressPostcodeZip,omitempty"`
+
 	// Security
 	CheckValue string `json:"checkValue"`
 
@@ -234,11 +240,15 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 		CustomerLastName:          lastName,
 		CustomerEmail:             customerEmail,
 		CustomerMobilePhone:       customerPhone,
-		BillingAddressStreet:      billingStreet,
-		BillingAddressCity:        billingCity,
-		BillingAddressCountry:     "LK", // Sri Lanka
-		BillingAddressPostcodeZip: billingPostcode,
-		CheckValue:                checkValue,
+		BillingAddressStreet:       billingStreet,
+		BillingAddressCity:         billingCity,
+		BillingAddressCountry:      "LK", // Sri Lanka
+		BillingAddressPostcodeZip:  billingPostcode,
+		ShippingAddressStreet:      billingStreet,  // Same as billing for bus tickets
+		ShippingAddressCity:        billingCity,
+		ShippingAddressCountry:     "LK",
+		ShippingAddressPostcodeZip: billingPostcode,
+		CheckValue:                 checkValue,
 		IsMobilePayment:           1,
 		IntegrationType:           "SmartTransit", // Max 20 chars
 		IntegrationVersion:        "1.0.0",
