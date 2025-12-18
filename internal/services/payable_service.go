@@ -268,10 +268,18 @@ func (s *PAYableService) InitiatePayment(params *InitiatePaymentParams) (*PAYabl
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	// Log the request payload (without sensitive data)
+	// Log the request payload for debugging
 	s.logger.WithFields(logrus.Fields{
-		"request_body": string(jsonBody),
-	}).Info("PAYable request payload")
+		"invoice_id":           params.InvoiceID,
+		"amount":              params.Amount,
+		"currency":            params.CurrencyCode,
+		"customer_email":      customerEmail,
+		"customer_phone":      customerPhone,
+		"billing_country":     "LK",
+		"shipping_included":   billingStreet,
+		"merchant_key_prefix": s.config.MerchantKey[:10],
+		"full_request":        string(jsonBody),
+	}).Info("PAYable full request payload")
 
 	resp, err := s.client.Post(endpointURL, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
