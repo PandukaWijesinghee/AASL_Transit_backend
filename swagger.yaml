@@ -11272,6 +11272,33 @@ components:
           items:
             $ref: "#/components/schemas/PreOrderItem"
 
+    LoungeIntentPayload:
+      type: object
+      description: Payload for adding lounge to existing intent
+      required:
+        - lounge_id
+        - guest_count
+        - guests
+      properties:
+        lounge_id:
+          type: string
+          format: uuid
+        guest_count:
+          type: integer
+          minimum: 1
+        scheduled_arrival:
+          type: string
+          format: date-time
+          description: Expected arrival time at lounge
+        guests:
+          type: array
+          items:
+            $ref: "#/components/schemas/LoungeGuestRequest"
+        pre_orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/PreOrderItem"
+
     LoungeGuestRequest:
       type: object
       required:
