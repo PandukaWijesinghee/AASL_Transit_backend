@@ -499,6 +499,7 @@ func (r *LoungeBookingRepository) GetLoungeBookingByID(bookingID uuid.UUID) (*mo
 			lb.discount_amount, lb.total_amount, lb.status, lb.payment_status,
 			lb.primary_guest_name, lb.primary_guest_phone, lb.promo_code, lb.special_requests,
 			lb.internal_notes, lb.cancelled_at, lb.cancellation_reason, lb.created_at, lb.updated_at,
+			lb.qr_code_data,
 			l.lounge_name, l.address
 		FROM lounge_bookings lb
 		JOIN lounges l ON lb.lounge_id = l.id
@@ -514,6 +515,7 @@ func (r *LoungeBookingRepository) GetLoungeBookingByID(bookingID uuid.UUID) (*mo
 		&booking.DiscountAmount, &booking.TotalAmount, &booking.Status, &booking.PaymentStatus,
 		&booking.PrimaryGuestName, &booking.PrimaryGuestPhone, &booking.PromoCode, &booking.SpecialRequests,
 		&booking.InternalNotes, &booking.CancelledAt, &booking.CancellationReason, &booking.CreatedAt, &booking.UpdatedAt,
+		&booking.QRCodeData,
 		&booking.LoungeName, &booking.LoungeAddress,
 	)
 	if err == sql.ErrNoRows {

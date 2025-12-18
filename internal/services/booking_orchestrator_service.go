@@ -568,6 +568,18 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 		return nil, fmt.Errorf("intent not found")
 	}
 
+	// Log the intent state for debugging
+	s.logger.WithFields(logrus.Fields{
+		"intent_id":             intent.ID,
+		"intent_type":           intent.IntentType,
+		"status":                intent.Status,
+		"has_bus_intent":        intent.BusIntent != nil,
+		"has_pre_lounge_intent": intent.PreTripLoungeIntent != nil,
+		"has_post_lounge_intent": intent.PostTripLoungeIntent != nil,
+		"pre_lounge_fare":       intent.PreLoungeFare,
+		"post_lounge_fare":      intent.PostLoungeFare,
+	}).Debug("ConfirmBooking: Retrieved intent for confirmation")
+
 	// 2. Verify ownership
 	if intent.UserID != userID {
 		return nil, fmt.Errorf("unauthorized: intent belongs to another user")
@@ -658,9 +670,11 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 	intent, _ = s.intentRepo.GetIntentByID(intentID)
 
 	s.logger.WithFields(logrus.Fields{
-		"intent_id":        intentID,
-		"master_reference": masterRef,
-		"bus_booking_id":   busBookingID,
+		"intent_id":              intentID,
+		"master_reference":       masterRef,
+		"bus_booking_id":         busBookingID,
+		"pre_lounge_booking_id":  preLoungeBookingID,
+		"post_lounge_booking_id": postLoungeBookingID,
 	}).Info("Booking confirmed successfully")
 
 	return s.buildConfirmResponse(intent), nil
@@ -1045,6 +1059,13 @@ func (s *BookingOrchestratorService) buildConfirmResponse(intent *models.Booking
 		Currency:  intent.Currency,
 	}
 
+	s.logger.WithFields(logrus.Fields{
+		"intent_id":              intent.ID,
+		"bus_booking_id":         intent.BusBookingID,
+		"pre_lounge_booking_id":  intent.PreLoungeBookingID,
+		"post_lounge_booking_id": intent.PostLoungeBookingID,
+	}).Debug("Building confirm response")
+
 	// Get bus booking details
 	if intent.BusBookingID != nil {
 		busBooking, err := s.appBookingRepo.GetBusBookingByBookingID(intent.BusBookingID.String())
@@ -1065,8 +1086,11 @@ func (s *BookingOrchestratorService) buildConfirmResponse(intent *models.Booking
 
 	// Get pre-lounge booking details
 	if intent.PreLoungeBookingID != nil {
+		s.logger.Debug("Fetching pre-lounge booking")
 		loungeBooking, err := s.loungeBookingRepo.GetLoungeBookingByID(*intent.PreLoungeBookingID)
-		if err == nil && loungeBooking != nil {
+		if err != nil {
+			s.logger.WithError(err).Error("Failed to get pre-lounge booking")
+		} else if loungeBooking != nil {
 			response.PreLoungeBooking = &models.ConfirmedLoungeBooking{
 				ID:        loungeBooking.ID,
 				Reference: loungeBooking.BookingReference,
@@ -1074,13 +1098,17 @@ func (s *BookingOrchestratorService) buildConfirmResponse(intent *models.Booking
 			if loungeBooking.QRCodeData != nil {
 				response.PreLoungeBooking.QRCode = loungeBooking.QRCodeData
 			}
+			s.logger.WithField("pre_lounge_ref", loungeBooking.BookingReference).Debug("Pre-lounge booking found")
 		}
 	}
 
 	// Get post-lounge booking details
 	if intent.PostLoungeBookingID != nil {
+		s.logger.Debug("Fetching post-lounge booking")
 		loungeBooking, err := s.loungeBookingRepo.GetLoungeBookingByID(*intent.PostLoungeBookingID)
-		if err == nil && loungeBooking != nil {
+		if err != nil {
+			s.logger.WithError(err).Error("Failed to get post-lounge booking")
+		} else if loungeBooking != nil {
 			response.PostLoungeBooking = &models.ConfirmedLoungeBooking{
 				ID:        loungeBooking.ID,
 				Reference: loungeBooking.BookingReference,
@@ -1088,6 +1116,7 @@ func (s *BookingOrchestratorService) buildConfirmResponse(intent *models.Booking
 			if loungeBooking.QRCodeData != nil {
 				response.PostLoungeBooking.QRCode = loungeBooking.QRCodeData
 			}
+			s.logger.WithField("post_lounge_ref", loungeBooking.BookingReference).Debug("Post-lounge booking found")
 		}
 	}
 
