@@ -570,14 +570,14 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 
 	// Log the intent state for debugging
 	s.logger.WithFields(logrus.Fields{
-		"intent_id":             intent.ID,
-		"intent_type":           intent.IntentType,
-		"status":                intent.Status,
-		"has_bus_intent":        intent.BusIntent != nil,
-		"has_pre_lounge_intent": intent.PreTripLoungeIntent != nil,
+		"intent_id":              intent.ID,
+		"intent_type":            intent.IntentType,
+		"status":                 intent.Status,
+		"has_bus_intent":         intent.BusIntent != nil,
+		"has_pre_lounge_intent":  intent.PreTripLoungeIntent != nil,
 		"has_post_lounge_intent": intent.PostTripLoungeIntent != nil,
-		"pre_lounge_fare":       intent.PreLoungeFare,
-		"post_lounge_fare":      intent.PostLoungeFare,
+		"pre_lounge_fare":        intent.PreLoungeFare,
+		"post_lounge_fare":       intent.PostLoungeFare,
 	}).Debug("ConfirmBooking: Retrieved intent for confirmation")
 
 	// 2. Verify ownership
@@ -905,21 +905,65 @@ func (s *BookingOrchestratorService) AddLoungeToIntent(
 		return nil, fmt.Errorf("intent has expired")
 	}
 
+	// Helper function to calculate checkout time from pricing type
+	calculateCheckoutTime := func(checkInTime string, pricingType string) string {
+		// Parse check-in time
+		t, err := time.Parse("15:04", checkInTime)
+		if err != nil {
+			return checkInTime // Fallback to same time
+		}
+
+		// Add hours based on pricing type
+		var duration time.Duration
+		switch pricingType {
+		case "1_hour":
+			duration = 1 * time.Hour
+		case "2_hours":
+			duration = 2 * time.Hour
+		case "3_hours":
+			duration = 3 * time.Hour
+		case "until_bus":
+			duration = 2 * time.Hour // Default for until_bus
+		default:
+			duration = 2 * time.Hour
+		}
+
+		checkout := t.Add(duration)
+		return checkout.Format("15:04")
+	}
+
+	// Helper to parse lounge date
+	parseLoungeDate := func(dateStr string) time.Time {
+		parsed, err := time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			return time.Now()
+		}
+		return parsed
+	}
+
 	// 2. Calculate additional lounge fares
 	var preLoungeFare, postLoungeFare float64
 
 	if preTripLounge != nil {
 		preLoungeFare = preTripLounge.TotalPrice
-		// Create lounge capacity hold
+		// Create lounge capacity hold using actual lounge date/time
 		expiresAt := time.Now().Add(s.config.IntentTTL)
 		loungeID, _ := uuid.Parse(preTripLounge.LoungeID)
+
+		loungeDate := parseLoungeDate(preTripLounge.Date)
+		checkInTime := preTripLounge.CheckInTime
+		if checkInTime == "" {
+			checkInTime = "09:00" // Default fallback
+		}
+		checkOutTime := calculateCheckoutTime(checkInTime, preTripLounge.PricingType)
+
 		hold := &models.LoungeCapacityHold{
 			ID:            uuid.New(),
 			LoungeID:      loungeID,
 			IntentID:      intent.ID,
-			Date:          time.Now(), // Should be trip date
-			TimeSlotStart: time.Now().Format("15:04"),
-			TimeSlotEnd:   time.Now().Add(2 * time.Hour).Format("15:04"),
+			Date:          loungeDate,
+			TimeSlotStart: checkInTime,
+			TimeSlotEnd:   checkOutTime,
 			GuestsCount:   preTripLounge.GuestCount,
 			HeldUntil:     expiresAt,
 			Status:        "held",
@@ -932,16 +976,24 @@ func (s *BookingOrchestratorService) AddLoungeToIntent(
 
 	if postTripLounge != nil {
 		postLoungeFare = postTripLounge.TotalPrice
-		// Create lounge capacity hold
+		// Create lounge capacity hold using actual lounge date/time
 		expiresAt := time.Now().Add(s.config.IntentTTL)
 		loungeID, _ := uuid.Parse(postTripLounge.LoungeID)
+
+		loungeDate := parseLoungeDate(postTripLounge.Date)
+		checkInTime := postTripLounge.CheckInTime
+		if checkInTime == "" {
+			checkInTime = "09:00" // Default fallback
+		}
+		checkOutTime := calculateCheckoutTime(checkInTime, postTripLounge.PricingType)
+
 		hold := &models.LoungeCapacityHold{
 			ID:            uuid.New(),
 			LoungeID:      loungeID,
 			IntentID:      intent.ID,
-			Date:          time.Now(), // Should be trip date
-			TimeSlotStart: time.Now().Format("15:04"),
-			TimeSlotEnd:   time.Now().Add(2 * time.Hour).Format("15:04"),
+			Date:          loungeDate,
+			TimeSlotStart: checkInTime,
+			TimeSlotEnd:   checkOutTime,
 			GuestsCount:   postTripLounge.GuestCount,
 			HeldUntil:     expiresAt,
 			Status:        "held",

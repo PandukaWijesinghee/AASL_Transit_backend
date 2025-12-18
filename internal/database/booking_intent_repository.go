@@ -359,22 +359,26 @@ func (r *BookingIntentRepository) AddLoungeToIntent(
 	newTotal float64,
 	newExpiresAt time.Time,
 ) error {
-	// Convert lounge payloads to JSON
-	var preLoungeJSON, postLoungeJSON []byte
+	// Convert lounge payloads to JSON - use *string to properly handle JSONB
+	var preLoungeJSON, postLoungeJSON *string
 	var err error
 
 	if preTripLounge != nil {
-		preLoungeJSON, err = json.Marshal(preTripLounge)
+		jsonBytes, err := json.Marshal(preTripLounge)
 		if err != nil {
 			return fmt.Errorf("failed to marshal pre-trip lounge: %w", err)
 		}
+		s := string(jsonBytes)
+		preLoungeJSON = &s
 	}
 
 	if postTripLounge != nil {
-		postLoungeJSON, err = json.Marshal(postTripLounge)
+		jsonBytes, err := json.Marshal(postTripLounge)
 		if err != nil {
 			return fmt.Errorf("failed to marshal post-trip lounge: %w", err)
 		}
+		s := string(jsonBytes)
+		postLoungeJSON = &s
 	}
 
 	// Update intent type based on what's being added
@@ -537,6 +541,11 @@ func (r *BookingIntentRepository) CheckSeatsAvailableForHold(seatIDs []string) (
 
 // CreateLoungeCapacityHold creates a lounge capacity hold for an intent
 func (r *BookingIntentRepository) CreateLoungeCapacityHold(hold *models.LoungeCapacityHold) error {
+	// Validate time slot: start and end must be different (zero duration not allowed)
+	if hold.TimeSlotStart == hold.TimeSlotEnd {
+		return fmt.Errorf("invalid time slot: start (%s) and end (%s) cannot be the same", hold.TimeSlotStart, hold.TimeSlotEnd)
+	}
+
 	hold.ID = uuid.New()
 	hold.CreatedAt = time.Now()
 	hold.Status = "held"
