@@ -301,6 +301,7 @@ func main() {
 		scheduledTripRepo,
 		tripSeatRepo,
 		busOwnerRouteRepo,
+		logger,
 	)
 	staffBookingHandler := handlers.NewStaffBookingHandler(appBookingRepo)
 	logger.Info("✓ App booking system initialized")

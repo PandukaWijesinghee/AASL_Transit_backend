@@ -302,10 +302,14 @@ func (r *AppBookingRepository) GetBookingsByUserID(userID string, limit, offset 
 			b.id, b.booking_reference, b.booking_type,
 			b.total_amount, b.payment_status, b.booking_status,
 			b.passenger_name, b.created_at,
-			bb.route_name, bb.departure_datetime, bb.number_of_seats,
+			bor.custom_route_name as route_name, 
+			st.departure_datetime, 
+			bb.number_of_seats,
 			bb.status as bus_status, bb.qr_code_data
 		FROM bookings b
 		LEFT JOIN bus_bookings bb ON bb.booking_id = b.id
+		LEFT JOIN scheduled_trips st ON st.id = bb.scheduled_trip_id
+		LEFT JOIN bus_owner_routes bor ON bor.id = st.bus_owner_route_id
 		WHERE b.user_id = $1
 		ORDER BY b.created_at DESC
 		LIMIT $2 OFFSET $3`
@@ -322,14 +326,18 @@ func (r *AppBookingRepository) GetUpcomingBookingsByUserID(userID string) ([]mod
 			b.id, b.booking_reference, b.booking_type,
 			b.total_amount, b.payment_status, b.booking_status,
 			b.passenger_name, b.created_at,
-			bb.route_name, bb.departure_datetime, bb.number_of_seats,
+			bor.custom_route_name as route_name, 
+			st.departure_datetime, 
+			bb.number_of_seats,
 			bb.status as bus_status, bb.qr_code_data
 		FROM bookings b
 		LEFT JOIN bus_bookings bb ON bb.booking_id = b.id
+		LEFT JOIN scheduled_trips st ON st.id = bb.scheduled_trip_id
+		LEFT JOIN bus_owner_routes bor ON bor.id = st.bus_owner_route_id
 		WHERE b.user_id = $1
 		  AND b.booking_status IN ('pending', 'confirmed', 'in_progress')
-		  AND (bb.departure_datetime IS NULL OR bb.departure_datetime >= NOW())
-		ORDER BY bb.departure_datetime ASC`
+		  AND (st.departure_datetime IS NULL OR st.departure_datetime >= NOW())
+		ORDER BY st.departure_datetime ASC`
 
 	var bookings []models.BookingListItem
 	err := r.db.Select(&bookings, query, userID)

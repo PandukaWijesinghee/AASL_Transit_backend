@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/smarttransit/sms-auth-backend/internal/database"
 	"github.com/smarttransit/sms-auth-backend/internal/middleware"
 	"github.com/smarttransit/sms-auth-backend/internal/models"
@@ -19,6 +20,7 @@ type AppBookingHandler struct {
 	tripRepo     *database.ScheduledTripRepository
 	tripSeatRepo *database.TripSeatRepository
 	routeRepo    *database.BusOwnerRouteRepository
+	logger       *logrus.Logger
 }
 
 // NewAppBookingHandler creates a new AppBookingHandler
@@ -27,12 +29,14 @@ func NewAppBookingHandler(
 	tripRepo *database.ScheduledTripRepository,
 	tripSeatRepo *database.TripSeatRepository,
 	routeRepo *database.BusOwnerRouteRepository,
+	logger *logrus.Logger,
 ) *AppBookingHandler {
 	return &AppBookingHandler{
 		bookingRepo:  bookingRepo,
 		tripRepo:     tripRepo,
 		tripSeatRepo: tripSeatRepo,
 		routeRepo:    routeRepo,
+		logger:       logger,
 	}
 }
 
@@ -255,7 +259,10 @@ func (h *AppBookingHandler) GetUpcomingBookings(c *gin.Context) {
 
 	bookings, err := h.bookingRepo.GetUpcomingBookingsByUserID(userCtx.UserID.String())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get bookings"})
+		if h.logger != nil {
+			h.logger.WithError(err).WithField("user_id", userCtx.UserID.String()).Error("Failed to get upcoming bookings")
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get bookings", "details": err.Error()})
 		return
 	}
 
