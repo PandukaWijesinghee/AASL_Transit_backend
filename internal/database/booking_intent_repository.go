@@ -381,8 +381,9 @@ func (r *BookingIntentRepository) AddLoungeToIntent(
 		postLoungeJSON = &s
 	}
 
-	// Update intent type based on what's being added
-	newIntentType := "bus_with_lounge"
+	// Update intent type to 'combined' (bus + lounge)
+	// Must match DB constraint: chk_intent_type_matches_payload
+	newIntentType := "combined"
 
 	query := `
 		UPDATE booking_intents 
