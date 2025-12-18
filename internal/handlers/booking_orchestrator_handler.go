@@ -503,7 +503,36 @@ func (h *BookingOrchestratorHandler) PaymentWebhook(c *gin.Context) {
 		"correlation_id": correlationID,
 	}).Info("PAYable status check response")
 
-	// Check if payment was successful
+	// FIRST: Look up intent by payment UID to check if already confirmed
+	intent, err := h.orchestratorService.GetIntentByPaymentUID(uid)
+
+	// Check if booking was already confirmed (by Flutter via return URL)
+	// This handles the race condition where Flutter confirms before webhook completes
+	if intent != nil && intent.Status == models.IntentStatusConfirmed {
+		h.logger.WithFields(logrus.Fields{
+			"uid":            uid,
+			"intent_id":      intent.ID,
+			"intent_status":  intent.Status,
+			"correlation_id": correlationID,
+		}).Info("Booking already confirmed by client - acknowledging webhook")
+
+		alreadyConfirmedAudit := models.NewPaymentAudit(models.PaymentEventSuccess, models.PaymentSourcePayableWebhook)
+		alreadyConfirmedAudit.SetPaymentUID(uid)
+		alreadyConfirmedAudit.SetIntent(intent.ID)
+		alreadyConfirmedAudit.SetPaymentStatus("ALREADY_CONFIRMED")
+		alreadyConfirmedAudit.SetIdempotencyKey(fmt.Sprintf("%s-already-confirmed", uid))
+		h.logAudit(ctx, alreadyConfirmedAudit, startTime)
+
+		c.JSON(http.StatusOK, gin.H{
+			"message":        "webhook acknowledged",
+			"note":           "booking already confirmed by client",
+			"intent_id":      intent.ID,
+			"correlation_id": correlationID,
+		})
+		return
+	}
+
+	// Check if payment was successful from PAYable API
 	paymentStatus := strings.ToUpper(statusResp.PaymentStatus)
 	if paymentStatus != "SUCCESS" {
 		h.logger.WithFields(logrus.Fields{
@@ -536,8 +565,7 @@ func (h *BookingOrchestratorHandler) PaymentWebhook(c *gin.Context) {
 		return
 	}
 
-	// Payment successful - Look up intent by payment UID
-	intent, err := h.orchestratorService.GetIntentByPaymentUID(uid)
+	// Payment successful from PAYable - verify intent exists
 	if err != nil || intent == nil {
 		h.logger.WithFields(logrus.Fields{
 			"uid":            uid,
