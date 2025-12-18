@@ -11466,6 +11466,14 @@ components:
         master_reference:
           type: string
           description: Main booking reference
+        total_paid:
+          type: number
+          format: double
+          description: Total amount paid for the booking
+        currency:
+          type: string
+          description: Currency code (e.g., LKR)
+          example: "LKR"
         bus_booking:
           type: object
           nullable: true
@@ -11477,6 +11485,10 @@ components:
               type: string
             qr_code:
               type: string
+            total_amount:
+              type: number
+              format: double
+              description: Bus booking total fare
         pre_lounge_booking:
           type: object
           nullable: true

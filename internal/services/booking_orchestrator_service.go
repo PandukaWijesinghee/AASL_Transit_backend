@@ -930,8 +930,9 @@ func (s *BookingOrchestratorService) buildConfirmResponse(intent *models.Booking
 			// Get master booking for reference
 			masterBooking, _ := s.appBookingRepo.GetBookingByID(busBooking.BookingID)
 			response.BusBooking = &models.ConfirmedBusBooking{
-				ID:        uuid.MustParse(busBooking.ID),
-				Reference: masterBooking.BookingReference,
+				ID:          uuid.MustParse(busBooking.ID),
+				Reference:   masterBooking.BookingReference,
+				TotalAmount: busBooking.TotalFare, // Include total fare for display
 			}
 			if busBooking.QRCodeData != nil {
 				response.BusBooking.QRCode = *busBooking.QRCodeData

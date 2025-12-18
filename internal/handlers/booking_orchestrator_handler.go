@@ -435,7 +435,34 @@ func (h *BookingOrchestratorHandler) PaymentWebhook(c *gin.Context) {
 	})
 	h.logAudit(ctx, statusCheckAudit, startTime)
 
-	statusResp, rawBody, err := h.payableService.CheckStatusWithRawResponse(uid, statusIndicator)
+	// Try status check with retry for sandbox (sometimes returns empty status)
+	var statusResp *services.PAYableStatusResponse
+	var rawBody string
+	var err error
+	maxRetries := 3
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		statusResp, rawBody, err = h.payableService.CheckStatusWithRawResponse(uid, statusIndicator)
+		if err != nil {
+			break // Fatal error, don't retry
+		}
+
+		// If we got a valid status, we're done
+		if statusResp != nil && statusResp.PaymentStatus != "" {
+			break
+		}
+
+		// Empty status - sandbox quirk, retry after short delay
+		if attempt < maxRetries {
+			h.logger.WithFields(logrus.Fields{
+				"uid":            uid,
+				"attempt":        attempt,
+				"max_retries":    maxRetries,
+				"correlation_id": correlationID,
+			}).Warn("PAYable returned empty payment_status - retrying after delay")
+			time.Sleep(2 * time.Second)
+		}
+	}
 
 	// Log the status check response (even if it fails)
 	statusRespAudit := models.NewPaymentAudit(models.PaymentEventStatusCheckResponse, models.PaymentSourcePayableAPI)

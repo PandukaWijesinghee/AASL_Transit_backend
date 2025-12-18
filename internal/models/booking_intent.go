@@ -461,9 +461,10 @@ type ConfirmBookingResponse struct {
 
 // ConfirmedBusBooking represents the confirmed bus booking details
 type ConfirmedBusBooking struct {
-	ID        uuid.UUID `json:"id"`
-	Reference string    `json:"reference"`
-	QRCode    string    `json:"qr_code"` // Base64 encoded QR or QR data string
+	ID          uuid.UUID `json:"id"`
+	Reference   string    `json:"reference"`
+	QRCode      string    `json:"qr_code"`      // Base64 encoded QR or QR data string
+	TotalAmount float64   `json:"total_amount"` // Total fare for this bus booking
 }
 
 // ConfirmedLoungeBooking represents the confirmed lounge booking details
