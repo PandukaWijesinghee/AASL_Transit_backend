@@ -583,9 +583,9 @@ func (r *BookingIntentRepository) GetLoungeCapacityAvailable(
 	date time.Time,
 	timeSlotStart, timeSlotEnd string,
 ) (int, error) {
-	// First, get the lounge max capacity
+	// First, get the lounge max capacity (column is "capacity" not "max_capacity")
 	var maxCapacity int
-	err := r.db.Get(&maxCapacity, `SELECT COALESCE(max_capacity, 50) FROM lounges WHERE id = $1`, loungeID)
+	err := r.db.Get(&maxCapacity, `SELECT COALESCE(capacity, 50) FROM lounges WHERE id = $1`, loungeID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get lounge capacity: %w", err)
 	}
