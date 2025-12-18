@@ -7782,6 +7782,66 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /api/v1/booking/intent/{intent_id}/add-lounge:
+    patch:
+      summary: Add lounge to existing intent
+      description: |
+        Adds pre-trip and/or post-trip lounge to an existing bus-only intent.
+        This keeps the seat hold active and extends the expiration time.
+        
+        **Use Case:**
+        1. User creates bus intent (seats are held)
+        2. User fills passenger details
+        3. User decides to add lounge - calls this endpoint
+        4. Seat holds are extended, lounge holds are created
+        5. User proceeds to payment
+      operationId: addLoungeToIntent
+      tags:
+        - Booking Orchestration
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: intent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Existing booking intent ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pre_trip_lounge:
+                  $ref: "#/components/schemas/LoungeIntentPayload"
+                post_trip_lounge:
+                  $ref: "#/components/schemas/LoungeIntentPayload"
+              description: At least one lounge must be provided
+      responses:
+        "200":
+          description: Lounge(s) added successfully, intent updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingIntentResponse"
+        "400":
+          description: Invalid request, intent expired, or wrong status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "can only add lounges to held intents"
+        "404":
+          description: Intent not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   /api/v1/booking/confirm:
     post:
       summary: Confirm booking after payment
@@ -11498,6 +11558,9 @@ components:
               format: uuid
             reference:
               type: string
+            qr_code:
+              type: string
+              description: QR code for lounge check-in (LQ-YYYYMMDDHHMMSS-XXXXXXXX format)
         post_lounge_booking:
           type: object
           nullable: true
@@ -11507,6 +11570,9 @@ components:
               format: uuid
             reference:
               type: string
+            qr_code:
+              type: string
+              description: QR code for lounge check-in (LQ-YYYYMMDDHHMMSS-XXXXXXXX format)
 
     BookingIntent:
       type: object

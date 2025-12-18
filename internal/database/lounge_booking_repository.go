@@ -1,8 +1,11 @@
 package database
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,6 +22,36 @@ type LoungeBookingRepository struct {
 // NewLoungeBookingRepository creates a new lounge booking repository
 func NewLoungeBookingRepository(db *sqlx.DB) *LoungeBookingRepository {
 	return &LoungeBookingRepository{db: db}
+}
+
+// GenerateLoungeBookingQR generates a unique QR code for lounge booking
+// Format: LQ-YYYYMMDDHHMMSS-XXXXXXXX (8 char alphanumeric)
+// Example: LQ-20251206143022-A1B2C3D4
+func (r *LoungeBookingRepository) GenerateLoungeBookingQR() (string, error) {
+	for attempts := 0; attempts < 10; attempts++ {
+		// Generate 8 random bytes and take first 8 hex chars
+		randomBytes := make([]byte, 4)
+		if _, err := rand.Read(randomBytes); err != nil {
+			return "", fmt.Errorf("failed to generate random bytes: %w", err)
+		}
+		randomStr := strings.ToUpper(hex.EncodeToString(randomBytes))
+
+		timestampStr := time.Now().Format("20060102150405")
+		qrData := fmt.Sprintf("LQ-%s-%s", timestampStr, randomStr)
+
+		// Check if exists
+		var count int
+		err := r.db.Get(&count, `SELECT COUNT(*) FROM lounge_bookings WHERE qr_code_data = $1`, qrData)
+		if err != nil {
+			return "", fmt.Errorf("failed to check QR uniqueness: %w", err)
+		}
+
+		if count == 0 {
+			return qrData, nil
+		}
+	}
+
+	return "", fmt.Errorf("failed to generate unique lounge QR code after 10 attempts")
 }
 
 // ============================================================================
@@ -366,6 +399,15 @@ func (r *LoungeBookingRepository) CreateLoungeBooking(
 	booking.CreatedAt = time.Now()
 	booking.UpdatedAt = time.Now()
 
+	// Generate QR code for lounge booking
+	qrCode, err := r.GenerateLoungeBookingQR()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate QR code: %w", err)
+	}
+	booking.QRCodeData = &qrCode
+	now := time.Now()
+	booking.QRGeneratedAt = &now
+
 	// Insert booking
 	bookingQuery := `
 		INSERT INTO lounge_bookings (
@@ -375,9 +417,10 @@ func (r *LoungeBookingRepository) CreateLoungeBooking(
 			discount_amount, total_amount, status, payment_status,
 			lounge_name, lounge_address, lounge_phone,
 			primary_guest_name, primary_guest_phone, promo_code, special_requests,
+			qr_code_data, qr_generated_at,
 			created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
 		)
 	`
 	_, err = tx.Exec(bookingQuery,
@@ -389,6 +432,7 @@ func (r *LoungeBookingRepository) CreateLoungeBooking(
 		booking.Status, booking.PaymentStatus,
 		booking.LoungeName, booking.LoungeAddress, booking.LoungePhone,
 		booking.PrimaryGuestName, booking.PrimaryGuestPhone, booking.PromoCode, booking.SpecialRequests,
+		booking.QRCodeData, booking.QRGeneratedAt,
 		booking.CreatedAt, booking.UpdatedAt,
 	)
 	if err != nil {

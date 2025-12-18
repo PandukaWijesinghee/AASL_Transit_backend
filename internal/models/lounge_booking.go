@@ -258,6 +258,10 @@ type LoungeBooking struct {
 	SpecialRequests sql.NullString `db:"special_requests" json:"special_requests,omitempty"`
 	InternalNotes   sql.NullString `db:"internal_notes" json:"internal_notes,omitempty"`
 
+	// QR Code (for check-in at lounge)
+	QRCodeData    *string    `db:"qr_code_data" json:"qr_code_data,omitempty"`
+	QRGeneratedAt *time.Time `db:"qr_generated_at" json:"qr_generated_at,omitempty"`
+
 	// Lounge Info (denormalized for booking record)
 	LoungeName    string         `db:"lounge_name" json:"lounge_name"`
 	LoungeAddress sql.NullString `db:"lounge_address" json:"lounge_address,omitempty"`

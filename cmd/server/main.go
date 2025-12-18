@@ -834,6 +834,9 @@ func main() {
 			logger.Info("  ✅ POST /api/v1/booking/intent/:intent_id/cancel - Cancel intent")
 			bookingOrchestration.POST("/intent/:intent_id/cancel", bookingOrchestratorHandler.CancelIntent)
 
+			logger.Info("  ✅ PATCH /api/v1/booking/intent/:intent_id/add-lounge - Add lounge to intent")
+			bookingOrchestration.PATCH("/intent/:intent_id/add-lounge", bookingOrchestratorHandler.AddLoungeToIntent)
+
 			logger.Info("  ✅ POST /api/v1/booking/confirm - Confirm booking after payment")
 			bookingOrchestration.POST("/confirm", bookingOrchestratorHandler.ConfirmBooking)
 		}

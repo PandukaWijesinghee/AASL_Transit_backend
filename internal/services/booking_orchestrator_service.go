@@ -848,6 +848,128 @@ func (s *BookingOrchestratorService) GetIntentByPaymentUID(uid string) (*models.
 }
 
 // ============================================================================
+// ADD LOUNGE TO EXISTING INTENT
+// ============================================================================
+
+// AddLoungeToIntentRequest represents a request to add lounge(s) to an existing intent
+type AddLoungeToIntentRequest struct {
+	IntentID         uuid.UUID                  `json:"intent_id"`
+	PreTripLounge    *models.LoungeIntentPayload `json:"pre_trip_lounge,omitempty"`
+	PostTripLounge   *models.LoungeIntentPayload `json:"post_trip_lounge,omitempty"`
+}
+
+// AddLoungeToIntent adds pre-trip and/or post-trip lounge to an existing bus intent
+// This keeps the seat hold active and extends the expiration time
+func (s *BookingOrchestratorService) AddLoungeToIntent(
+	intentID uuid.UUID,
+	userID uuid.UUID,
+	preTripLounge *models.LoungeIntentPayload,
+	postTripLounge *models.LoungeIntentPayload,
+) (*models.BookingIntentResponse, error) {
+	// 1. Get and validate intent
+	intent, err := s.intentRepo.GetIntentByID(intentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get intent: %w", err)
+	}
+	if intent == nil {
+		return nil, fmt.Errorf("intent not found")
+	}
+
+	// Verify ownership
+	if intent.UserID != userID {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	// Check status - can only add lounges to held intents
+	if intent.Status != models.IntentStatusHeld {
+		return nil, fmt.Errorf("can only add lounges to held intents, current status: %s", intent.Status)
+	}
+
+	// Check if expired
+	if time.Now().After(intent.ExpiresAt) {
+		s.intentRepo.UpdateIntentExpired(intent.ID)
+		return nil, fmt.Errorf("intent has expired")
+	}
+
+	// 2. Calculate additional lounge fares
+	var preLoungeFare, postLoungeFare float64
+
+	if preTripLounge != nil {
+		preLoungeFare = preTripLounge.TotalPrice
+		// Create lounge capacity hold
+		expiresAt := time.Now().Add(s.config.IntentTTL)
+		loungeID, _ := uuid.Parse(preTripLounge.LoungeID)
+		hold := &models.LoungeCapacityHold{
+			ID:            uuid.New(),
+			LoungeID:      loungeID,
+			IntentID:      intent.ID,
+			Date:          time.Now(), // Should be trip date
+			TimeSlotStart: time.Now().Format("15:04"),
+			TimeSlotEnd:   time.Now().Add(2 * time.Hour).Format("15:04"),
+			GuestsCount:   preTripLounge.GuestCount,
+			HeldUntil:     expiresAt,
+			Status:        "held",
+			CreatedAt:     time.Now(),
+		}
+		if err := s.intentRepo.CreateLoungeCapacityHold(hold); err != nil {
+			s.logger.WithError(err).Warn("Failed to create pre-trip lounge hold")
+		}
+	}
+
+	if postTripLounge != nil {
+		postLoungeFare = postTripLounge.TotalPrice
+		// Create lounge capacity hold
+		expiresAt := time.Now().Add(s.config.IntentTTL)
+		loungeID, _ := uuid.Parse(postTripLounge.LoungeID)
+		hold := &models.LoungeCapacityHold{
+			ID:            uuid.New(),
+			LoungeID:      loungeID,
+			IntentID:      intent.ID,
+			Date:          time.Now(), // Should be trip date
+			TimeSlotStart: time.Now().Format("15:04"),
+			TimeSlotEnd:   time.Now().Add(2 * time.Hour).Format("15:04"),
+			GuestsCount:   postTripLounge.GuestCount,
+			HeldUntil:     expiresAt,
+			Status:        "held",
+			CreatedAt:     time.Now(),
+		}
+		if err := s.intentRepo.CreateLoungeCapacityHold(hold); err != nil {
+			s.logger.WithError(err).Warn("Failed to create post-trip lounge hold")
+		}
+	}
+
+	// 3. Update intent with lounge data
+	newTotal := intent.BusFare + preLoungeFare + postLoungeFare
+	newExpiresAt := time.Now().Add(s.config.IntentTTL) // Extend the hold timer
+
+	err = s.intentRepo.AddLoungeToIntent(
+		intent.ID,
+		preTripLounge,
+		postTripLounge,
+		preLoungeFare,
+		postLoungeFare,
+		newTotal,
+		newExpiresAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update intent with lounges: %w", err)
+	}
+
+	// 4. Extend seat holds to match new expiration
+	if err := s.intentRepo.ExtendSeatHolds(intent.ID, newExpiresAt); err != nil {
+		s.logger.WithError(err).Warn("Failed to extend seat holds")
+	}
+
+	// 5. Fetch updated intent and return response
+	updatedIntent, err := s.intentRepo.GetIntentByID(intent.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get updated intent: %w", err)
+	}
+
+	return s.buildIntentResponse(updatedIntent), nil
+}
+
+// ============================================================================
 // CANCEL INTENT
 // ============================================================================
 
@@ -949,6 +1071,9 @@ func (s *BookingOrchestratorService) buildConfirmResponse(intent *models.Booking
 				ID:        loungeBooking.ID,
 				Reference: loungeBooking.BookingReference,
 			}
+			if loungeBooking.QRCodeData != nil {
+				response.PreLoungeBooking.QRCode = loungeBooking.QRCodeData
+			}
 		}
 	}
 
@@ -959,6 +1084,9 @@ func (s *BookingOrchestratorService) buildConfirmResponse(intent *models.Booking
 			response.PostLoungeBooking = &models.ConfirmedLoungeBooking{
 				ID:        loungeBooking.ID,
 				Reference: loungeBooking.BookingReference,
+			}
+			if loungeBooking.QRCodeData != nil {
+				response.PostLoungeBooking.QRCode = loungeBooking.QRCodeData
 			}
 		}
 	}

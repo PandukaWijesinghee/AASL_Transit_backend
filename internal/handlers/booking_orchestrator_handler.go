@@ -326,6 +326,85 @@ func (h *BookingOrchestratorHandler) CancelIntent(c *gin.Context) {
 }
 
 // ============================================================================
+// ADD LOUNGE TO INTENT - PATCH /api/v1/booking/intent/{intent_id}/add-lounge
+// ============================================================================
+
+// AddLoungeToIntentRequest represents the request to add lounges to an existing intent
+type AddLoungeToIntentRequest struct {
+	PreTripLounge  *models.LoungeIntentPayload `json:"pre_trip_lounge,omitempty"`
+	PostTripLounge *models.LoungeIntentPayload `json:"post_trip_lounge,omitempty"`
+}
+
+// AddLoungeToIntent adds pre-trip and/or post-trip lounge to an existing bus intent
+// This keeps the seat hold active and extends the expiration time
+// @Summary Add lounge to existing intent
+// @Description Adds lounge(s) to an existing bus-only intent, extending the hold timer
+// @Tags Booking Orchestration
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token"
+// @Param intent_id path string true "Intent ID"
+// @Param request body AddLoungeToIntentRequest true "Lounge(s) to add"
+// @Success 200 {object} models.BookingIntentResponse "Updated intent with lounges"
+// @Failure 400 {object} map[string]interface{} "Invalid request or intent status"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 404 {object} map[string]interface{} "Intent not found"
+// @Router /booking/intent/{intent_id}/add-lounge [patch]
+func (h *BookingOrchestratorHandler) AddLoungeToIntent(c *gin.Context) {
+	// Get user context from middleware
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
+		return
+	}
+
+	userID := userCtx.UserID
+
+	// Parse intent ID from URL
+	intentIDStr := c.Param("intent_id")
+	intentID, err := uuid.Parse(intentIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid intent_id"})
+		return
+	}
+
+	// Parse request body
+	var req AddLoungeToIntentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
+		return
+	}
+
+	// Validate at least one lounge is provided
+	if req.PreTripLounge == nil && req.PostTripLounge == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "at least one lounge (pre_trip_lounge or post_trip_lounge) must be provided"})
+		return
+	}
+
+	// Add lounges to intent
+	response, err := h.orchestratorService.AddLoungeToIntent(intentID, userID, req.PreTripLounge, req.PostTripLounge)
+	if err != nil {
+		errMsg := err.Error()
+		if errMsg == "intent not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": errMsg})
+			return
+		}
+		if errMsg == "unauthorized" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": errMsg})
+			return
+		}
+		if strings.Contains(errMsg, "has expired") || strings.Contains(errMsg, "status") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": errMsg})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// ============================================================================
 // PAYMENT WEBHOOK - POST /api/v1/payments/webhook
 // Industry-standard implementation with:
 // - Audit logging of ALL events

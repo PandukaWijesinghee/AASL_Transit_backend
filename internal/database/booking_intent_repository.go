@@ -349,6 +349,81 @@ func (r *BookingIntentRepository) UpdateIntentConfirmationFailed(intentID uuid.U
 	return err
 }
 
+// AddLoungeToIntent adds lounge data to an existing bus intent
+func (r *BookingIntentRepository) AddLoungeToIntent(
+	intentID uuid.UUID,
+	preTripLounge *models.LoungeIntentPayload,
+	postTripLounge *models.LoungeIntentPayload,
+	preLoungeFare float64,
+	postLoungeFare float64,
+	newTotal float64,
+	newExpiresAt time.Time,
+) error {
+	// Convert lounge payloads to JSON
+	var preLoungeJSON, postLoungeJSON []byte
+	var err error
+
+	if preTripLounge != nil {
+		preLoungeJSON, err = json.Marshal(preTripLounge)
+		if err != nil {
+			return fmt.Errorf("failed to marshal pre-trip lounge: %w", err)
+		}
+	}
+
+	if postTripLounge != nil {
+		postLoungeJSON, err = json.Marshal(postTripLounge)
+		if err != nil {
+			return fmt.Errorf("failed to marshal post-trip lounge: %w", err)
+		}
+	}
+
+	// Update intent type based on what's being added
+	newIntentType := "bus_with_lounge"
+
+	query := `
+		UPDATE booking_intents 
+		SET intent_type = $2,
+		    pre_trip_lounge_intent = COALESCE($3, pre_trip_lounge_intent),
+		    post_trip_lounge_intent = COALESCE($4, post_trip_lounge_intent),
+		    pre_lounge_fare = CASE WHEN $5 > 0 THEN $5 ELSE pre_lounge_fare END,
+		    post_lounge_fare = CASE WHEN $6 > 0 THEN $6 ELSE post_lounge_fare END,
+		    total_amount = $7,
+		    expires_at = $8,
+		    updated_at = NOW()
+		WHERE id = $1 AND status = 'held'`
+
+	result, err := r.db.Exec(query,
+		intentID,
+		newIntentType,
+		preLoungeJSON,
+		postLoungeJSON,
+		preLoungeFare,
+		postLoungeFare,
+		newTotal,
+		newExpiresAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update intent: %w", err)
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("intent not found or not in held status")
+	}
+
+	return nil
+}
+
+// ExtendSeatHolds extends the hold time for all seats held by an intent
+func (r *BookingIntentRepository) ExtendSeatHolds(intentID uuid.UUID, newExpiresAt time.Time) error {
+	query := `
+		UPDATE trip_seats 
+		SET held_until = $2, updated_at = NOW()
+		WHERE held_by_intent_id = $1`
+	_, err := r.db.Exec(query, intentID, newExpiresAt)
+	return err
+}
+
 // ============================================================================
 // SEAT HOLDING OPERATIONS (TTL-based)
 // ============================================================================
