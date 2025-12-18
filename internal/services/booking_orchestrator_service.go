@@ -674,7 +674,15 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 	// 9. Confirm lounge holds (convert from held to confirmed)
 	s.intentRepo.ConfirmLoungeHoldsForIntent(intent.ID)
 
-	// 10. Refresh intent to get booking IDs
+	// 10. Update lounge booking statuses to confirmed
+	if preLoungeBookingID != nil {
+		s.loungeBookingRepo.UpdateLoungeBookingStatus(*preLoungeBookingID, models.LoungeBookingStatusConfirmed)
+	}
+	if postLoungeBookingID != nil {
+		s.loungeBookingRepo.UpdateLoungeBookingStatus(*postLoungeBookingID, models.LoungeBookingStatusConfirmed)
+	}
+
+	// 11. Refresh intent to get booking IDs
 	intent, _ = s.intentRepo.GetIntentByID(intentID)
 
 	s.logger.WithFields(logrus.Fields{
@@ -1125,7 +1133,7 @@ func (s *BookingOrchestratorService) buildConfirmResponse(intent *models.Booking
 		"bus_booking_id":         intent.BusBookingID,
 		"pre_lounge_booking_id":  intent.PreLoungeBookingID,
 		"post_lounge_booking_id": intent.PostLoungeBookingID,
-	}).Debug("Building confirm response")
+	}).Info("Building confirm response with booking IDs")
 
 	// Get bus booking details
 	if intent.BusBookingID != nil {
@@ -1147,10 +1155,13 @@ func (s *BookingOrchestratorService) buildConfirmResponse(intent *models.Booking
 
 	// Get pre-lounge booking details
 	if intent.PreLoungeBookingID != nil {
-		s.logger.Debug("Fetching pre-lounge booking")
+		s.logger.WithField("lounge_booking_id", intent.PreLoungeBookingID).Info("Fetching pre-lounge booking details")
 		loungeBooking, err := s.loungeBookingRepo.GetLoungeBookingByID(*intent.PreLoungeBookingID)
 		if err != nil {
-			s.logger.WithError(err).Error("Failed to get pre-lounge booking")
+			s.logger.WithFields(logrus.Fields{
+				"error":             err.Error(),
+				"lounge_booking_id": intent.PreLoungeBookingID,
+			}).Error("Failed to get pre-lounge booking for confirm response")
 		} else if loungeBooking != nil {
 			response.PreLoungeBooking = &models.ConfirmedLoungeBooking{
 				ID:        loungeBooking.ID,
@@ -1159,16 +1170,22 @@ func (s *BookingOrchestratorService) buildConfirmResponse(intent *models.Booking
 			if loungeBooking.QRCodeData != nil {
 				response.PreLoungeBooking.QRCode = loungeBooking.QRCodeData
 			}
-			s.logger.WithField("pre_lounge_ref", loungeBooking.BookingReference).Debug("Pre-lounge booking found")
+			s.logger.WithFields(logrus.Fields{
+				"pre_lounge_ref": loungeBooking.BookingReference,
+				"has_qr_code":    loungeBooking.QRCodeData != nil,
+			}).Info("Pre-lounge booking added to confirm response")
 		}
 	}
 
 	// Get post-lounge booking details
 	if intent.PostLoungeBookingID != nil {
-		s.logger.Debug("Fetching post-lounge booking")
+		s.logger.WithField("lounge_booking_id", intent.PostLoungeBookingID).Info("Fetching post-lounge booking details")
 		loungeBooking, err := s.loungeBookingRepo.GetLoungeBookingByID(*intent.PostLoungeBookingID)
 		if err != nil {
-			s.logger.WithError(err).Error("Failed to get post-lounge booking")
+			s.logger.WithFields(logrus.Fields{
+				"error":             err.Error(),
+				"lounge_booking_id": intent.PostLoungeBookingID,
+			}).Error("Failed to get post-lounge booking for confirm response")
 		} else if loungeBooking != nil {
 			response.PostLoungeBooking = &models.ConfirmedLoungeBooking{
 				ID:        loungeBooking.ID,
@@ -1177,9 +1194,19 @@ func (s *BookingOrchestratorService) buildConfirmResponse(intent *models.Booking
 			if loungeBooking.QRCodeData != nil {
 				response.PostLoungeBooking.QRCode = loungeBooking.QRCodeData
 			}
-			s.logger.WithField("post_lounge_ref", loungeBooking.BookingReference).Debug("Post-lounge booking found")
+			s.logger.WithFields(logrus.Fields{
+				"post_lounge_ref": loungeBooking.BookingReference,
+				"has_qr_code":     loungeBooking.QRCodeData != nil,
+			}).Info("Post-lounge booking added to confirm response")
 		}
 	}
+
+	s.logger.WithFields(logrus.Fields{
+		"has_bus_booking":   response.BusBooking != nil,
+		"has_pre_lounge":    response.PreLoungeBooking != nil,
+		"has_post_lounge":   response.PostLoungeBooking != nil,
+		"master_reference":  response.MasterReference,
+	}).Info("Confirm response built successfully")
 
 	return response
 }
