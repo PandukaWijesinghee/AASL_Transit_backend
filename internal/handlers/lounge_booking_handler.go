@@ -881,12 +881,12 @@ func (h *LoungeBookingHandler) GetMyLoungeBookings(c *gin.Context) {
 
 	if statusFilter != "" {
 		validStatuses := map[string]bool{
-			"pending":   true,
-			"confirmed": true,
+			"pending":    true,
+			"confirmed":  true,
 			"checked_in": true,
-			"completed": true,
-			"cancelled": true,
-			"no_show":   true,
+			"completed":  true,
+			"cancelled":  true,
+			"no_show":    true,
 		}
 
 		if !validStatuses[statusFilter] {
