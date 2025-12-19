@@ -1222,14 +1222,16 @@ func (s *BookingOrchestratorService) buildConfirmResponse(intent *models.Booking
 
 	// Get pre-lounge booking details
 	if intent.PreLoungeBookingID != nil {
-		s.logger.WithField("lounge_booking_id", intent.PreLoungeBookingID).Info("Fetching pre-lounge booking details")
+		s.logger.WithField("lounge_booking_id", intent.PreLoungeBookingID.String()).Info("Fetching pre-lounge booking details")
 		loungeBooking, err := s.loungeBookingRepo.GetLoungeBookingByID(*intent.PreLoungeBookingID)
 		if err != nil {
 			s.logger.WithFields(logrus.Fields{
-				"error":             err.Error(),
-				"lounge_booking_id": intent.PreLoungeBookingID,
+				"error":             fmt.Sprintf("%v", err),
+				"lounge_booking_id": intent.PreLoungeBookingID.String(),
 			}).Error("Failed to get pre-lounge booking for confirm response")
-		} else if loungeBooking != nil {
+		} else if loungeBooking == nil {
+			s.logger.WithField("lounge_booking_id", intent.PreLoungeBookingID.String()).Warn("Pre-lounge booking not found in database despite having ID")
+		} else {
 			response.PreLoungeBooking = &models.ConfirmedLoungeBooking{
 				ID:        loungeBooking.ID,
 				Reference: loungeBooking.BookingReference,
@@ -1246,14 +1248,16 @@ func (s *BookingOrchestratorService) buildConfirmResponse(intent *models.Booking
 
 	// Get post-lounge booking details
 	if intent.PostLoungeBookingID != nil {
-		s.logger.WithField("lounge_booking_id", intent.PostLoungeBookingID).Info("Fetching post-lounge booking details")
+		s.logger.WithField("lounge_booking_id", intent.PostLoungeBookingID.String()).Info("Fetching post-lounge booking details")
 		loungeBooking, err := s.loungeBookingRepo.GetLoungeBookingByID(*intent.PostLoungeBookingID)
 		if err != nil {
 			s.logger.WithFields(logrus.Fields{
-				"error":             err.Error(),
-				"lounge_booking_id": intent.PostLoungeBookingID,
+				"error":             fmt.Sprintf("%v", err),
+				"lounge_booking_id": intent.PostLoungeBookingID.String(),
 			}).Error("Failed to get post-lounge booking for confirm response")
-		} else if loungeBooking != nil {
+		} else if loungeBooking == nil {
+			s.logger.WithField("lounge_booking_id", intent.PostLoungeBookingID.String()).Warn("Post-lounge booking not found in database despite having ID")
+		} else {
 			response.PostLoungeBooking = &models.ConfirmedLoungeBooking{
 				ID:        loungeBooking.ID,
 				Reference: loungeBooking.BookingReference,

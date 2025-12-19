@@ -331,14 +331,13 @@ func nullStringToPtr(ns sql.NullString) *string {
 
 // LoungeBookingGuest represents a guest in a lounge booking
 type LoungeBookingGuest struct {
-	ID               uuid.UUID      `db:"id" json:"id"`
-	LoungeBookingID  uuid.UUID      `db:"lounge_booking_id" json:"lounge_booking_id"`
-	GuestName        string         `db:"guest_name" json:"guest_name"`
-	GuestPhone       sql.NullString `db:"guest_phone" json:"guest_phone,omitempty"`
-	IsPrimaryGuest   bool           `db:"is_primary_guest" json:"is_primary_guest"`
-	CheckedInAt      sql.NullTime   `db:"checked_in_at" json:"checked_in_at,omitempty"`
-	CheckedInByStaff *uuid.UUID     `db:"checked_in_by_staff" json:"checked_in_by_staff,omitempty"`
-	CreatedAt        time.Time      `db:"created_at" json:"created_at"`
+	ID              uuid.UUID      `db:"id" json:"id"`
+	LoungeBookingID uuid.UUID      `db:"lounge_booking_id" json:"lounge_booking_id"`
+	GuestName       string         `db:"guest_name" json:"guest_name"`
+	GuestPhone      sql.NullString `db:"guest_phone" json:"guest_phone,omitempty"`
+	IsPrimaryGuest  bool           `db:"is_primary_guest" json:"is_primary_guest"`
+	CheckedInAt     sql.NullTime   `db:"checked_in_at" json:"checked_in_at,omitempty"`
+	CreatedAt       time.Time      `db:"created_at" json:"created_at"`
 }
 
 // MarshalJSON implements custom JSON marshaling for LoungeBookingGuest

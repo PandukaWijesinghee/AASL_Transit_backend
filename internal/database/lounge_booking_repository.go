@@ -522,34 +522,34 @@ func (r *LoungeBookingRepository) GetLoungeBookingByID(bookingID uuid.UUID) (*mo
 		return nil, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to scan lounge booking %s: %w", bookingID, err)
 	}
 
 	// Get guests
 	var guests []models.LoungeBookingGuest
 	guestQuery := `
-		SELECT id, lounge_booking_id, guest_name, guest_phone, is_primary_guest, checked_in_at, checked_in_by_staff, created_at
+		SELECT id, lounge_booking_id, guest_name, guest_phone, is_primary_guest, checked_in_at, created_at
 		FROM lounge_booking_guests
 		WHERE lounge_booking_id = $1
 		ORDER BY is_primary_guest DESC, created_at ASC
 	`
 	err = r.db.Select(&guests, guestQuery, bookingID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get guests for lounge booking %s: %w", bookingID, err)
 	}
 	booking.Guests = guests
 
 	// Get pre-orders
 	var preOrders []models.LoungeBookingPreOrder
 	preOrderQuery := `
-		SELECT id, lounge_booking_id, product_id, product_name, quantity, unit_price, total_price, created_at
+		SELECT id, lounge_booking_id, product_id, product_name, product_type, product_image_url, quantity, unit_price, total_price, created_at
 		FROM lounge_booking_pre_orders
 		WHERE lounge_booking_id = $1
 		ORDER BY created_at ASC
 	`
 	err = r.db.Select(&preOrders, preOrderQuery, bookingID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get pre-orders for lounge booking %s: %w", bookingID, err)
 	}
 	booking.PreOrders = preOrders
 
