@@ -863,6 +863,7 @@ func (h *LoungeBookingHandler) CreateLoungeBooking(c *gin.Context) {
 }
 
 // GetMyLoungeBookings handles GET /api/v1/lounge-bookings
+// Supports optional ?status=completed|cancelled query parameter
 func (h *LoungeBookingHandler) GetMyLoungeBookings(c *gin.Context) {
 	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
@@ -875,8 +876,19 @@ func (h *LoungeBookingHandler) GetMyLoungeBookings(c *gin.Context) {
 
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	statusFilter := c.Query("status") // Optional: "completed", "cancelled", etc.
 
-	bookings, err := h.bookingRepo.GetLoungeBookingsByUserID(userCtx.UserID, limit, offset)
+	var bookings []models.LoungeBookingListItem
+	var err error
+
+	if statusFilter != "" {
+		// Filter by specific status
+		bookings, err = h.bookingRepo.GetLoungeBookingsByUserIDAndStatus(userCtx.UserID, statusFilter, limit, offset)
+	} else {
+		// Get all bookings
+		bookings, err = h.bookingRepo.GetLoungeBookingsByUserID(userCtx.UserID, limit, offset)
+	}
+
 	if err != nil {
 		log.Printf("ERROR: Failed to get lounge bookings: %v", err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
