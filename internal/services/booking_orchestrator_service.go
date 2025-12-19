@@ -568,7 +568,7 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 		return nil, fmt.Errorf("intent not found")
 	}
 
-	// Log the intent state for debugging
+	// Log the intent state for debugging - using Info level for visibility
 	s.logger.WithFields(logrus.Fields{
 		"intent_id":              intent.ID,
 		"intent_type":            intent.IntentType,
@@ -578,7 +578,8 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 		"has_post_lounge_intent": intent.PostTripLoungeIntent != nil,
 		"pre_lounge_fare":        intent.PreLoungeFare,
 		"post_lounge_fare":       intent.PostLoungeFare,
-	}).Debug("ConfirmBooking: Retrieved intent for confirmation")
+		"total_amount":           intent.TotalAmount,
+	}).Info("ConfirmBooking: Retrieved intent for confirmation")
 
 	// 2. Verify ownership
 	if intent.UserID != userID {
@@ -631,6 +632,13 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 
 	// Create pre-trip lounge booking if present
 	if intent.PreTripLoungeIntent != nil {
+		s.logger.WithFields(logrus.Fields{
+			"intent_id": intent.ID,
+			"lounge_id": intent.PreTripLoungeIntent.LoungeID,
+			"lounge_name": intent.PreTripLoungeIntent.LoungeName,
+			"total_price": intent.PreTripLoungeIntent.TotalPrice,
+		}).Info("Creating pre-trip lounge booking from intent")
+		
 		preLoungeBooking, err := s.createLoungeBookingFromIntent(intent, intent.PreTripLoungeIntent, "pre_trip", busBookingID)
 		if err != nil {
 			s.logger.WithFields(logrus.Fields{
@@ -642,10 +650,16 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 		} else {
 			id := preLoungeBooking.ID
 			preLoungeBookingID = &id
+			s.logger.WithFields(logrus.Fields{
+				"pre_lounge_booking_id": id,
+				"booking_reference":     preLoungeBooking.BookingReference,
+			}).Info("Pre-trip lounge booking created successfully")
 			if masterRef == "" {
 				masterRef = preLoungeBooking.BookingReference
 			}
 		}
+	} else {
+		s.logger.WithField("intent_id", intent.ID).Info("No pre-trip lounge intent found - skipping lounge booking creation")
 	}
 
 	// Create post-trip lounge booking if present
@@ -1025,6 +1039,15 @@ func (s *BookingOrchestratorService) AddLoungeToIntent(
 	newTotal := intent.BusFare + preLoungeFare + postLoungeFare
 	newExpiresAt := time.Now().Add(s.config.IntentTTL) // Extend the hold timer
 
+	s.logger.WithFields(logrus.Fields{
+		"intent_id":         intent.ID,
+		"has_pre_lounge":    preTripLounge != nil,
+		"has_post_lounge":   postTripLounge != nil,
+		"pre_lounge_fare":   preLoungeFare,
+		"post_lounge_fare":  postLoungeFare,
+		"new_total":         newTotal,
+	}).Info("AddLoungeToIntent: Saving lounge data to intent")
+
 	err = s.intentRepo.AddLoungeToIntent(
 		intent.ID,
 		preTripLounge,
@@ -1038,16 +1061,29 @@ func (s *BookingOrchestratorService) AddLoungeToIntent(
 		return nil, fmt.Errorf("failed to update intent with lounges: %w", err)
 	}
 
+	s.logger.WithField("intent_id", intent.ID).Info("AddLoungeToIntent: Lounge data saved successfully")
+
 	// 4. Extend seat holds to match new expiration
 	if err := s.intentRepo.ExtendSeatHolds(intent.ID, newExpiresAt); err != nil {
 		s.logger.WithError(err).Warn("Failed to extend seat holds")
 	}
 
-	// 5. Fetch updated intent and return response
+	// 5. Fetch updated intent and verify lounge data was saved
 	updatedIntent, err := s.intentRepo.GetIntentByID(intent.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get updated intent: %w", err)
 	}
+
+	// Log verification of saved data
+	s.logger.WithFields(logrus.Fields{
+		"intent_id":              updatedIntent.ID,
+		"intent_type":            updatedIntent.IntentType,
+		"has_pre_lounge_intent":  updatedIntent.PreTripLoungeIntent != nil,
+		"has_post_lounge_intent": updatedIntent.PostTripLoungeIntent != nil,
+		"pre_lounge_fare":        updatedIntent.PreLoungeFare,
+		"post_lounge_fare":       updatedIntent.PostLoungeFare,
+		"total_amount":           updatedIntent.TotalAmount,
+	}).Info("AddLoungeToIntent: Verified saved intent data")
 
 	return s.buildIntentResponse(updatedIntent), nil
 }
