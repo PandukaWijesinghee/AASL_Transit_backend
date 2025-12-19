@@ -642,12 +642,12 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 	// Create pre-trip lounge booking if present
 	if intent.PreTripLoungeIntent != nil {
 		s.logger.WithFields(logrus.Fields{
-			"intent_id": intent.ID,
-			"lounge_id": intent.PreTripLoungeIntent.LoungeID,
+			"intent_id":   intent.ID,
+			"lounge_id":   intent.PreTripLoungeIntent.LoungeID,
 			"lounge_name": intent.PreTripLoungeIntent.LoungeName,
 			"total_price": intent.PreTripLoungeIntent.TotalPrice,
 		}).Info("Creating pre-trip lounge booking from intent")
-		
+
 		preLoungeBooking, err := s.createLoungeBookingFromIntent(intent, intent.PreTripLoungeIntent, "pre_trip", busBookingID)
 		if err != nil {
 			s.logger.WithFields(logrus.Fields{
@@ -697,12 +697,22 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 	// 9. Confirm lounge holds (convert from held to confirmed)
 	s.intentRepo.ConfirmLoungeHoldsForIntent(intent.ID)
 
-	// 10. Update lounge booking statuses to confirmed
+	// 10. Update lounge booking statuses and payment status to confirmed/paid
 	if preLoungeBookingID != nil {
-		s.loungeBookingRepo.UpdateLoungeBookingStatus(*preLoungeBookingID, models.LoungeBookingStatusConfirmed)
+		if err := s.loungeBookingRepo.UpdateLoungeBookingStatus(*preLoungeBookingID, models.LoungeBookingStatusConfirmed); err != nil {
+			s.logger.WithError(err).WithField("lounge_booking_id", preLoungeBookingID).Error("Failed to update pre-lounge booking status")
+		}
+		if err := s.loungeBookingRepo.UpdatePaymentStatus(*preLoungeBookingID, models.LoungePaymentPaid); err != nil {
+			s.logger.WithError(err).WithField("lounge_booking_id", preLoungeBookingID).Error("Failed to update pre-lounge payment status")
+		}
 	}
 	if postLoungeBookingID != nil {
-		s.loungeBookingRepo.UpdateLoungeBookingStatus(*postLoungeBookingID, models.LoungeBookingStatusConfirmed)
+		if err := s.loungeBookingRepo.UpdateLoungeBookingStatus(*postLoungeBookingID, models.LoungeBookingStatusConfirmed); err != nil {
+			s.logger.WithError(err).WithField("lounge_booking_id", postLoungeBookingID).Error("Failed to update post-lounge booking status")
+		}
+		if err := s.loungeBookingRepo.UpdatePaymentStatus(*postLoungeBookingID, models.LoungePaymentPaid); err != nil {
+			s.logger.WithError(err).WithField("lounge_booking_id", postLoungeBookingID).Error("Failed to update post-lounge payment status")
+		}
 	}
 
 	// 11. Refresh intent to get booking IDs
@@ -1049,12 +1059,12 @@ func (s *BookingOrchestratorService) AddLoungeToIntent(
 	newExpiresAt := time.Now().Add(s.config.IntentTTL) // Extend the hold timer
 
 	s.logger.WithFields(logrus.Fields{
-		"intent_id":         intent.ID,
-		"has_pre_lounge":    preTripLounge != nil,
-		"has_post_lounge":   postTripLounge != nil,
-		"pre_lounge_fare":   preLoungeFare,
-		"post_lounge_fare":  postLoungeFare,
-		"new_total":         newTotal,
+		"intent_id":        intent.ID,
+		"has_pre_lounge":   preTripLounge != nil,
+		"has_post_lounge":  postTripLounge != nil,
+		"pre_lounge_fare":  preLoungeFare,
+		"post_lounge_fare": postLoungeFare,
+		"new_total":        newTotal,
 	}).Info("AddLoungeToIntent: Saving lounge data to intent")
 
 	err = s.intentRepo.AddLoungeToIntent(
@@ -1213,8 +1223,8 @@ func (s *BookingOrchestratorService) buildConfirmResponse(intent *models.Booking
 				}
 				response.MasterReference = masterBooking.BookingReference
 				s.logger.WithFields(logrus.Fields{
-					"bus_ref":    masterBooking.BookingReference,
-					"has_qr":     busBooking.QRCodeData != nil,
+					"bus_ref": masterBooking.BookingReference,
+					"has_qr":  busBooking.QRCodeData != nil,
 				}).Info("Bus booking added to confirm response")
 			}
 		}
