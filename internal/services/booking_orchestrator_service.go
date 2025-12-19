@@ -569,7 +569,7 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 	}
 
 	// Log the intent state for debugging - using Info level for visibility
-	s.logger.WithFields(logrus.Fields{
+	confirmFields := logrus.Fields{
 		"intent_id":              intent.ID,
 		"intent_type":            intent.IntentType,
 		"status":                 intent.Status,
@@ -579,7 +579,16 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 		"pre_lounge_fare":        intent.PreLoungeFare,
 		"post_lounge_fare":       intent.PostLoungeFare,
 		"total_amount":           intent.TotalAmount,
-	}).Info("ConfirmBooking: Retrieved intent for confirmation")
+	}
+	// Add lounge IDs if present for detailed diagnosis
+	if intent.PreTripLoungeIntent != nil {
+		confirmFields["pre_lounge_id"] = intent.PreTripLoungeIntent.LoungeID
+		confirmFields["pre_lounge_name"] = intent.PreTripLoungeIntent.LoungeName
+	}
+	if intent.PostTripLoungeIntent != nil {
+		confirmFields["post_lounge_id"] = intent.PostTripLoungeIntent.LoungeID
+	}
+	s.logger.WithFields(confirmFields).Info("ConfirmBooking: Retrieved intent for confirmation")
 
 	// 2. Verify ownership
 	if intent.UserID != userID {
@@ -1075,7 +1084,7 @@ func (s *BookingOrchestratorService) AddLoungeToIntent(
 	}
 
 	// Log verification of saved data
-	s.logger.WithFields(logrus.Fields{
+	verifyFields := logrus.Fields{
 		"intent_id":              updatedIntent.ID,
 		"intent_type":            updatedIntent.IntentType,
 		"has_pre_lounge_intent":  updatedIntent.PreTripLoungeIntent != nil,
@@ -1083,7 +1092,16 @@ func (s *BookingOrchestratorService) AddLoungeToIntent(
 		"pre_lounge_fare":        updatedIntent.PreLoungeFare,
 		"post_lounge_fare":       updatedIntent.PostLoungeFare,
 		"total_amount":           updatedIntent.TotalAmount,
-	}).Info("AddLoungeToIntent: Verified saved intent data")
+	}
+	// Add lounge IDs if present for confirmation
+	if updatedIntent.PreTripLoungeIntent != nil {
+		verifyFields["pre_lounge_id"] = updatedIntent.PreTripLoungeIntent.LoungeID
+		verifyFields["pre_lounge_name"] = updatedIntent.PreTripLoungeIntent.LoungeName
+	}
+	if updatedIntent.PostTripLoungeIntent != nil {
+		verifyFields["post_lounge_id"] = updatedIntent.PostTripLoungeIntent.LoungeID
+	}
+	s.logger.WithFields(verifyFields).Info("AddLoungeToIntent: Verified saved intent data")
 
 	return s.buildIntentResponse(updatedIntent), nil
 }
