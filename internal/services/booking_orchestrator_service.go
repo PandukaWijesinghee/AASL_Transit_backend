@@ -1137,19 +1137,32 @@ func (s *BookingOrchestratorService) buildConfirmResponse(intent *models.Booking
 
 	// Get bus booking details
 	if intent.BusBookingID != nil {
-		busBooking, err := s.appBookingRepo.GetBusBookingByBookingID(intent.BusBookingID.String())
-		if err == nil && busBooking != nil {
+		busBooking, err := s.appBookingRepo.GetBusBookingByID(intent.BusBookingID.String())
+		if err != nil {
+			s.logger.WithFields(logrus.Fields{
+				"error":          err.Error(),
+				"bus_booking_id": intent.BusBookingID,
+			}).Error("Failed to get bus booking for confirm response")
+		} else if busBooking != nil {
 			// Get master booking for reference
-			masterBooking, _ := s.appBookingRepo.GetBookingByID(busBooking.BookingID)
-			response.BusBooking = &models.ConfirmedBusBooking{
-				ID:          uuid.MustParse(busBooking.ID),
-				Reference:   masterBooking.BookingReference,
-				TotalAmount: busBooking.TotalFare, // Include total fare for display
+			masterBooking, masterErr := s.appBookingRepo.GetBookingByID(busBooking.BookingID)
+			if masterErr != nil {
+				s.logger.WithError(masterErr).Error("Failed to get master booking")
+			} else if masterBooking != nil {
+				response.BusBooking = &models.ConfirmedBusBooking{
+					ID:          uuid.MustParse(busBooking.ID),
+					Reference:   masterBooking.BookingReference,
+					TotalAmount: busBooking.TotalFare,
+				}
+				if busBooking.QRCodeData != nil {
+					response.BusBooking.QRCode = *busBooking.QRCodeData
+				}
+				response.MasterReference = masterBooking.BookingReference
+				s.logger.WithFields(logrus.Fields{
+					"bus_ref":    masterBooking.BookingReference,
+					"has_qr":     busBooking.QRCodeData != nil,
+				}).Info("Bus booking added to confirm response")
 			}
-			if busBooking.QRCodeData != nil {
-				response.BusBooking.QRCode = *busBooking.QRCodeData
-			}
-			response.MasterReference = masterBooking.BookingReference
 		}
 	}
 
@@ -1202,10 +1215,10 @@ func (s *BookingOrchestratorService) buildConfirmResponse(intent *models.Booking
 	}
 
 	s.logger.WithFields(logrus.Fields{
-		"has_bus_booking":   response.BusBooking != nil,
-		"has_pre_lounge":    response.PreLoungeBooking != nil,
-		"has_post_lounge":   response.PostLoungeBooking != nil,
-		"master_reference":  response.MasterReference,
+		"has_bus_booking":  response.BusBooking != nil,
+		"has_pre_lounge":   response.PreLoungeBooking != nil,
+		"has_post_lounge":  response.PostLoungeBooking != nil,
+		"master_reference": response.MasterReference,
 	}).Info("Confirm response built successfully")
 
 	return response

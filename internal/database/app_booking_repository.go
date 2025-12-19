@@ -437,6 +437,38 @@ func (r *AppBookingRepository) CancelBooking(bookingID, userID string, reason *s
 // BUS BOOKING OPERATIONS
 // ============================================================================
 
+// GetBusBookingByID retrieves bus booking by its own ID (bus_bookings.id)
+func (r *AppBookingRepository) GetBusBookingByID(busBookingID string) (*models.BusBooking, error) {
+	busBooking := &models.BusBooking{}
+	query := `
+		SELECT bb.id, bb.booking_id, bb.scheduled_trip_id,
+		       bb.boarding_stop_id, bb.alighting_stop_id,
+		       bb.number_of_seats, bb.fare_per_seat, bb.total_fare,
+		       bb.status, bb.checked_in_at, bb.checked_in_by_user_id,
+		       bb.boarded_at, bb.boarded_by_user_id, bb.completed_at,
+		       bb.cancelled_at, bb.cancellation_reason,
+		       bb.qr_code_data, bb.qr_generated_at, bb.special_requests,
+		       bb.created_at, bb.updated_at
+		FROM bus_bookings bb
+		WHERE bb.id = $1`
+
+	err := r.db.Get(busBooking, query, busBookingID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get denormalized data via JOINs
+	r.populateBusBookingDetails(busBooking)
+
+	// Get seats
+	seats, err := r.GetSeatsByBusBookingID(busBooking.ID)
+	if err == nil {
+		busBooking.Seats = seats
+	}
+
+	return busBooking, nil
+}
+
 // GetBusBookingByBookingID retrieves bus booking by master booking ID with JOINs for denormalized data
 func (r *AppBookingRepository) GetBusBookingByBookingID(bookingID string) (*models.BusBooking, error) {
 	busBooking := &models.BusBooking{}
