@@ -876,7 +876,26 @@ func (h *LoungeBookingHandler) GetMyLoungeBookings(c *gin.Context) {
 
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
-	statusFilter := c.Query("status") // Optional: "completed", "cancelled", etc.
+	statusFilter := strings.ToLower(strings.TrimSpace(c.Query("status"))) // Optional: "completed", "cancelled", etc.
+
+	if statusFilter != "" {
+		validStatuses := map[string]bool{
+			"pending":   true,
+			"confirmed": true,
+			"checked_in": true,
+			"completed": true,
+			"cancelled": true,
+			"no_show":   true,
+		}
+
+		if !validStatuses[statusFilter] {
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "invalid_status",
+				Message: "Invalid status filter. Allowed: pending, confirmed, checked_in, completed, cancelled, no_show",
+			})
+			return
+		}
+	}
 
 	var bookings []models.LoungeBookingListItem
 	var err error
