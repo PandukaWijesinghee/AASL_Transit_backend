@@ -641,21 +641,35 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 
 	// Create pre-trip lounge booking if present
 	if intent.PreTripLoungeIntent != nil {
-		s.logger.WithFields(logrus.Fields{
-			"intent_id":   intent.ID,
-			"lounge_id":   intent.PreTripLoungeIntent.LoungeID,
-			"lounge_name": intent.PreTripLoungeIntent.LoungeName,
-			"total_price": intent.PreTripLoungeIntent.TotalPrice,
-		}).Info("Creating pre-trip lounge booking from intent")
+		// Determine booking type: standalone for lounge-only, pre_trip when with bus
+		loungeBookingType := "pre_trip"
+		if intent.IntentType == models.IntentTypeLoungeOnly {
+			loungeBookingType = "standalone"
+		}
 
-		preLoungeBooking, err := s.createLoungeBookingFromIntent(intent, intent.PreTripLoungeIntent, "pre_trip", busBookingID)
+		s.logger.WithFields(logrus.Fields{
+			"intent_id":    intent.ID,
+			"lounge_id":    intent.PreTripLoungeIntent.LoungeID,
+			"lounge_name":  intent.PreTripLoungeIntent.LoungeName,
+			"total_price":  intent.PreTripLoungeIntent.TotalPrice,
+			"booking_type": loungeBookingType,
+		}).Info("Creating lounge booking from intent")
+
+		preLoungeBooking, err := s.createLoungeBookingFromIntent(intent, intent.PreTripLoungeIntent, loungeBookingType, busBookingID)
 		if err != nil {
 			s.logger.WithFields(logrus.Fields{
-				"error":     err.Error(),
-				"intent_id": intent.ID,
-				"lounge_id": intent.PreTripLoungeIntent.LoungeID,
-			}).Error("Failed to create pre-trip lounge booking")
-			// Continue - bus booking is created
+				"error":        err.Error(),
+				"intent_id":    intent.ID,
+				"lounge_id":    intent.PreTripLoungeIntent.LoungeID,
+				"booking_type": loungeBookingType,
+			}).Error("Failed to create lounge booking")
+
+			// For lounge_only intents, if lounge booking fails, the whole intent fails
+			if intent.IntentType == models.IntentTypeLoungeOnly {
+				s.intentRepo.UpdateIntentConfirmationFailed(intent.ID)
+				return nil, fmt.Errorf("failed to create lounge booking: %w", err)
+			}
+			// For combined intents, continue - at least bus booking is created
 		} else {
 			id := preLoungeBooking.ID
 			preLoungeBookingID = &id
@@ -797,14 +811,31 @@ func (s *BookingOrchestratorService) createLoungeBookingFromIntent(
 	bookingType string,
 	busBookingID *uuid.UUID,
 ) (*models.LoungeBooking, error) {
-	loungeID, _ := uuid.Parse(loungeIntent.LoungeID)
+	// Validate guests array
+	if len(loungeIntent.Guests) == 0 {
+		return nil, fmt.Errorf("lounge intent has no guests")
+	}
+
+	loungeID, err := uuid.Parse(loungeIntent.LoungeID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid lounge ID: %w", err)
+	}
+
+	// Parse scheduled arrival from intent date/time
+	scheduledArrival := time.Now().Add(time.Hour) // Default fallback
+	if loungeIntent.Date != "" && loungeIntent.CheckInTime != "" {
+		parsedTime, err := time.Parse("2006-01-02 15:04", loungeIntent.Date+" "+loungeIntent.CheckInTime)
+		if err == nil {
+			scheduledArrival = parsedTime
+		}
+	}
 
 	// Build lounge booking
 	booking := &models.LoungeBooking{
 		UserID:           intent.UserID,
 		LoungeID:         loungeID,
 		BusBookingID:     busBookingID,
-		ScheduledArrival: time.Now().Add(time.Hour), // Would be calculated from trip time
+		ScheduledArrival: scheduledArrival,
 		NumberOfGuests:   loungeIntent.GuestCount,
 		PricingType:      loungeIntent.PricingType,
 		PricePerGuest:    fmt.Sprintf("%.2f", loungeIntent.PricePerGuest),
