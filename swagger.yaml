@@ -1585,6 +1585,15 @@ paths:
                   has_company_info:
                     type: boolean
                     example: true
+                  verification_status:
+                    type: string
+                    enum: [pending, verified, rejected]
+                    description: Admin verification status of the bus owner account
+                    example: "pending"
+                  is_verified:
+                    type: boolean
+                    description: Whether the bus owner is verified and can operate
+                    example: false
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
@@ -1917,6 +1926,12 @@ paths:
                   staff_type:
                     type: string
                     example: "driver"
+        "403":
+          description: Account not verified - bus owner must be verified by admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountNotVerifiedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -2135,6 +2150,12 @@ paths:
                   error:
                     type: string
                     example: "Staff is already linked to another bus owner"
+        "403":
+          description: Account not verified - bus owner must be verified by admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountNotVerifiedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -2216,6 +2237,12 @@ paths:
                   error:
                     type: string
                     example: "Staff member not found"
+        "403":
+          description: Account not verified - bus owner must be verified by admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountNotVerifiedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -2274,6 +2301,12 @@ paths:
           description: Bad request - validation failed
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Account not verified - bus owner must be verified by admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountNotVerifiedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -2377,6 +2410,12 @@ paths:
           description: Bad request - validation failed
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Account not verified - bus owner must be verified by admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountNotVerifiedError"
         "404":
           description: Route not found
         "500":
@@ -2410,6 +2449,12 @@ paths:
                     example: "Route deleted successfully"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Account not verified - bus owner must be verified by admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountNotVerifiedError"
         "404":
           description: Route not found
         "500":
@@ -5352,6 +5397,12 @@ paths:
           description: Invalid request or validation error
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Account not verified - bus owner must be verified by admin to create buses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountNotVerifiedError"
         "404":
           description: Permit not found
         "409":
@@ -5424,7 +5475,11 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: Permission denied
+          description: Permission denied or account not verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountNotVerifiedError"
         "404":
           description: Bus not found
         "500":
@@ -5458,6 +5513,12 @@ paths:
                     example: Bus deleted successfully
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Account not verified - bus owner must be verified by admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountNotVerifiedError"
         "404":
           description: Bus not found or permission denied
         "500":
@@ -8293,6 +8354,25 @@ components:
         Include in Authorization header as: `Bearer <token>`
 
   schemas:
+    # Error Schema for Account Not Verified
+    AccountNotVerifiedError:
+      type: object
+      description: Error returned when bus owner account is not verified by admin
+      properties:
+        error:
+          type: string
+          example: "Bus owner account is not verified"
+        code:
+          type: string
+          example: "ACCOUNT_NOT_VERIFIED"
+        verification_status:
+          type: string
+          enum: [pending, verified, rejected]
+          example: "pending"
+        message:
+          type: string
+          example: "Your account must be verified by admin before you can perform this operation. Please wait for verification or contact support."
+
     User:
       type: object
       properties:

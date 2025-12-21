@@ -29,6 +29,21 @@ func NewBusOwnerHandler(busOwnerRepo *database.BusOwnerRepository, permitRepo *d
 	}
 }
 
+// checkBusOwnerVerified is a helper that checks if the bus owner is verified.
+// Returns true if verified, or sends an error response and returns false if not.
+func (h *BusOwnerHandler) checkBusOwnerVerified(c *gin.Context, busOwner *models.BusOwner) bool {
+	if busOwner.VerificationStatus != models.VerificationVerified {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":               "Bus owner account is not verified",
+			"code":                "ACCOUNT_NOT_VERIFIED",
+			"verification_status": busOwner.VerificationStatus,
+			"message":             "Your account must be verified by admin before you can perform this operation. Please wait for verification or contact support.",
+		})
+		return false
+	}
+	return true
+}
+
 // GetProfile retrieves the bus owner profile
 // GET /api/v1/bus-owner/profile
 func (h *BusOwnerHandler) GetProfile(c *gin.Context) {
@@ -93,12 +108,17 @@ func (h *BusOwnerHandler) CheckProfileStatus(c *gin.Context) {
 		*busOwner.CompanyName != "" &&
 		*busOwner.IdentityOrIncorporationNo != ""
 
+	// Check verification status - bus owners can only operate when verified
+	isVerified := busOwner.VerificationStatus == models.VerificationVerified
+
 	c.JSON(http.StatusOK, gin.H{
-		"user_id":           userCtx.UserID.String(),
-		"phone":             userCtx.Phone,
-		"profile_completed": busOwner.ProfileCompleted,
-		"permit_count":      permitCount,
-		"has_company_info":  hasCompanyInfo,
+		"user_id":             userCtx.UserID.String(),
+		"phone":               userCtx.Phone,
+		"profile_completed":   busOwner.ProfileCompleted,
+		"permit_count":        permitCount,
+		"has_company_info":    hasCompanyInfo,
+		"verification_status": busOwner.VerificationStatus,
+		"is_verified":         isVerified,
 	})
 }
 
@@ -423,6 +443,11 @@ func (h *BusOwnerHandler) LinkStaff(c *gin.Context) {
 		return
 	}
 
+	// Check if bus owner is verified before allowing staff linking
+	if !h.checkBusOwnerVerified(c, busOwner) {
+		return
+	}
+
 	// Parse request
 	var req models.LinkStaffRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -521,6 +546,11 @@ func (h *BusOwnerHandler) AddStaff(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get bus owner profile"})
+		return
+	}
+
+	// Check if bus owner is verified before allowing staff addition
+	if !h.checkBusOwnerVerified(c, busOwner) {
 		return
 	}
 
@@ -821,6 +851,11 @@ func (h *BusOwnerHandler) UnlinkStaff(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get bus owner profile"})
+		return
+	}
+
+	// Check if bus owner is verified before allowing staff unlinking
+	if !h.checkBusOwnerVerified(c, busOwner) {
 		return
 	}
 

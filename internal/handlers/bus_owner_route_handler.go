@@ -23,6 +23,21 @@ func NewBusOwnerRouteHandler(routeRepo *database.BusOwnerRouteRepository, busOwn
 	}
 }
 
+// checkBusOwnerVerified is a helper that checks if the bus owner is verified.
+// Returns true if verified, or sends an error response and returns false if not.
+func (h *BusOwnerRouteHandler) checkBusOwnerVerified(c *gin.Context, busOwner *models.BusOwner) bool {
+	if busOwner.VerificationStatus != models.VerificationVerified {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":               "Bus owner account is not verified",
+			"code":                "ACCOUNT_NOT_VERIFIED",
+			"verification_status": busOwner.VerificationStatus,
+			"message":             "Your account must be verified by admin before you can perform this operation. Please wait for verification or contact support.",
+		})
+		return false
+	}
+	return true
+}
+
 // CreateRoute creates a new custom route
 // POST /api/v1/bus-owner-routes
 func (h *BusOwnerRouteHandler) CreateRoute(c *gin.Context) {
@@ -54,6 +69,11 @@ func (h *BusOwnerRouteHandler) CreateRoute(c *gin.Context) {
 		return
 	}
 	log.Printf("✅ [BUS OWNER ROUTE] Found bus owner: %s", busOwner.ID)
+
+	// Check if bus owner is verified before allowing route creation
+	if !h.checkBusOwnerVerified(c, busOwner) {
+		return
+	}
 
 	// Validate request
 	if err := req.Validate(); err != nil {
@@ -257,6 +277,11 @@ func (h *BusOwnerRouteHandler) UpdateRoute(c *gin.Context) {
 		return
 	}
 
+	// Check if bus owner is verified before allowing route update
+	if !h.checkBusOwnerVerified(c, busOwner) {
+		return
+	}
+
 	// Verify ownership
 	if existingRoute.BusOwnerID != busOwner.ID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
@@ -319,6 +344,11 @@ func (h *BusOwnerRouteHandler) DeleteRoute(c *gin.Context) {
 	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Bus owner profile not found"})
+		return
+	}
+
+	// Check if bus owner is verified before allowing route deletion
+	if !h.checkBusOwnerVerified(c, busOwner) {
 		return
 	}
 
