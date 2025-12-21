@@ -1353,6 +1353,15 @@ func (h *ScheduledTripHandler) AssignSeatLayout(c *gin.Context) {
 		return
 	}
 
+	// CRITICAL: Prevent reassignment - seat layout is permanent once assigned
+	if trip.SeatLayoutID != nil && *trip.SeatLayoutID != "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Seat layout already assigned",
+			"message": "This trip already has a seat layout assigned. Once assigned, the seat layout cannot be changed. This ensures booking integrity.",
+		})
+		return
+	}
+
 	// Verify the seat layout exists and belongs to this bus owner
 	// Note: You need a repository method to verify seat layout ownership
 	// For now, we'll proceed with the assignment

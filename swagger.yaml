@@ -6148,9 +6148,14 @@ paths:
 
   /api/v1/scheduled-trips/{id}/assign-seat-layout:
     patch:
-      summary: Assign seat layout template to a scheduled trip
+      summary: Assign seat layout template to a scheduled trip (PERMANENT)
       description: |
         Assign a seat layout template to a specific scheduled trip and create trip seats. 
+
+        **⚠️ IMPORTANT: This is a PERMANENT action!**
+        Once a seat layout is assigned to a trip, it CANNOT be changed or removed.
+        This ensures booking integrity - passengers who booked specific seats will
+        always have those same seats.
 
         **Business Context**:
         In Sri Lanka, buses change frequently on the same route, so seat layouts 
@@ -6165,6 +6170,7 @@ paths:
 
         **Requirements**:
         - Only the bus owner who owns the trip can assign seat layouts
+        - Trip must NOT already have a seat layout assigned (no reassignment allowed)
         - Seat layout must be assigned before trip can be published (is_bookable=true)
         - Seat layout template must have seats configured (not empty)
         - If seat creation fails, the operation returns an error (not silent warning)
@@ -6212,6 +6218,16 @@ paths:
                   message:
                     type: string
                     example: "Seat layout assigned successfully"
+                  trip:
+                    $ref: "#/components/schemas/ScheduledTrip"
+                  seats_created:
+                    type: integer
+                    example: 56
+        "400":
+          description: |
+            Invalid request:
+            - seat_layout_id is required
+            - Seat layout already assigned (cannot reassign)
             - Seat layout has no seats configured
             - Failed to create trip seats from layout
           content:
@@ -6221,18 +6237,10 @@ paths:
                 properties:
                   error:
                     type: string
-                    example: "Invalid request body"
-                    enum:
-                      - "Invalid request body"
-                      - "failed to create trip seats from layout"
-                      - "seat layout has no seats configured
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
+                    example: "Seat layout already assigned"
+                  message:
                     type: string
-                    example: "Invalid request body"
+                    example: "This trip already has a seat layout assigned. Once assigned, the seat layout cannot be changed."
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
