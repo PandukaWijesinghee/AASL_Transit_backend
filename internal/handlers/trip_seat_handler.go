@@ -37,6 +37,21 @@ func NewTripSeatHandler(
 	}
 }
 
+// checkBusOwnerVerified checks if the bus owner is verified and returns 403 if not.
+// Returns true if NOT verified (caller should return), false if verified (caller can proceed).
+func (h *TripSeatHandler) checkBusOwnerVerified(c *gin.Context, busOwner *models.BusOwner) bool {
+	if busOwner.VerificationStatus != models.VerificationVerified {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":               "Account not verified",
+			"code":                "ACCOUNT_NOT_VERIFIED",
+			"verification_status": busOwner.VerificationStatus,
+			"message":             "Your account must be verified by an administrator before you can perform this action",
+		})
+		return true
+	}
+	return false
+}
+
 // ===========================================================================
 // TRIP SEATS ENDPOINTS
 // ===========================================================================
@@ -97,6 +112,24 @@ func (h *TripSeatHandler) CreateTripSeats(c *gin.Context) {
 		return
 	}
 
+	// Verify the trip exists and belongs to this bus owner
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only bus owners can create trip seats"})
+		return
+	}
+
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
+		return
+	}
+
 	var req models.CreateTripSeatsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -105,15 +138,6 @@ func (h *TripSeatHandler) CreateTripSeats(c *gin.Context) {
 
 	// Override tripId from URL
 	req.ScheduledTripID = tripID
-
-	// Verify the trip exists and belongs to this bus owner
-	userCtx, exists := middleware.GetUserContext(c)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
-	// TODO: Add ownership verification here
 
 	// Create trip seats from layout
 	count, err := h.tripSeatRepo.CreateTripSeatsFromLayout(req.ScheduledTripID, req.SeatLayoutID, req.BaseFare)
@@ -143,6 +167,17 @@ func (h *TripSeatHandler) BlockSeats(c *gin.Context) {
 	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only bus owners can block seats"})
+		return
+	}
+
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
 		return
 	}
 
@@ -188,6 +223,23 @@ func (h *TripSeatHandler) UnblockSeats(c *gin.Context) {
 		return
 	}
 
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only bus owners can unblock seats"})
+		return
+	}
+
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
+		return
+	}
+
 	var req models.UnblockSeatsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -227,6 +279,23 @@ func (h *TripSeatHandler) UpdateSeatPrices(c *gin.Context) {
 	tripID := c.Param("id")
 	if tripID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Trip ID is required"})
+		return
+	}
+
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only bus owners can update seat prices"})
+		return
+	}
+
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
 		return
 	}
 
@@ -325,6 +394,17 @@ func (h *TripSeatHandler) CreateManualBooking(c *gin.Context) {
 	userCtx, exists := middleware.GetUserContext(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	busOwner, err := h.busOwnerRepo.GetByUserID(userCtx.UserID.String())
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only bus owners can create manual bookings"})
+		return
+	}
+
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
 		return
 	}
 

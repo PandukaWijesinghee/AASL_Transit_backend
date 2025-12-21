@@ -49,6 +49,21 @@ func NewScheduledTripHandler(
 	}
 }
 
+// checkBusOwnerVerified checks if the bus owner is verified and returns 403 if not.
+// Returns true if NOT verified (caller should return), false if verified (caller can proceed).
+func (h *ScheduledTripHandler) checkBusOwnerVerified(c *gin.Context, busOwner *models.BusOwner) bool {
+	if busOwner.VerificationStatus != models.VerificationVerified {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":               "Account not verified",
+			"code":                "ACCOUNT_NOT_VERIFIED",
+			"verification_status": busOwner.VerificationStatus,
+			"message":             "Your account must be verified by an administrator before you can perform this action",
+		})
+		return true
+	}
+	return false
+}
+
 // GetTripsByDateRange retrieves scheduled trips within a date range
 // GET /api/v1/scheduled-trips?start_date=2024-01-01&end_date=2024-01-31
 func (h *ScheduledTripHandler) GetTripsByDateRange(c *gin.Context) {
@@ -306,6 +321,11 @@ func (h *ScheduledTripHandler) UpdateTrip(c *gin.Context) {
 		return
 	}
 
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
+		return
+	}
+
 	tripID := c.Param("id")
 
 	trip, err := h.tripRepo.GetByID(tripID)
@@ -458,6 +478,11 @@ func (h *ScheduledTripHandler) CancelTrip(c *gin.Context) {
 		return
 	}
 
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
+		return
+	}
+
 	tripID := c.Param("id")
 
 	trip, err := h.tripRepo.GetByID(tripID)
@@ -557,6 +582,11 @@ func (h *ScheduledTripHandler) CreateSpecialTrip(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch profile"})
+		return
+	}
+
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
 		return
 	}
 
@@ -752,6 +782,11 @@ func (h *ScheduledTripHandler) PublishTrip(c *gin.Context) {
 		return
 	}
 
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
+		return
+	}
+
 	// Get trip details to check seat layout
 	trip, err := h.tripRepo.GetByID(tripID)
 	if err != nil {
@@ -845,6 +880,11 @@ func (h *ScheduledTripHandler) UnpublishTrip(c *gin.Context) {
 		return
 	}
 
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
+		return
+	}
+
 	// Unpublish the trip
 	if err := h.tripRepo.UnpublishTrip(tripID, busOwner.ID); err != nil {
 		if err.Error() == "trip not found or unauthorized" {
@@ -900,6 +940,11 @@ func (h *ScheduledTripHandler) BulkPublishTrips(c *gin.Context) {
 		}
 		log.Printf("Bulk publish: Failed to fetch bus owner: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bus owner"})
+		return
+	}
+
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
 		return
 	}
 
@@ -979,6 +1024,11 @@ func (h *ScheduledTripHandler) BulkUnpublishTrips(c *gin.Context) {
 		return
 	}
 
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
+		return
+	}
+
 	log.Printf("Bulk unpublish: Bus owner found - ID: %s, User ID: %s",
 		busOwner.ID, userCtx.UserID.String())
 
@@ -1018,6 +1068,11 @@ func (h *ScheduledTripHandler) AssignStaffAndPermit(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bus owner"})
+		return
+	}
+
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
 		return
 	}
 
@@ -1295,6 +1350,11 @@ func (h *ScheduledTripHandler) AssignSeatLayout(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bus owner"})
+		return
+	}
+
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
 		return
 	}
 

@@ -2764,7 +2764,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: Access denied
+          $ref: "#/components/responses/AccountNotVerifiedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -5095,6 +5095,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AccountNotVerifiedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -5192,6 +5194,8 @@ paths:
           description: Permit not found
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AccountNotVerifiedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -5225,6 +5229,8 @@ paths:
           description: Permit not found
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AccountNotVerifiedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -5706,6 +5712,8 @@ paths:
           description: Invalid input
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AccountNotVerifiedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -5806,6 +5814,8 @@ paths:
           description: Schedule not found
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AccountNotVerifiedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -5964,6 +5974,8 @@ paths:
           description: Trip not found
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AccountNotVerifiedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -6041,7 +6053,17 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: Only bus owners can publish trips
+          description: Bus owner account not verified or not a bus owner
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      error:
+                        type: string
+                        example: "Only bus owners can publish trips"
+                  - $ref: "#/components/schemas/AccountNotVerifiedError"
         "404":
           description: Trip not found or access denied
         "500":
@@ -6084,7 +6106,17 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: Only bus owners can unpublish trips
+          description: Bus owner account not verified or not a bus owner
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      error:
+                        type: string
+                        example: "Only bus owners can unpublish trips"
+                  - $ref: "#/components/schemas/AccountNotVerifiedError"
         "404":
           description: Trip not found or access denied
         "500":
@@ -6192,16 +6224,19 @@ paths:
         "403":
           description: |
             Access denied:
+            - Bus owner account not verified
             - Only bus owners can assign staff and permits
             - Staff or permit does not belong to your organization
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Driver does not belong to your organization"
+                oneOf:
+                  - $ref: "#/components/schemas/AccountNotVerifiedError"
+                  - type: object
+                    properties:
+                      error:
+                        type: string
+                        example: "Driver does not belong to your organization"
         "404":
           description: Trip not found
         "500":
@@ -6307,16 +6342,19 @@ paths:
         "403":
           description: |
             Access denied:
+            - Bus owner account not verified
             - Only bus owners can assign seat layouts
             - Trip does not belong to your organization
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Unauthorized to modify this trip"
+                oneOf:
+                  - $ref: "#/components/schemas/AccountNotVerifiedError"
+                  - type: object
+                    properties:
+                      error:
+                        type: string
+                        example: "Unauthorized to modify this trip"
         "404":
           description: Trip not found
         "500":
@@ -6398,7 +6436,17 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: Only bus owners can publish trips
+          description: Bus owner account not verified or not a bus owner
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/AccountNotVerifiedError"
+                  - type: object
+                    properties:
+                      error:
+                        type: string
+                        example: "Only bus owners can publish trips"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -6455,7 +6503,17 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: Only bus owners can unpublish trips
+          description: Bus owner account not verified or not a bus owner
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/AccountNotVerifiedError"
+                  - type: object
+                    properties:
+                      error:
+                        type: string
+                        example: "Only bus owners can unpublish trips"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -6638,6 +6696,8 @@ paths:
           description: Invalid request
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AccountNotVerifiedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -6690,6 +6750,8 @@ paths:
           description: Invalid seat IDs or seats not available
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AccountNotVerifiedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -6737,6 +6799,8 @@ paths:
           description: Invalid seat IDs or seats not blocked
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AccountNotVerifiedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -6787,6 +6851,8 @@ paths:
           description: Invalid seat IDs
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AccountNotVerifiedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -6923,6 +6989,8 @@ paths:
             - Seats don't belong to this trip
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/AccountNotVerifiedError"
         "500":
           $ref: "#/components/responses/InternalServerError"
 

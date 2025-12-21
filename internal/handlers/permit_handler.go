@@ -24,6 +24,21 @@ func NewPermitHandler(permitRepo *database.RoutePermitRepository, busOwnerRepo *
 	}
 }
 
+// checkBusOwnerVerified checks if the bus owner is verified and returns 403 if not.
+// Returns true if NOT verified (caller should return), false if verified (caller can proceed).
+func (h *PermitHandler) checkBusOwnerVerified(c *gin.Context, busOwner *models.BusOwner) bool {
+	if busOwner.VerificationStatus != models.VerificationVerified {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":               "Account not verified",
+			"code":                "ACCOUNT_NOT_VERIFIED",
+			"verification_status": busOwner.VerificationStatus,
+			"message":             "Your account must be verified by an administrator before you can perform this action",
+		})
+		return true
+	}
+	return false
+}
+
 // GetAllPermits retrieves all permits for the authenticated bus owner
 // GET /api/v1/permits
 func (h *PermitHandler) GetAllPermits(c *gin.Context) {
@@ -155,6 +170,11 @@ func (h *PermitHandler) CreatePermit(c *gin.Context) {
 		return
 	}
 
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
+		return
+	}
+
 	// Parse request
 	var req models.CreateRoutePermitRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -208,6 +228,11 @@ func (h *PermitHandler) UpdatePermit(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch profile"})
+		return
+	}
+
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
 		return
 	}
 
@@ -272,6 +297,11 @@ func (h *PermitHandler) DeletePermit(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch profile"})
+		return
+	}
+
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
 		return
 	}
 

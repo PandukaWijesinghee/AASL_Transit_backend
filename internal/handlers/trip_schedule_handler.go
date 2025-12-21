@@ -40,6 +40,21 @@ func NewTripScheduleHandler(
 	}
 }
 
+// checkBusOwnerVerified checks if the bus owner is verified and returns 403 if not.
+// Returns true if NOT verified (caller should return), false if verified (caller can proceed).
+func (h *TripScheduleHandler) checkBusOwnerVerified(c *gin.Context, busOwner *models.BusOwner) bool {
+	if busOwner.VerificationStatus != models.VerificationVerified {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":               "Account not verified",
+			"code":                "ACCOUNT_NOT_VERIFIED",
+			"verification_status": busOwner.VerificationStatus,
+			"message":             "Your account must be verified by an administrator before you can perform this action",
+		})
+		return true
+	}
+	return false
+}
+
 // GetAllSchedules retrieves all trip schedules for the authenticated bus owner
 // GET /api/v1/trip-schedules
 func (h *TripScheduleHandler) GetAllSchedules(c *gin.Context) {
@@ -170,6 +185,11 @@ func (h *TripScheduleHandler) CreateSchedule(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch profile"})
+		return
+	}
+
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
 		return
 	}
 
@@ -336,6 +356,11 @@ func (h *TripScheduleHandler) UpdateSchedule(c *gin.Context) {
 		return
 	}
 
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
+		return
+	}
+
 	scheduleID := c.Param("id")
 
 	// Get existing schedule
@@ -493,6 +518,11 @@ func (h *TripScheduleHandler) DeleteSchedule(c *gin.Context) {
 		return
 	}
 
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
+		return
+	}
+
 	scheduleID := c.Param("id")
 
 	schedule, err := h.scheduleRepo.GetByID(scheduleID)
@@ -535,6 +565,11 @@ func (h *TripScheduleHandler) CreateTimetable(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch profile"})
+		return
+	}
+
+	// Check verification status
+	if h.checkBusOwnerVerified(c, busOwner) {
 		return
 	}
 
