@@ -5918,8 +5918,17 @@ paths:
         - Attempting to publish without seat_layout_id will fail with error
         - Once published, ever_published flag is set to true permanently
 
+        **Automatic Seat Creation**:
+        - If trip has seat_layout_id but trip_seats records don't exist, the system automatically creates them
+        - Seats are created from the assigned seat layout template
+        - If seat creation fails (e.g., layout has no seats configured), publish fails with error
+
         **Validation**:
-        The system validates that seat_layout_id IS NOT NULL before allowing publish.
+        The system validates that:
+        1. seat_layout_id IS NOT NULL
+        2. trip_seats records exist (auto-creates if missing)
+        3. Seat layout has valid seats configured
+        
         Use the `/scheduled-trips/{id}/assign-seat-layout` endpoint to assign a seat 
         layout before publishing.
       operationId: publishScheduledTrip
@@ -5955,6 +5964,7 @@ paths:
             Validation failed:
             - Invalid trip ID format
             - Seat layout not assigned (seat_layout_id is NULL)
+            - Trip seats creation failed (layout has no seats configured)
           content:
             application/json:
               schema:
@@ -5963,6 +5973,10 @@ paths:
                   error:
                     type: string
                     example: "cannot publish trip: seat layout must be assigned before publishing"
+                    enum:
+                      - "cannot publish trip: seat layout must be assigned before publishing"
+                      - "cannot publish trip: failed to create trip seats from layout"
+                      - "cannot publish trip: trip has no seats assigned"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -6136,17 +6150,24 @@ paths:
     patch:
       summary: Assign seat layout template to a scheduled trip
       description: |
-        Assign a seat layout template to a specific scheduled trip. 
+        Assign a seat layout template to a specific scheduled trip and create trip seats. 
 
         **Business Context**:
         In Sri Lanka, buses change frequently on the same route, so seat layouts 
         are assigned per trip rather than per bus. Each trip needs its own seat 
         layout assignment before it can be published for booking.
 
+        **Seat Creation Process**:
+        - Automatically creates trip_seats records from the selected layout template
+        - Each seat from the template is copied to the trip with available status
+        - If seat creation fails (e.g., layout has no seats configured), the entire operation fails
+        - The seat_layout_id assignment is rolled back if seat creation fails
+
         **Requirements**:
         - Only the bus owner who owns the trip can assign seat layouts
         - Seat layout must be assigned before trip can be published (is_bookable=true)
-        - Attempting to publish without seat_layout_id will fail with validation error
+        - Seat layout template must have seats configured (not empty)
+        - If seat creation fails, the operation returns an error (not silent warning)
 
         **Database Constraint**:
         A check constraint enforces that if is_bookable=true, then seat_layout_id 
@@ -6191,14 +6212,20 @@ paths:
                   message:
                     type: string
                     example: "Seat layout assigned successfully"
-                  trip:
-                    $ref: "#/components/schemas/ScheduledTrip"
-        "400":
-          description: |
-            Invalid request body:
-            - seat_layout_id is required
-            - Trip has no schedule link (cannot determine ownership)
+            - Seat layout has no seats configured
+            - Failed to create trip seats from layout
           content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid request body"
+                    enum:
+                      - "Invalid request body"
+                      - "failed to create trip seats from layout"
+                      - "seat layout has no seats configured
             application/json:
               schema:
                 type: object

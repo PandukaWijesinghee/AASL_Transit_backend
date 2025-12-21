@@ -752,6 +752,50 @@ func (h *ScheduledTripHandler) PublishTrip(c *gin.Context) {
 		return
 	}
 
+	// Get trip details to check seat layout
+	trip, err := h.tripRepo.GetByID(tripID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Trip not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch trip"})
+		return
+	}
+
+	// Check if seat layout is assigned
+	if trip.SeatLayoutID == nil || *trip.SeatLayoutID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Seat layout required",
+			"message": "Please assign a seat layout to this trip before publishing for booking",
+		})
+		return
+	}
+
+	// Check if trip_seats exist for this trip
+	existingSeats, err := h.tripSeatRepo.GetByScheduledTripID(tripID)
+	if err != nil {
+		log.Printf("PublishTrip: Error checking existing seats: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check trip seats"})
+		return
+	}
+
+	// If no seats exist but seat layout is assigned, auto-create them
+	if len(existingSeats) == 0 {
+		log.Printf("PublishTrip: No seats found for trip %s, auto-creating from layout %s", tripID, *trip.SeatLayoutID)
+		seatsCreated, err := h.tripSeatRepo.CreateTripSeatsFromLayout(tripID, *trip.SeatLayoutID, trip.BaseFare)
+		if err != nil {
+			log.Printf("PublishTrip: Failed to create trip seats: %v", err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Failed to create trip seats",
+				"message": "Could not create seats from the assigned layout. Please try assigning the seat layout again.",
+				"details": err.Error(),
+			})
+			return
+		}
+		log.Printf("PublishTrip: Auto-created %d seats for trip %s", seatsCreated, tripID)
+	}
+
 	// Publish the trip
 	if err := h.tripRepo.PublishTrip(tripID, busOwner.ID); err != nil {
 		if err.Error() == "trip not found or unauthorized" {
@@ -1321,17 +1365,33 @@ func (h *ScheduledTripHandler) AssignSeatLayout(c *gin.Context) {
 		return
 	}
 
-	// Auto-create trip seats from the layout
+	// Auto-create trip seats from the layout - THIS IS REQUIRED, NOT OPTIONAL
 	seatsCreated := 0
 	if req.SeatLayoutID != nil && *req.SeatLayoutID != "" {
 		seatsCreated, err = h.tripSeatRepo.CreateTripSeatsFromLayout(tripID, *req.SeatLayoutID, trip.BaseFare)
 		if err != nil {
-			fmt.Printf("⚠️ Warning: Failed to create trip seats: %v\n", err)
-			// Don't fail the entire request, just log the warning
-			// The user can manually trigger seat creation later if needed
-		} else {
-			fmt.Printf("✅ Created %d trip seats from layout %s\n", seatsCreated, *req.SeatLayoutID)
+			fmt.Printf("❌ Failed to create trip seats: %v\n", err)
+			// Rollback the seat layout assignment since seats couldn't be created
+			h.tripRepo.AssignSeatLayout(tripID, nil)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Failed to create trip seats from layout",
+				"message": "The seat layout was not applied because trip seats could not be created. Please check the seat layout configuration.",
+				"details": err.Error(),
+			})
+			return
 		}
+		fmt.Printf("✅ Created %d trip seats from layout %s\n", seatsCreated, *req.SeatLayoutID)
+	}
+
+	// Verify seats were actually created
+	if seatsCreated == 0 {
+		// Rollback the seat layout assignment
+		h.tripRepo.AssignSeatLayout(tripID, nil)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "No seats in layout",
+			"message": "The selected seat layout has no seats configured. Please choose a different layout or configure seats in this layout first.",
+		})
+		return
 	}
 
 	// Fetch updated trip
