@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/smarttransit/sms-auth-backend/internal/database"
@@ -12,9 +13,10 @@ import (
 
 // StaffHandler handles staff-related HTTP requests
 type StaffHandler struct {
-	staffService *services.StaffService
-	userRepo     *database.UserRepository
-	staffRepo    *database.BusStaffRepository
+	staffService      *services.StaffService
+	userRepo          *database.UserRepository
+	staffRepo         *database.BusStaffRepository
+	scheduledTripRepo *database.ScheduledTripRepository
 }
 
 // NewStaffHandler creates a new StaffHandler
@@ -22,11 +24,13 @@ func NewStaffHandler(
 	staffService *services.StaffService,
 	userRepo *database.UserRepository,
 	staffRepo *database.BusStaffRepository,
+	scheduledTripRepo *database.ScheduledTripRepository,
 ) *StaffHandler {
 	return &StaffHandler{
-		staffService: staffService,
-		userRepo:     userRepo,
-		staffRepo:    staffRepo,
+		staffService:      staffService,
+		userRepo:          userRepo,
+		staffRepo:         staffRepo,
+		scheduledTripRepo: scheduledTripRepo,
 	}
 }
 
@@ -204,5 +208,100 @@ func (h *StaffHandler) SearchBusOwners(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"found":     true,
 		"bus_owner": busOwner,
+	})
+}
+
+// GetMyTrips gets trips assigned to the authenticated staff member
+// GET /api/v1/staff/my-trips?start_date=2024-01-01&end_date=2024-01-31
+func (h *StaffHandler) GetMyTrips(c *gin.Context) {
+	// Get user context from Gin (set by auth middleware)
+	userCtx, exists := middleware.GetUserContext(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":   "unauthorized",
+			"message": "User not authenticated",
+		})
+		return
+	}
+
+	userIDStr := userCtx.UserID.String()
+
+	// Get staff profile to get staff_id
+	staff, err := h.staffRepo.GetByUserID(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "not_staff",
+			"message": "User is not registered as staff",
+		})
+		return
+	}
+
+	// Parse date parameters (default to today + 7 days)
+	startDateStr := c.Query("start_date")
+	endDateStr := c.Query("end_date")
+
+	var startDate, endDate time.Time
+
+	if startDateStr == "" {
+		// Default to today
+		startDate = time.Now().Truncate(24 * time.Hour)
+	} else {
+		startDate, err = time.Parse("2006-01-02", startDateStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "invalid_date",
+				"message": "Invalid start_date format. Use YYYY-MM-DD",
+			})
+			return
+		}
+	}
+
+	if endDateStr == "" {
+		// Default to 7 days from start
+		endDate = startDate.Add(7 * 24 * time.Hour)
+	} else {
+		endDate, err = time.Parse("2006-01-02", endDateStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "invalid_date",
+				"message": "Invalid end_date format. Use YYYY-MM-DD",
+			})
+			return
+		}
+	}
+
+	// Get assigned trips
+	trips, err := h.scheduledTripRepo.GetAssignedTripsForStaff(staff.ID, startDate, endDate)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "fetch_failed",
+			"message": "Failed to fetch assigned trips",
+		})
+		return
+	}
+
+	// Enrich trips with role information (is_driver, is_conductor)
+	type TripWithRole struct {
+		models.ScheduledTripWithRouteInfo
+		IsDriver    bool `json:"is_driver"`
+		IsConductor bool `json:"is_conductor"`
+	}
+
+	enrichedTrips := make([]TripWithRole, len(trips))
+	for i, trip := range trips {
+		enrichedTrips[i] = TripWithRole{
+			ScheduledTripWithRouteInfo: trip,
+			IsDriver:                   trip.AssignedDriverID != nil && *trip.AssignedDriverID == staff.ID,
+			IsConductor:                trip.AssignedConductorID != nil && *trip.AssignedConductorID == staff.ID,
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"trips":      enrichedTrips,
+		"count":      len(enrichedTrips),
+		"staff_id":   staff.ID,
+		"staff_type": staff.StaffType,
+		"start_date": startDate.Format("2006-01-02"),
+		"end_date":   endDate.Format("2006-01-02"),
 	})
 }

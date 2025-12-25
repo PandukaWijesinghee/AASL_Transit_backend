@@ -197,7 +197,7 @@ func main() {
 	)
 
 	// Initialize staff handler
-	staffHandler := handlers.NewStaffHandler(staffService, userRepository, staffRepository)
+	staffHandler := handlers.NewStaffHandler(staffService, userRepository, staffRepository, scheduledTripRepo)
 
 	// Initialize bus owner and permit handlers
 	busOwnerHandler := handlers.NewBusOwnerHandler(ownerRepository, permitRepository, userRepository, staffRepository)
@@ -490,6 +490,7 @@ func main() {
 			{
 				staffProtected.GET("/profile", staffHandler.GetProfile)
 				staffProtected.PUT("/profile", staffHandler.UpdateProfile)
+				staffProtected.GET("/my-trips", staffHandler.GetMyTrips)
 			}
 		}
 

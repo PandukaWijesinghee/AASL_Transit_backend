@@ -1528,6 +1528,98 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/staff/my-trips:
+    get:
+      summary: Get assigned trips for staff member
+      description: |
+        Retrieves all trips assigned to the authenticated staff member (driver or conductor).
+        
+        **Returns trips where:**
+        - User is assigned as driver (assigned_driver_id matches user's staff ID)
+        - OR user is assigned as conductor (assigned_conductor_id matches user's staff ID)
+        
+        **Each trip includes:**
+        - `is_driver`: true if user is assigned as driver for this trip
+        - `is_conductor`: true if user is assigned as conductor for this trip
+        
+        **Filters:**
+        - Only returns trips with status NOT in ('cancelled', 'completed')
+        - Optional date range filtering via query parameters
+        
+        **Use Case:** Driver/Conductor app home screen to show upcoming assigned trips
+      operationId: getStaffAssignedTrips
+      tags:
+        - Staff
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: start_date
+          in: query
+          required: false
+          description: Filter trips starting from this date (YYYY-MM-DD format)
+          schema:
+            type: string
+            format: date
+            example: "2025-12-26"
+        - name: end_date
+          in: query
+          required: false
+          description: Filter trips until this date (YYYY-MM-DD format)
+          schema:
+            type: string
+            format: date
+            example: "2025-12-31"
+      responses:
+        "200":
+          description: Assigned trips retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trips:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/StaffAssignedTrip"
+                  count:
+                    type: integer
+                    description: Total number of trips returned
+                    example: 3
+                  staff_id:
+                    type: string
+                    format: uuid
+                    description: Staff member's ID
+                    example: "d581c281-ba77-49d2-8f68-5f7377417bf8"
+                  staff_type:
+                    type: string
+                    enum: [driver, conductor]
+                    description: Staff member's type
+                    example: "driver"
+                  start_date:
+                    type: string
+                    format: date
+                    description: Filter start date (if provided)
+                    example: "2025-12-26"
+                  end_date:
+                    type: string
+                    format: date
+                    description: Filter end date (if provided)
+                    example: "2025-12-31"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Staff profile not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Staff profile not found"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   # ============================================================================
   # Bus Owner Endpoints
   # ============================================================================
@@ -9792,6 +9884,96 @@ components:
           type: string
           format: date-time
           example: "2025-11-01T10:00:00Z"
+
+    StaffAssignedTrip:
+      type: object
+      description: Trip assigned to a staff member (driver or conductor)
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Scheduled trip ID
+          example: "e4eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        trip_schedule_id:
+          type: string
+          format: uuid
+          description: Parent trip schedule ID
+          example: "d3eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        departure_datetime:
+          type: string
+          format: date-time
+          description: Trip departure date and time
+          example: "2025-12-26T08:00:00Z"
+        route_number:
+          type: string
+          nullable: true
+          description: Route number from master routes
+          example: "138"
+        route_display_name:
+          type: string
+          nullable: true
+          description: Formatted route display name
+          example: "138 - Colombo to Kandy"
+        origin_city:
+          type: string
+          nullable: true
+          description: Trip origin city
+          example: "Colombo"
+        destination_city:
+          type: string
+          nullable: true
+          description: Trip destination city
+          example: "Kandy"
+        is_up_direction:
+          type: boolean
+          nullable: true
+          description: Trip direction - true for up, false for down
+          example: true
+        status:
+          type: string
+          enum: [scheduled, confirmed, in_progress, completed, cancelled]
+          description: Current trip status
+          example: "scheduled"
+        base_fare:
+          type: number
+          format: double
+          description: Base fare for the trip
+          example: 350.00
+        assigned_driver_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Assigned driver's staff ID
+          example: "f5eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        assigned_conductor_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Assigned conductor's staff ID
+          example: "g6eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        is_driver:
+          type: boolean
+          description: True if the requesting user is assigned as driver for this trip
+          example: true
+        is_conductor:
+          type: boolean
+          description: True if the requesting user is assigned as conductor for this trip
+          example: false
+        estimated_duration_minutes:
+          type: integer
+          nullable: true
+          description: Estimated trip duration in minutes
+          example: 180
+        is_bookable:
+          type: boolean
+          description: Whether this trip is available for passenger booking
+          example: true
+        bus_owner_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Bus owner ID for this trip
+          example: "a1eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
 
     BusSeatLayoutTemplate:
       type: object

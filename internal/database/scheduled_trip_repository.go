@@ -897,3 +897,45 @@ func (r *ScheduledTripRepository) AssignSeatLayout(tripID string, seatLayoutID *
 type scanner interface {
 	Scan(dest ...interface{}) error
 }
+
+// GetAssignedTripsForStaff retrieves trips assigned to a driver or conductor
+// Returns trips where the staff member is assigned as driver OR conductor
+func (r *ScheduledTripRepository) GetAssignedTripsForStaff(staffID string, startDate, endDate time.Time) ([]models.ScheduledTripWithRouteInfo, error) {
+	log.Printf("GetAssignedTripsForStaff: staff_id=%s, dates=%s to %s",
+		staffID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+
+	query := `
+		SELECT 
+			st.id, st.trip_schedule_id, st.permit_id, st.departure_datetime,
+			st.estimated_duration_minutes, st.assigned_driver_id, st.assigned_conductor_id,
+			st.seat_layout_id, st.is_bookable, st.ever_published, st.base_fare, st.status, 
+			st.cancellation_reason, st.cancelled_at,
+			st.assignment_deadline, st.created_at, st.updated_at,
+			mr.route_number, mr.origin_city, mr.destination_city,
+			bor.direction
+		FROM scheduled_trips st
+		LEFT JOIN trip_schedules ts ON st.trip_schedule_id = ts.id
+		LEFT JOIN bus_owner_routes bor ON COALESCE(st.bus_owner_route_id, ts.bus_owner_route_id) = bor.id
+		LEFT JOIN master_routes mr ON bor.master_route_id = mr.id
+		WHERE (st.assigned_driver_id = $1 OR st.assigned_conductor_id = $1)
+		  AND DATE(st.departure_datetime) BETWEEN $2 AND $3
+		  AND st.status NOT IN ('cancelled', 'completed')
+		ORDER BY st.departure_datetime ASC
+	`
+
+	rows, err := r.db.Query(query, staffID, startDate, endDate)
+	if err != nil {
+		log.Printf("GetAssignedTripsForStaff: Query error: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	trips, err := r.scanTripsWithRouteInfo(rows)
+	if err != nil {
+		log.Printf("GetAssignedTripsForStaff: Scan error: %v", err)
+		return nil, err
+	}
+
+	log.Printf("GetAssignedTripsForStaff: Found %d trips for staff %s", len(trips), staffID)
+	return trips, nil
+}
