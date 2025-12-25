@@ -115,6 +115,14 @@ func (s *StaffService) RegisterStaff(input *models.StaffRegistrationInput) (*mod
 		fmt.Printf("WARNING: Failed to add role %s to user %s: %v\n", roleToAdd, userUUID, err)
 	}
 
+	// IMPORTANT: Set profile_completed = true on users table
+	// This ensures the JWT token will have profile_completed = true on next login
+	err = s.userRepo.SetProfileCompleted(userUUID, true)
+	if err != nil {
+		// Log error but don't fail the registration
+		fmt.Printf("WARNING: Failed to set profile_completed for user %s: %v\n", userUUID, err)
+	}
+
 	return staff, nil
 }
 
