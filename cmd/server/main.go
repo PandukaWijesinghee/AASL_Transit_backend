@@ -517,6 +517,7 @@ func main() {
 				staffProtected.POST("/trips/:id/end", activeTripHandler.EndTrip)
 				staffProtected.GET("/trips/:id/active", activeTripHandler.GetActiveTrip)
 				staffProtected.PUT("/trips/:id/passengers", activeTripHandler.UpdatePassengerCount)
+				staffProtected.GET("/trips/:id/bookings", staffBookingHandler.GetTripBookings)
 				logger.Info("✓ Active Trip routes registered")
 			}
 		}
@@ -894,12 +895,6 @@ func main() {
 			staffBookings.POST("/board", staffBookingHandler.BoardPassenger)
 			logger.Info("  ✅ POST /api/v1/staff/bookings/no-show - Mark no-show")
 			staffBookings.POST("/no-show", staffBookingHandler.MarkNoShow)
-		}
-		staffTrips := v1.Group("/staff/trips")
-		staffTrips.Use(middleware.AuthMiddleware(jwtService))
-		{
-			logger.Info("  ✅ GET /api/v1/staff/trips/:trip_id/bookings - Get trip bookings")
-			staffTrips.GET("/:trip_id/bookings", staffBookingHandler.GetTripBookings)
 		}
 		logger.Info("👨‍✈️ Staff Booking routes registered successfully")
 
