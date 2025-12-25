@@ -112,11 +112,16 @@ func main() {
 	// Initialize staff service
 	staffService := services.NewStaffService(staffRepository, ownerRepository, userRepository)
 
+	// NOTE: Active trip service is initialized after repositories are ready (see below)
+
 	// Initialize trip scheduling repositories
 	tripScheduleRepo := database.NewTripScheduleRepository(sqlxDB.DB)
 	scheduledTripRepo := database.NewScheduledTripRepository(sqlxDB.DB)
 	masterRouteRepo := database.NewMasterRouteRepository(sqlxDB.DB)
 	systemSettingRepo := database.NewSystemSettingRepository(sqlxDB.DB)
+
+	// Initialize active trip repository (for real-time trip tracking)
+	activeTripRepo := database.NewActiveTripRepository(db)
 
 	// Initialize trip generator service
 	tripGeneratorSvc := services.NewTripGeneratorService(
@@ -198,6 +203,18 @@ func main() {
 
 	// Initialize staff handler
 	staffHandler := handlers.NewStaffHandler(staffService, userRepository, staffRepository, scheduledTripRepo)
+
+	// Initialize active trip service and handler (for Start Trip / End Trip / Location tracking)
+	logger.Info("🚌 Initializing Active Trip tracking system...")
+	activeTripService := services.NewActiveTripService(
+		activeTripRepo,
+		scheduledTripRepo,
+		staffRepository,
+		busRepository,
+		permitRepository,
+	)
+	activeTripHandler := handlers.NewActiveTripHandler(activeTripService, staffRepository)
+	logger.Info("✓ Active Trip tracking system initialized")
 
 	// Initialize bus owner and permit handlers
 	busOwnerHandler := handlers.NewBusOwnerHandler(ownerRepository, permitRepository, userRepository, staffRepository)
@@ -488,9 +505,19 @@ func main() {
 			staffProtected := staff.Group("")
 			staffProtected.Use(middleware.AuthMiddleware(jwtService))
 			{
-				staffProtected.GET("/profile", staffHandler.GetProfile)
+					staffProtected.GET("/profile", staffHandler.GetProfile)
 				staffProtected.PUT("/profile", staffHandler.UpdateProfile)
 				staffProtected.GET("/my-trips", staffHandler.GetMyTrips)
+
+				// Active Trip routes (Start Trip / End Trip / Location tracking)
+				logger.Info("🚌 Registering Active Trip routes...")
+				staffProtected.GET("/trips/my-active", activeTripHandler.GetMyActiveTrip)
+				staffProtected.POST("/trips/start", activeTripHandler.StartTrip)
+				staffProtected.PUT("/trips/:id/location", activeTripHandler.UpdateLocation)
+				staffProtected.POST("/trips/:id/end", activeTripHandler.EndTrip)
+				staffProtected.GET("/trips/:id/active", activeTripHandler.GetActiveTrip)
+				staffProtected.PUT("/trips/:id/passengers", activeTripHandler.UpdatePassengerCount)
+				logger.Info("✓ Active Trip routes registered")
 			}
 		}
 

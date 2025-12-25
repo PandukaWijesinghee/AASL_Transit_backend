@@ -1620,6 +1620,394 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/staff/trips/my-active:
+    get:
+      summary: Get staff's current active trip
+      description: |
+        Retrieves the current active trip for the authenticated staff member.
+        Returns null if no active trip exists.
+        
+        **Use Case:** Check if driver/conductor has an ongoing trip when opening the app
+      operationId: getMyActiveTrip
+      tags:
+        - Staff Active Trip
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Active trip retrieved (or null if none)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  active_trip:
+                    $ref: "#/components/schemas/ActiveTrip"
+                  has_active_trip:
+                    type: boolean
+                    example: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Staff profile not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/staff/trips/start:
+    post:
+      summary: Start a trip
+      description: |
+        Starts a scheduled trip and creates an active trip record.
+        Requires GPS location for the starting point.
+        
+        **Validations:**
+        - Staff must be assigned to the trip (as driver or conductor)
+        - Trip must be in 'scheduled' or 'confirmed' status
+        - Trip departure date must be today
+        
+        **Side Effects:**
+        - Creates active_trips record with status 'in_transit'
+        - Updates scheduled_trips status to 'in_progress'
+        - Records actual departure time and location
+      operationId: startTrip
+      tags:
+        - Staff Active Trip
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - scheduled_trip_id
+                - latitude
+                - longitude
+              properties:
+                scheduled_trip_id:
+                  type: string
+                  format: uuid
+                  description: ID of the scheduled trip to start
+                latitude:
+                  type: number
+                  format: double
+                  description: Current GPS latitude
+                  example: 6.9271
+                longitude:
+                  type: number
+                  format: double
+                  description: Current GPS longitude
+                  example: 79.8612
+                initial_passenger_count:
+                  type: integer
+                  description: Initial number of passengers boarding
+                  default: 0
+                  example: 15
+      responses:
+        "201":
+          description: Trip started successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Trip started successfully"
+                  active_trip:
+                    $ref: "#/components/schemas/ActiveTrip"
+        "400":
+          description: Invalid request or trip cannot be started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Trip is not in a valid status to start"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Staff not assigned to this trip
+        "404":
+          description: Trip or staff profile not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/staff/trips/{id}/location:
+    put:
+      summary: Update trip location
+      description: |
+        Updates the GPS location for an active trip.
+        Called periodically by the driver/conductor app.
+        
+        **Updates:**
+        - Current latitude/longitude
+        - Speed (km/h)
+        - Heading (compass direction)
+        - Last location update timestamp
+      operationId: updateTripLocation
+      tags:
+        - Staff Active Trip
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Active trip ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - latitude
+                - longitude
+              properties:
+                latitude:
+                  type: number
+                  format: double
+                  description: Current GPS latitude
+                  example: 6.9350
+                longitude:
+                  type: number
+                  format: double
+                  description: Current GPS longitude
+                  example: 79.8450
+                speed_kmh:
+                  type: number
+                  format: double
+                  description: Current speed in km/h
+                  example: 45.5
+                heading:
+                  type: number
+                  format: double
+                  description: Compass heading in degrees (0-360)
+                  example: 180.0
+      responses:
+        "200":
+          description: Location updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Location updated"
+        "400":
+          description: Invalid request
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Not authorized to update this trip
+        "404":
+          description: Active trip not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/staff/trips/{id}/end:
+    post:
+      summary: End a trip
+      description: |
+        Ends an active trip and marks it as completed.
+        Requires final GPS location.
+        
+        **Side Effects:**
+        - Updates active_trips status to 'completed'
+        - Updates scheduled_trips status to 'completed'
+        - Records actual arrival time and final location
+        - Records final passenger count
+      operationId: endTrip
+      tags:
+        - Staff Active Trip
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Active trip ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - latitude
+                - longitude
+              properties:
+                latitude:
+                  type: number
+                  format: double
+                  description: Final GPS latitude
+                  example: 7.2906
+                longitude:
+                  type: number
+                  format: double
+                  description: Final GPS longitude
+                  example: 80.6337
+                final_passenger_count:
+                  type: integer
+                  description: Final passenger count at trip end
+                  example: 12
+                notes:
+                  type: string
+                  description: Optional notes about the trip
+                  example: "Traffic delay on highway"
+      responses:
+        "200":
+          description: Trip ended successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Trip ended successfully"
+                  active_trip:
+                    $ref: "#/components/schemas/ActiveTrip"
+                  duration_minutes:
+                    type: integer
+                    description: Trip duration in minutes
+                    example: 180
+        "400":
+          description: Invalid request or trip already ended
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Not authorized to end this trip
+        "404":
+          description: Active trip not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/staff/trips/{id}/passengers:
+    put:
+      summary: Update passenger count
+      description: |
+        Updates the current passenger count for an active trip.
+        Used when passengers board or alight mid-trip.
+      operationId: updatePassengerCount
+      tags:
+        - Staff Active Trip
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Active trip ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - passenger_count
+              properties:
+                passenger_count:
+                  type: integer
+                  minimum: 0
+                  description: Current number of passengers
+                  example: 18
+      responses:
+        "200":
+          description: Passenger count updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Passenger count updated"
+                  passenger_count:
+                    type: integer
+                    example: 18
+        "400":
+          description: Invalid request
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Not authorized to update this trip
+        "404":
+          description: Active trip not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/staff/trips/{id}:
+    get:
+      summary: Get active trip by ID
+      description: |
+        Retrieves a specific active trip by its ID.
+        Staff must be assigned to the trip to view it.
+      operationId: getActiveTrip
+      tags:
+        - Staff Active Trip
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Active trip ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Active trip retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  active_trip:
+                    $ref: "#/components/schemas/ActiveTrip"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Not authorized to view this trip
+        "404":
+          description: Active trip not found
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   # ============================================================================
   # Bus Owner Endpoints
   # ============================================================================
@@ -9974,6 +10362,104 @@ components:
           nullable: true
           description: Bus owner ID for this trip
           example: "a1eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+
+    ActiveTrip:
+      type: object
+      description: An active/in-progress trip with GPS tracking
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Active trip ID
+          example: "f7eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        scheduled_trip_id:
+          type: string
+          format: uuid
+          description: Reference to the scheduled trip
+          example: "e4eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        bus_id:
+          type: string
+          format: uuid
+          description: Bus being used for this trip
+          example: "b2eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        driver_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Driver staff ID
+          example: "c3eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        conductor_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Conductor staff ID
+          example: "d4eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        status:
+          type: string
+          enum: [not_started, in_transit, at_stop, completed, cancelled]
+          description: Current trip status
+          example: "in_transit"
+        current_latitude:
+          type: number
+          format: double
+          nullable: true
+          description: Current GPS latitude
+          example: 6.9271
+        current_longitude:
+          type: number
+          format: double
+          nullable: true
+          description: Current GPS longitude
+          example: 79.8612
+        current_speed_kmh:
+          type: number
+          format: double
+          nullable: true
+          description: Current speed in km/h
+          example: 45.5
+        heading:
+          type: number
+          format: double
+          nullable: true
+          description: Compass heading (0-360 degrees)
+          example: 180.0
+        last_location_update:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp of last GPS update
+          example: "2025-12-26T08:30:00Z"
+        actual_departure_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: Actual departure time
+          example: "2025-12-26T08:05:00Z"
+        actual_arrival_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: Actual arrival time (set when trip ends)
+          example: "2025-12-26T11:15:00Z"
+        current_passenger_count:
+          type: integer
+          description: Current number of passengers
+          example: 25
+        notes:
+          type: string
+          nullable: true
+          description: Trip notes (delays, issues, etc.)
+          example: "Traffic delay on highway"
+        created_at:
+          type: string
+          format: date-time
+          description: When the active trip was created
+          example: "2025-12-26T08:05:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2025-12-26T08:30:00Z"
 
     BusSeatLayoutTemplate:
       type: object
