@@ -141,6 +141,10 @@ func (s *ActiveTripService) StartTrip(input *StartTripInput) (*StartTripResult, 
 		log.Printf("[StartTrip] ERROR: Failed to get bus: %v", err)
 		return nil, errors.New("failed to get bus information")
 	}
+	if bus == nil {
+		log.Printf("[StartTrip] ERROR: Bus not found with license plate: %s", permit.BusRegistrationNumber)
+		return nil, errors.New("bus not found with license plate: " + permit.BusRegistrationNumber)
+	}
 	log.Printf("[StartTrip] Got bus: ID=%s", bus.ID)
 
 	// 6. Create the active trip record
