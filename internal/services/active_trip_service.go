@@ -88,6 +88,11 @@ func (s *ActiveTripService) StartTrip(input *StartTripInput) (*StartTripResult, 
 	if scheduledTrip.PermitID == nil {
 		return nil, errors.New("trip has no permit assigned")
 	}
+	
+	// Validate that a driver is assigned (required for trip to start)
+	if scheduledTrip.AssignedDriverID == nil {
+		return nil, errors.New("trip cannot start without an assigned driver")
+	}
 
 	// Get bus from permit
 	permit, err := s.permitRepo.GetByID(*scheduledTrip.PermitID)
@@ -107,7 +112,7 @@ func (s *ActiveTripService) StartTrip(input *StartTripInput) (*StartTripResult, 
 		ScheduledTripID:       input.ScheduledTripID,
 		BusID:                 bus.ID,
 		PermitID:              *scheduledTrip.PermitID,
-		DriverID:              scheduledTrip.AssignedDriverID,
+		DriverID:              *scheduledTrip.AssignedDriverID, // Safe: validated above
 		ConductorID:           scheduledTrip.AssignedConductorID,
 		CurrentLatitude:       &input.InitialLatitude,
 		CurrentLongitude:      &input.InitialLongitude,
