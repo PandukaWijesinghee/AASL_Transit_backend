@@ -505,7 +505,7 @@ func main() {
 			staffProtected := staff.Group("")
 			staffProtected.Use(middleware.AuthMiddleware(jwtService))
 			{
-					staffProtected.GET("/profile", staffHandler.GetProfile)
+				staffProtected.GET("/profile", staffHandler.GetProfile)
 				staffProtected.PUT("/profile", staffHandler.UpdateProfile)
 				staffProtected.GET("/my-trips", staffHandler.GetMyTrips)
 
