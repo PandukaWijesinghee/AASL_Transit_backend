@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	"github.com/smarttransit/sms-auth-backend/internal/database"
@@ -51,29 +52,51 @@ type StartTripResult struct {
 
 // StartTrip starts a scheduled trip - creates active_trip record and updates scheduled_trip status
 func (s *ActiveTripService) StartTrip(input *StartTripInput) (*StartTripResult, error) {
+	log.Printf("[StartTrip] === START TRIP DEBUG v2 ===")
+	log.Printf("[StartTrip] Input: ScheduledTripID=%s, StaffID=%s, Lat=%f, Lon=%f", 
+		input.ScheduledTripID, input.StaffID, input.InitialLatitude, input.InitialLongitude)
+
 	// 1. Get the scheduled trip
 	scheduledTrip, err := s.scheduledTripRepo.GetByID(input.ScheduledTripID)
 	if err != nil {
+		log.Printf("[StartTrip] ERROR: Failed to get scheduled trip: %v", err)
 		return nil, errors.New("scheduled trip not found")
 	}
+	log.Printf("[StartTrip] Got scheduled trip: ID=%s, Status=%s", scheduledTrip.ID, scheduledTrip.Status)
 
 	// 2. Validate the scheduled trip can be started
 	if scheduledTrip.Status != "scheduled" && scheduledTrip.Status != "confirmed" {
+		log.Printf("[StartTrip] ERROR: Invalid status: %s", scheduledTrip.Status)
 		return nil, errors.New("trip cannot be started - current status: " + string(scheduledTrip.Status))
+	}
+
+	// Log assigned staff - check for nil before dereferencing
+	log.Printf("[StartTrip] AssignedDriverID is nil: %v", scheduledTrip.AssignedDriverID == nil)
+	log.Printf("[StartTrip] AssignedConductorID is nil: %v", scheduledTrip.AssignedConductorID == nil)
+	if scheduledTrip.AssignedDriverID != nil {
+		log.Printf("[StartTrip] AssignedDriverID value: %s", *scheduledTrip.AssignedDriverID)
+	}
+	if scheduledTrip.AssignedConductorID != nil {
+		log.Printf("[StartTrip] AssignedConductorID value: %s", *scheduledTrip.AssignedConductorID)
 	}
 
 	// 3. Verify the staff is assigned to this trip
 	isDriver := scheduledTrip.AssignedDriverID != nil && *scheduledTrip.AssignedDriverID == input.StaffID
 	isConductor := scheduledTrip.AssignedConductorID != nil && *scheduledTrip.AssignedConductorID == input.StaffID
+	log.Printf("[StartTrip] Staff check: isDriver=%v, isConductor=%v", isDriver, isConductor)
 	if !isDriver && !isConductor {
+		log.Printf("[StartTrip] ERROR: Staff not assigned to trip")
 		return nil, errors.New("you are not assigned to this trip")
 	}
 
 	// 4. Check if an active trip already exists for this scheduled trip
+	log.Printf("[StartTrip] Checking for existing active trip...")
 	existingActiveTrip, err := s.activeTripRepo.GetByScheduledTripID(input.ScheduledTripID)
 	if err == nil && existingActiveTrip != nil {
+		log.Printf("[StartTrip] Found existing active trip: ID=%s, Status=%s", existingActiveTrip.ID, existingActiveTrip.Status)
 		// Active trip already exists
 		if existingActiveTrip.IsActive() {
+			log.Printf("[StartTrip] Trip already active, returning existing")
 			return &StartTripResult{
 				ActiveTrip:      existingActiveTrip,
 				Message:         "Trip already started",
@@ -81,32 +104,47 @@ func (s *ActiveTripService) StartTrip(input *StartTripInput) (*StartTripResult, 
 			}, nil
 		}
 		// Trip was completed/cancelled, can't restart
+		log.Printf("[StartTrip] ERROR: Trip already completed/cancelled")
 		return nil, errors.New("trip has already been completed or cancelled")
 	}
+	log.Printf("[StartTrip] No existing active trip found (this is expected for new trips)")
 
 	// 5. Get bus and permit info from scheduled trip
+	log.Printf("[StartTrip] PermitID is nil: %v", scheduledTrip.PermitID == nil)
 	if scheduledTrip.PermitID == nil {
+		log.Printf("[StartTrip] ERROR: No permit assigned")
 		return nil, errors.New("trip has no permit assigned")
 	}
+	log.Printf("[StartTrip] PermitID value: %s", *scheduledTrip.PermitID)
 	
 	// Validate that a driver is assigned (required for trip to start)
+	log.Printf("[StartTrip] Validating driver assignment...")
 	if scheduledTrip.AssignedDriverID == nil {
+		log.Printf("[StartTrip] ERROR: No driver assigned - this is the validation that should prevent crash")
 		return nil, errors.New("trip cannot start without an assigned driver")
 	}
+	log.Printf("[StartTrip] Driver validation passed: %s", *scheduledTrip.AssignedDriverID)
 
 	// Get bus from permit
+	log.Printf("[StartTrip] Getting permit info...")
 	permit, err := s.permitRepo.GetByID(*scheduledTrip.PermitID)
 	if err != nil {
+		log.Printf("[StartTrip] ERROR: Failed to get permit: %v", err)
 		return nil, errors.New("failed to get permit information")
 	}
+	log.Printf("[StartTrip] Got permit: BusRegNumber=%s", permit.BusRegistrationNumber)
 
 	// Get bus by registration number from permit
+	log.Printf("[StartTrip] Getting bus info...")
 	bus, err := s.busRepo.GetByLicensePlate(permit.BusRegistrationNumber)
 	if err != nil {
+		log.Printf("[StartTrip] ERROR: Failed to get bus: %v", err)
 		return nil, errors.New("failed to get bus information")
 	}
+	log.Printf("[StartTrip] Got bus: ID=%s", bus.ID)
 
 	// 6. Create the active trip record
+	log.Printf("[StartTrip] Creating active trip record...")
 	now := time.Now()
 	activeTrip := &models.ActiveTrip{
 		ScheduledTripID:       input.ScheduledTripID,
@@ -121,19 +159,24 @@ func (s *ActiveTripService) StartTrip(input *StartTripInput) (*StartTripResult, 
 		ActualDepartureTime:   &now,
 		CurrentPassengerCount: 0,
 	}
+	log.Printf("[StartTrip] ActiveTrip struct created: DriverID=%s, BusID=%s", activeTrip.DriverID, activeTrip.BusID)
 
 	err = s.activeTripRepo.Create(activeTrip)
 	if err != nil {
+		log.Printf("[StartTrip] ERROR: Failed to create active trip: %v", err)
 		return nil, errors.New("failed to create active trip: " + err.Error())
 	}
+	log.Printf("[StartTrip] Active trip created successfully: ID=%s", activeTrip.ID)
 
 	// 7. Update scheduled trip status to in_progress
+	log.Printf("[StartTrip] Updating scheduled trip status to in_progress...")
 	err = s.scheduledTripRepo.UpdateStatus(input.ScheduledTripID, "in_progress")
 	if err != nil {
+		log.Printf("[StartTrip] WARNING: Failed to update scheduled trip status: %v", err)
 		// Log but don't fail - active trip was created successfully
-		// TODO: Add proper logging
 	}
 
+	log.Printf("[StartTrip] === START TRIP COMPLETED SUCCESSFULLY ===")
 	return &StartTripResult{
 		ActiveTrip:      activeTrip,
 		Message:         "Trip started successfully",
