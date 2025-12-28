@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -53,7 +54,7 @@ type StartTripResult struct {
 // StartTrip starts a scheduled trip - creates active_trip record and updates scheduled_trip status
 func (s *ActiveTripService) StartTrip(input *StartTripInput) (*StartTripResult, error) {
 	log.Printf("[StartTrip] === START TRIP DEBUG v2 ===")
-	log.Printf("[StartTrip] Input: ScheduledTripID=%s, StaffID=%s, Lat=%f, Lon=%f", 
+	log.Printf("[StartTrip] Input: ScheduledTripID=%s, StaffID=%s, Lat=%f, Lon=%f",
 		input.ScheduledTripID, input.StaffID, input.InitialLatitude, input.InitialLongitude)
 
 	// 1. Get the scheduled trip
@@ -116,7 +117,7 @@ func (s *ActiveTripService) StartTrip(input *StartTripInput) (*StartTripResult, 
 		return nil, errors.New("trip has no permit assigned")
 	}
 	log.Printf("[StartTrip] PermitID value: %s", *scheduledTrip.PermitID)
-	
+
 	// Validate that a driver is assigned (required for trip to start)
 	log.Printf("[StartTrip] Validating driver assignment...")
 	if scheduledTrip.AssignedDriverID == nil {
@@ -338,4 +339,61 @@ func (s *ActiveTripService) UpdatePassengerCount(activeTripID string, staffID st
 	}
 
 	return nil
+}
+
+// GetActiveTripPassengers retrieves all passengers for an active scheduled trip
+func (s *ActiveTripService) GetActiveTripPassengers(scheduledTripID uint) ([]map[string]interface{}, error) {
+	return s.activeTripRepo.GetActiveTripPassengers(scheduledTripID)
+}
+
+// BoardPassenger updates a passenger's status to boarded
+func (s *ActiveTripService) BoardPassenger(bookingID uint) error {
+	// Validate booking belongs to an active trip
+	isValid, err := s.activeTripRepo.ValidateBookingForActiveTrip(bookingID)
+	if err != nil {
+		return err
+	}
+	if !isValid {
+		return fmt.Errorf("booking does not belong to an active trip")
+	}
+
+	return s.activeTripRepo.UpdatePassengerBoardingStatus(bookingID)
+}
+
+// UpdatePassengerStatus updates a passenger's booking status
+func (s *ActiveTripService) UpdatePassengerStatus(bookingID uint, status string) error {
+	// Validate booking belongs to an active trip
+	isValid, err := s.activeTripRepo.ValidateBookingForActiveTrip(bookingID)
+	if err != nil {
+		return err
+	}
+	if !isValid {
+		return fmt.Errorf("booking does not belong to an active trip")
+	}
+
+	return s.activeTripRepo.UpdatePassengerStatus(bookingID, status)
+}
+
+// GetBookingByID retrieves a booking with trip information
+func (s *ActiveTripService) GetBookingByID(bookingID uint) (map[string]interface{}, error) {
+	return s.activeTripRepo.GetBookingByID(bookingID)
+}
+
+// VerifyBookingByQR verifies a booking using QR code data
+func (s *ActiveTripService) VerifyBookingByQR(reference string) (map[string]interface{}, error) {
+	booking, err := s.activeTripRepo.GetBookingByReference(reference)
+	if err != nil {
+		return nil, err
+	}
+	if booking == nil {
+		return nil, fmt.Errorf("booking not found")
+	}
+
+	// Check if booking belongs to an active trip
+	activeTripID, ok := booking["active_trip_id"]
+	if !ok || activeTripID == nil {
+		return nil, fmt.Errorf("booking does not belong to an active trip")
+	}
+
+	return booking, nil
 }

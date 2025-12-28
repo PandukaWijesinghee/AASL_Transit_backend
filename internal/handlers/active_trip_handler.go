@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/smarttransit/sms-auth-backend/internal/database"
@@ -393,5 +394,216 @@ func (h *ActiveTripHandler) UpdatePassengerCount(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message":         "Passenger count updated successfully",
 		"passenger_count": req.PassengerCount,
+	})
+}
+
+// GetActiveTripPassengers retrieves all passengers for an active scheduled trip
+func (h *ActiveTripHandler) GetActiveTripPassengers(c *gin.Context) {
+	scheduledTripIDStr := c.Query("scheduled_trip_id")
+	if scheduledTripIDStr == "" {
+		c.JSON(400, gin.H{"error": "scheduled_trip_id is required"})
+		return
+	}
+
+	scheduledTripID, err := strconv.ParseUint(scheduledTripIDStr, 10, 32)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid scheduled_trip_id"})
+		return
+	}
+
+	passengers, err := h.activeTripService.GetActiveTripPassengers(uint(scheduledTripID))
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(passengers) == 0 {
+		c.JSON(200, gin.H{
+			"status":  "success",
+			"data":    []interface{}{},
+			"message": "No passengers found for this trip",
+		})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"status": "success",
+		"data":   passengers,
+		"count":  len(passengers),
+	})
+}
+
+// BoardPassenger updates a passenger's status to boarded
+func (h *ActiveTripHandler) BoardPassenger(c *gin.Context) {
+	var req struct {
+		BookingID uint `json:"booking_id" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "booking_id is required"})
+		return
+	}
+
+	err := h.activeTripService.BoardPassenger(req.BookingID)
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get updated booking details
+	booking, err := h.activeTripService.GetBookingByID(req.BookingID)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to retrieve updated booking"})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"status":  "success",
+		"message": "Passenger boarded successfully",
+		"data":    booking,
+	})
+}
+
+// UpdatePassengerStatusToPending updates passenger status to waiting/pending
+func (h *ActiveTripHandler) UpdatePassengerStatusToPending(c *gin.Context) {
+	var req struct {
+		BookingID uint `json:"booking_id" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "booking_id is required"})
+		return
+	}
+
+	err := h.activeTripService.UpdatePassengerStatus(req.BookingID, "waiting")
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"status":  "success",
+		"message": "Passenger status updated to waiting",
+	})
+}
+
+// CancelPassenger cancels a passenger booking
+func (h *ActiveTripHandler) CancelPassenger(c *gin.Context) {
+	var req struct {
+		BookingID uint `json:"booking_id" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "booking_id is required"})
+		return
+	}
+
+	err := h.activeTripService.UpdatePassengerStatus(req.BookingID, "cancelled")
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"status":  "success",
+		"message": "Passenger booking cancelled successfully",
+	})
+}
+
+// VerifyPassengerByQR verifies a booking using QR code
+func (h *ActiveTripHandler) VerifyPassengerByQR(c *gin.Context) {
+	var req struct {
+		Reference string `json:"reference" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "QR reference is required"})
+		return
+	}
+
+	booking, err := h.activeTripService.VerifyBookingByQR(req.Reference)
+	if err != nil {
+		c.JSON(400, gin.H{
+			"status":  "error",
+			"message": err.Error(),
+			"valid":   false,
+		})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"status":  "success",
+		"message": "Booking verified successfully",
+		"valid":   true,
+		"data":    booking,
+	})
+}
+
+// ConfirmPassenger updates passenger status to confirmed
+func (h *ActiveTripHandler) ConfirmPassenger(c *gin.Context) {
+	var req struct {
+		BookingID uint `json:"booking_id" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "booking_id is required"})
+		return
+	}
+
+	err := h.activeTripService.UpdatePassengerStatus(req.BookingID, "confirmed")
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"status":  "success",
+		"message": "Passenger booking confirmed",
+	})
+}
+
+// MarkPassengerInTransit updates passenger status to in-transit
+func (h *ActiveTripHandler) MarkPassengerInTransit(c *gin.Context) {
+	var req struct {
+		BookingID uint `json:"booking_id" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "booking_id is required"})
+		return
+	}
+
+	err := h.activeTripService.UpdatePassengerStatus(req.BookingID, "in-transit")
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"status":  "success",
+		"message": "Passenger marked as in-transit",
+	})
+}
+
+// CompletePassenger updates passenger status to completed
+func (h *ActiveTripHandler) CompletePassenger(c *gin.Context) {
+	var req struct {
+		BookingID uint `json:"booking_id" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "booking_id is required"})
+		return
+	}
+
+	err := h.activeTripService.UpdatePassengerStatus(req.BookingID, "completed")
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"status":  "success",
+		"message": "Passenger journey completed",
 	})
 }

@@ -522,6 +522,37 @@ func main() {
 			}
 		}
 
+		// Active Trip Passenger Management routes (protected - staff only)
+		logger.Info("👥 Registering Active Trip Passenger Management routes...")
+		activeTripPassengers := v1.Group("/active-trips/passengers")
+		activeTripPassengers.Use(middleware.AuthMiddleware(jwtService))
+		{
+			logger.Info("  ✅ GET /api/v1/active-trips/passengers - Get all passengers")
+			activeTripPassengers.GET("", activeTripHandler.GetActiveTripPassengers)
+
+			logger.Info("  ✅ PUT /api/v1/active-trips/passengers/board - Board passenger")
+			activeTripPassengers.PUT("/board", activeTripHandler.BoardPassenger)
+
+			logger.Info("  ✅ PUT /api/v1/active-trips/passengers/pending - Set to waiting")
+			activeTripPassengers.PUT("/pending", activeTripHandler.UpdatePassengerStatusToPending)
+
+			logger.Info("  ✅ PUT /api/v1/active-trips/passengers/cancelled - Cancel passenger")
+			activeTripPassengers.PUT("/cancelled", activeTripHandler.CancelPassenger)
+
+			logger.Info("  ✅ POST /api/v1/active-trips/passengers/verify - Verify by QR")
+			activeTripPassengers.POST("/verify", activeTripHandler.VerifyPassengerByQR)
+
+			logger.Info("  ✅ PUT /api/v1/active-trips/passengers/confirmed - Confirm passenger")
+			activeTripPassengers.PUT("/confirmed", activeTripHandler.ConfirmPassenger)
+
+			logger.Info("  ✅ PUT /api/v1/active-trips/passengers/in-transit - Mark in-transit")
+			activeTripPassengers.PUT("/in-transit", activeTripHandler.MarkPassengerInTransit)
+
+			logger.Info("  ✅ PUT /api/v1/active-trips/passengers/completed - Complete journey")
+			activeTripPassengers.PUT("/completed", activeTripHandler.CompletePassenger)
+		}
+		logger.Info("👥 Active Trip Passenger Management routes registered successfully")
+
 		// Bus Owner routes (all protected)
 		busOwner := v1.Group("/bus-owner")
 		busOwner.Use(middleware.AuthMiddleware(jwtService))
