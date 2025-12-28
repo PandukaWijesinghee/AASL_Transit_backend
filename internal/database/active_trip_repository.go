@@ -201,31 +201,32 @@ func (r *ActiveTripRepository) UpdateStatus(tripID string, status models.ActiveT
 	return nil
 }
 
-// GetActiveTripPassengers retrieves all passengers for an active scheduled trip
-func (r *ActiveTripRepository) GetActiveTripPassengers(scheduledTripID uint) ([]map[string]interface{}, error) {
+// GetPassengersByScheduledTripID retrieves passengers by scheduled trip ID
+func (r *ActiveTripRepository) GetPassengersByScheduledTripID(scheduledTripID string) ([]models.PassengerInfo, error) {
+	var passengers []models.PassengerInfo
+
 	query := `
 		SELECT 
 			bb.id as booking_id,
-			bb.reference_number,
+			b.booking_reference,
 			bb.status,
 			bb.boarded_at,
-			bb.created_at as booking_time,
-			bbs.passenger_name,
-			bbs.passenger_phone,
-			bbs.seat_number,
-			st.id as scheduled_trip_id,
-			st.departure_time,
-			mr.origin || ' → ' || mr.destination as route_name,
-			mr.origin,
-			mr.destination
+			b.created_at,
+			COALESCE(b.passenger_name, '') as passenger_name,
+			COALESCE(b.passenger_phone, '') as passenger_phone,
+			COALESCE(bor.custom_route_name, mr.route_name, '') as route_name,
+			COALESCE(mrs_board.stop_name, '') as pickup_stop_name,
+			COALESCE(mrs_alight.stop_name, '') as dropoff_stop_name
 		FROM bus_bookings bb
-		INNER JOIN bus_booking_seats bbs ON bb.id = bbs.booking_id
+		INNER JOIN bookings b ON bb.booking_id = b.id
 		INNER JOIN scheduled_trips st ON bb.scheduled_trip_id = st.id
-		INNER JOIN bus_owner_routes bor ON st.route_id = bor.id
-		INNER JOIN master_routes mr ON bor.master_route_id = mr.id
+		LEFT JOIN bus_owner_routes bor ON st.bus_owner_route_id = bor.id
+		LEFT JOIN master_routes mr ON bor.master_route_id = mr.id
+		LEFT JOIN master_route_stops mrs_board ON bb.boarding_stop_id = mrs_board.id
+		LEFT JOIN master_route_stops mrs_alight ON bb.alighting_stop_id = mrs_alight.id
 		WHERE bb.scheduled_trip_id = $1
-		AND bb.status NOT IN ('cancelled', 'refunded')
-		ORDER BY bbs.seat_number ASC, bb.created_at ASC
+		AND bb.status NOT IN ('cancelled')
+		ORDER BY b.created_at DESC
 	`
 
 	rows, err := r.db.Query(query, scheduledTripID)
@@ -234,236 +235,24 @@ func (r *ActiveTripRepository) GetActiveTripPassengers(scheduledTripID uint) ([]
 	}
 	defer rows.Close()
 
-	var results []map[string]interface{}
 	for rows.Next() {
-		var bookingID, scheduledTripID int
-		var referenceNumber, status, passengerName, passengerPhone, seatNumber, routeName, origin, destination string
-		var boardedAt, bookingTime, departureTime sql.NullTime
-
+		var p models.PassengerInfo
 		err := rows.Scan(
-			&bookingID, &referenceNumber, &status, &boardedAt, &bookingTime,
-			&passengerName, &passengerPhone, &seatNumber, &scheduledTripID,
-			&departureTime, &routeName, &origin, &destination,
+			&p.BookingID, &p.BookingReference, &p.Status, &p.BoardedAt, &p.CreatedAt,
+			&p.PassengerName, &p.PassengerPhone, &p.RouteName,
+			&p.PickupStopName, &p.DropoffStopName,
 		)
 		if err != nil {
 			return nil, err
 		}
-
-		result := map[string]interface{}{
-			"booking_id":        bookingID,
-			"reference_number":  referenceNumber,
-			"status":            status,
-			"passenger_name":    passengerName,
-			"passenger_phone":   passengerPhone,
-			"seat_number":       seatNumber,
-			"scheduled_trip_id": scheduledTripID,
-			"route_name":        routeName,
-			"origin":            origin,
-			"destination":       destination,
-		}
-
-		if boardedAt.Valid {
-			result["boarded_at"] = boardedAt.Time
-		}
-		if bookingTime.Valid {
-			result["booking_time"] = bookingTime.Time
-		}
-		if departureTime.Valid {
-			result["departure_time"] = departureTime.Time
-		}
-
-		results = append(results, result)
+		passengers = append(passengers, p)
 	}
 
-	return results, rows.Err()
-}
-
-// UpdatePassengerBoardingStatus updates a passenger's status to boarded
-func (r *ActiveTripRepository) UpdatePassengerBoardingStatus(bookingID uint) error {
-	query := `
-		UPDATE bus_bookings 
-		SET status = 'boarded', boarded_at = NOW(), updated_at = NOW()
-		WHERE id = $1
-	`
-	result, err := r.db.Exec(query, bookingID)
-	if err != nil {
-		return err
-	}
-
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rows == 0 {
-		return fmt.Errorf("booking not found")
-	}
-
-	return nil
-}
-
-// UpdatePassengerStatus updates a passenger's booking status
-func (r *ActiveTripRepository) UpdatePassengerStatus(bookingID uint, status string) error {
-	query := `
-		UPDATE bus_bookings 
-		SET status = $1, updated_at = NOW()
-		WHERE id = $2
-	`
-	result, err := r.db.Exec(query, status, bookingID)
-	if err != nil {
-		return err
-	}
-
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rows == 0 {
-		return fmt.Errorf("booking not found")
-	}
-
-	return nil
-}
-
-// GetBookingByID retrieves a booking by ID with trip and route information
-func (r *ActiveTripRepository) GetBookingByID(bookingID uint) (map[string]interface{}, error) {
-	query := `
-		SELECT 
-			bb.id as booking_id,
-			bb.reference_number,
-			bb.status,
-			bb.boarded_at,
-			bb.scheduled_trip_id,
-			bbs.passenger_name,
-			bbs.passenger_phone,
-			bbs.seat_number,
-			st.status as trip_status,
-			mr.origin || ' → ' || mr.destination as route_name
-		FROM bus_bookings bb
-		INNER JOIN bus_booking_seats bbs ON bb.id = bbs.booking_id
-		INNER JOIN scheduled_trips st ON bb.scheduled_trip_id = st.id
-		INNER JOIN bus_owner_routes bor ON st.route_id = bor.id
-		INNER JOIN master_routes mr ON bor.master_route_id = mr.id
-		WHERE bb.id = $1
-		LIMIT 1
-	`
-
-	var bookingIDRes, scheduledTripID int
-	var referenceNumber, status, passengerName, passengerPhone, seatNumber, tripStatus, routeName string
-	var boardedAt sql.NullTime
-
-	err := r.db.QueryRow(query, bookingID).Scan(
-		&bookingIDRes, &referenceNumber, &status, &boardedAt, &scheduledTripID,
-		&passengerName, &passengerPhone, &seatNumber, &tripStatus, &routeName,
-	)
-
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
+	if err = rows.Err(); err != nil {
 		return nil, err
 	}
 
-	result := map[string]interface{}{
-		"booking_id":        bookingIDRes,
-		"reference_number":  referenceNumber,
-		"status":            status,
-		"scheduled_trip_id": scheduledTripID,
-		"passenger_name":    passengerName,
-		"passenger_phone":   passengerPhone,
-		"seat_number":       seatNumber,
-		"trip_status":       tripStatus,
-		"route_name":        routeName,
-	}
-
-	if boardedAt.Valid {
-		result["boarded_at"] = boardedAt.Time
-	}
-
-	return result, nil
-}
-
-// GetBookingByReference retrieves a booking by reference number for QR verification
-func (r *ActiveTripRepository) GetBookingByReference(reference string) (map[string]interface{}, error) {
-	query := `
-		SELECT 
-			bb.id as booking_id,
-			bb.reference_number,
-			bb.status,
-			bb.boarded_at,
-			bb.scheduled_trip_id,
-			bbs.passenger_name,
-			bbs.passenger_phone,
-			bbs.seat_number,
-			st.status as trip_status,
-			mr.origin || ' → ' || mr.destination as route_name,
-			at.id as active_trip_id
-		FROM bus_bookings bb
-		INNER JOIN bus_booking_seats bbs ON bb.id = bbs.booking_id
-		INNER JOIN scheduled_trips st ON bb.scheduled_trip_id = st.id
-		INNER JOIN bus_owner_routes bor ON st.route_id = bor.id
-		INNER JOIN master_routes mr ON bor.master_route_id = mr.id
-		LEFT JOIN active_trips at ON st.id = at.scheduled_trip_id AND at.status = 'in_transit'
-		WHERE bb.reference_number = $1
-		LIMIT 1
-	`
-
-	var bookingID, scheduledTripID int
-	var referenceNumber, status, passengerName, passengerPhone, seatNumber, tripStatus, routeName string
-	var boardedAt sql.NullTime
-	var activeTripID sql.NullString
-
-	err := r.db.QueryRow(query, reference).Scan(
-		&bookingID, &referenceNumber, &status, &boardedAt, &scheduledTripID,
-		&passengerName, &passengerPhone, &seatNumber, &tripStatus, &routeName, &activeTripID,
-	)
-
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	result := map[string]interface{}{
-		"booking_id":        bookingID,
-		"reference_number":  referenceNumber,
-		"status":            status,
-		"scheduled_trip_id": scheduledTripID,
-		"passenger_name":    passengerName,
-		"passenger_phone":   passengerPhone,
-		"seat_number":       seatNumber,
-		"trip_status":       tripStatus,
-		"route_name":        routeName,
-	}
-
-	if boardedAt.Valid {
-		result["boarded_at"] = boardedAt.Time
-	}
-	if activeTripID.Valid {
-		result["active_trip_id"] = activeTripID.String
-	}
-
-	return result, nil
-}
-
-// ValidateBookingForActiveTrip checks if a booking belongs to an active scheduled trip
-func (r *ActiveTripRepository) ValidateBookingForActiveTrip(bookingID uint) (bool, error) {
-	var count int
-
-	query := `
-		SELECT COUNT(*) 
-		FROM bus_bookings bb
-		INNER JOIN scheduled_trips st ON bb.scheduled_trip_id = st.id
-		INNER JOIN active_trips at ON st.id = at.scheduled_trip_id
-		WHERE bb.id = $1 AND at.status IN ('in_transit', 'at_stop')
-	`
-
-	err := r.db.QueryRow(query, bookingID).Scan(&count)
-	if err != nil {
-		return false, err
-	}
-
-	return count > 0, nil
+	return passengers, nil
 }
 
 // scanTrip scans a single active trip
