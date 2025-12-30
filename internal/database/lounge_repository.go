@@ -88,7 +88,14 @@ func (r *LoungeRepository) CreateLounge(
 // GetLoungeByID retrieves a lounge by ID
 func (r *LoungeRepository) GetLoungeByID(id uuid.UUID) (*models.Lounge, error) {
 	var lounge models.Lounge
-	query := `SELECT * FROM lounges WHERE id = $1`
+	query := `
+		SELECT id, lounge_owner_id, lounge_name, description, address, state, country, 
+		       postal_code, latitude, longitude, contact_phone, capacity, 
+		       price_1_hour, price_2_hours, price_3_hours, price_until_bus, 
+		       amenities, images, status, is_operational, average_rating, 
+		       created_at, updated_at
+		FROM lounges WHERE id = $1
+	`
 	err := r.db.Get(&lounge, query, id)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -103,7 +110,12 @@ func (r *LoungeRepository) GetLoungeByID(id uuid.UUID) (*models.Lounge, error) {
 func (r *LoungeRepository) GetLoungesByOwnerID(ownerID uuid.UUID) ([]models.Lounge, error) {
 	var lounges []models.Lounge
 	query := `
-		SELECT * FROM lounges 
+		SELECT id, lounge_owner_id, lounge_name, description, address, state, country, 
+		       postal_code, latitude, longitude, contact_phone, capacity, 
+		       price_1_hour, price_2_hours, price_3_hours, price_until_bus, 
+		       amenities, images, status, is_operational, average_rating, 
+		       created_at, updated_at
+		FROM lounges 
 		WHERE lounge_owner_id = $1 
 		ORDER BY created_at DESC
 	`
@@ -118,7 +130,12 @@ func (r *LoungeRepository) GetLoungesByOwnerID(ownerID uuid.UUID) ([]models.Loun
 func (r *LoungeRepository) GetAllActiveLounges() ([]models.Lounge, error) {
 	var lounges []models.Lounge
 	query := `
-		SELECT * FROM lounges 
+		SELECT id, lounge_owner_id, lounge_name, description, address, state, country, 
+		       postal_code, latitude, longitude, contact_phone, capacity, 
+		       price_1_hour, price_2_hours, price_3_hours, price_until_bus, 
+		       amenities, images, status, is_operational, average_rating, 
+		       created_at, updated_at
+		FROM lounges 
 		WHERE status = 'approved' AND is_operational = true
 		ORDER BY lounge_name
 	`
@@ -132,7 +149,14 @@ func (r *LoungeRepository) GetAllActiveLounges() ([]models.Lounge, error) {
 // GetLoungesByStatus retrieves all lounges with a specific status
 func (r *LoungeRepository) GetLoungesByStatus(status string) ([]models.Lounge, error) {
 	var lounges []models.Lounge
-	query := `SELECT * FROM lounges WHERE status = $1 ORDER BY created_at DESC`
+	query := `
+		SELECT id, lounge_owner_id, lounge_name, description, address, state, country, 
+		       postal_code, latitude, longitude, contact_phone, capacity, 
+		       price_1_hour, price_2_hours, price_3_hours, price_until_bus, 
+		       amenities, images, status, is_operational, average_rating, 
+		       created_at, updated_at
+		FROM lounges WHERE status = $1 ORDER BY created_at DESC
+	`
 	err := r.db.Select(&lounges, query, status)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get lounges by status: %w", err)
@@ -146,7 +170,14 @@ func (r *LoungeRepository) SearchActiveLounges(state string, limit int) ([]model
 	var args []interface{}
 	argNum := 1
 
-	query := `SELECT * FROM lounges WHERE status = 'approved' AND is_operational = true`
+	query := `
+		SELECT id, lounge_owner_id, lounge_name, description, address, state, country, 
+		       postal_code, latitude, longitude, contact_phone, capacity, 
+		       price_1_hour, price_2_hours, price_3_hours, price_until_bus, 
+		       amenities, images, status, is_operational, average_rating, 
+		       created_at, updated_at
+		FROM lounges WHERE status = 'approved' AND is_operational = true
+	`
 
 	if state != "" {
 		query += fmt.Sprintf(" AND LOWER(state) = LOWER($%d)", argNum)
@@ -175,7 +206,11 @@ func (r *LoungeRepository) SearchActiveLounges(state string, limit int) ([]model
 func (r *LoungeRepository) GetLoungesByStopID(stopID uuid.UUID) ([]models.Lounge, error) {
 	var lounges []models.Lounge
 	query := `
-		SELECT DISTINCT l.* 
+		SELECT DISTINCT l.id, l.lounge_owner_id, l.lounge_name, l.description, l.address, l.state, l.country, 
+		       l.postal_code, l.latitude, l.longitude, l.contact_phone, l.capacity, 
+		       l.price_1_hour, l.price_2_hours, l.price_3_hours, l.price_until_bus, 
+		       l.amenities, l.images, l.status, l.is_operational, l.average_rating, 
+		       l.created_at, l.updated_at
 		FROM lounges l
 		INNER JOIN lounge_routes lr ON l.id = lr.lounge_id
 		WHERE l.status = 'approved' 
@@ -194,7 +229,11 @@ func (r *LoungeRepository) GetLoungesByStopID(stopID uuid.UUID) ([]models.Lounge
 func (r *LoungeRepository) GetLoungesByRouteID(routeID uuid.UUID) ([]models.Lounge, error) {
 	var lounges []models.Lounge
 	query := `
-		SELECT DISTINCT l.* 
+		SELECT DISTINCT l.id, l.lounge_owner_id, l.lounge_name, l.description, l.address, l.state, l.country, 
+		       l.postal_code, l.latitude, l.longitude, l.contact_phone, l.capacity, 
+		       l.price_1_hour, l.price_2_hours, l.price_3_hours, l.price_until_bus, 
+		       l.amenities, l.images, l.status, l.is_operational, l.average_rating, 
+		       l.created_at, l.updated_at
 		FROM lounges l
 		INNER JOIN lounge_routes lr ON l.id = lr.lounge_id
 		WHERE l.status = 'approved' 
@@ -232,7 +271,11 @@ func (r *LoungeRepository) GetLoungesNearStop(masterRouteID uuid.UUID, passenger
 			LEFT JOIN master_route_stops mrs_after ON lr.stop_after_id = mrs_after.id
 			WHERE lr.master_route_id = $1
 		)
-		SELECT DISTINCT l.* 
+		SELECT DISTINCT l.id, l.lounge_owner_id, l.lounge_name, l.description, l.address, l.state, l.country, 
+		       l.postal_code, l.latitude, l.longitude, l.contact_phone, l.capacity, 
+		       l.price_1_hour, l.price_2_hours, l.price_3_hours, l.price_until_bus, 
+		       l.amenities, l.images, l.status, l.is_operational, l.average_rating, 
+		       l.created_at, l.updated_at
 		FROM lounges l
 		INNER JOIN lounge_stops ls ON l.id = ls.lounge_id
 		CROSS JOIN passenger_stop ps

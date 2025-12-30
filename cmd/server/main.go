@@ -526,26 +526,32 @@ func main() {
 		busOwner := v1.Group("/bus-owner")
 		busOwner.Use(middleware.AuthMiddleware(jwtService))
 		{
+			// Profile endpoints (no verification needed - for registration flow)
 			busOwner.GET("/profile", busOwnerHandler.GetProfile)
 			busOwner.GET("/profile-status", busOwnerHandler.CheckProfileStatus)
 			busOwner.POST("/complete-onboarding", busOwnerHandler.CompleteOnboarding)
-			busOwner.GET("/staff", busOwnerHandler.GetStaff)            // Get all staff (drivers & conductors)
-			busOwner.POST("/staff", busOwnerHandler.AddStaff)           // Add driver or conductor (legacy - creates new)
-			busOwner.POST("/staff/verify", busOwnerHandler.VerifyStaff) // Verify if staff can be added
-			busOwner.POST("/staff/link", busOwnerHandler.LinkStaff)     // Link verified staff to bus owner
-			busOwner.POST("/staff/unlink", busOwnerHandler.UnlinkStaff) // Remove staff from bus owner (end employment)
+			busOwner.GET("/staff", busOwnerHandler.GetStaff) // Get all staff (no verification needed)
+
+			// Staff management (requires verification)
+			busOwner.POST("/staff", middleware.RequireVerifiedBusOwner(ownerRepository), busOwnerHandler.AddStaff)           // Add driver or conductor
+			busOwner.POST("/staff/verify", busOwnerHandler.VerifyStaff)                                                      // Verify if staff can be added (no verification needed)
+			busOwner.POST("/staff/link", middleware.RequireVerifiedBusOwner(ownerRepository), busOwnerHandler.LinkStaff)     // Link verified staff to bus owner
+			busOwner.POST("/staff/unlink", middleware.RequireVerifiedBusOwner(ownerRepository), busOwnerHandler.UnlinkStaff) // Remove staff from bus owner
 		}
 
 		// Bus Owner Routes (custom route configurations)
 		busOwnerRoutes := v1.Group("/bus-owner-routes")
 		busOwnerRoutes.Use(middleware.AuthMiddleware(jwtService))
 		{
-			busOwnerRoutes.POST("", busOwnerRouteHandler.CreateRoute)
+			// Read endpoints (no verification needed)
 			busOwnerRoutes.GET("", busOwnerRouteHandler.GetRoutes)
 			busOwnerRoutes.GET("/:id", busOwnerRouteHandler.GetRouteByID)
 			busOwnerRoutes.GET("/by-master-route/:master_route_id", busOwnerRouteHandler.GetRoutesByMasterRoute)
-			busOwnerRoutes.PUT("/:id", busOwnerRouteHandler.UpdateRoute)
-			busOwnerRoutes.DELETE("/:id", busOwnerRouteHandler.DeleteRoute)
+
+			// Write endpoints (requires verification)
+			busOwnerRoutes.POST("", middleware.RequireVerifiedBusOwner(ownerRepository), busOwnerRouteHandler.CreateRoute)
+			busOwnerRoutes.PUT("/:id", middleware.RequireVerifiedBusOwner(ownerRepository), busOwnerRouteHandler.UpdateRoute)
+			busOwnerRoutes.DELETE("/:id", middleware.RequireVerifiedBusOwner(ownerRepository), busOwnerRouteHandler.DeleteRoute)
 		}
 
 		// Lounge Owner routes (all protected)
@@ -553,13 +559,13 @@ func main() {
 		loungeOwner := v1.Group("/lounge-owner")
 		loungeOwner.Use(middleware.AuthMiddleware(jwtService))
 		{
-			// Registration endpoints
+			// Registration endpoints (no verification needed - for registration flow)
 			logger.Info("  ✅ POST /api/v1/lounge-owner/register/business-info")
 			loungeOwner.POST("/register/business-info", loungeOwnerHandler.SaveBusinessAndManagerInfo)
 			logger.Info("  ✅ POST /api/v1/lounge-owner/register/upload-manager-nic")
 			loungeOwner.POST("/register/upload-manager-nic", loungeOwnerHandler.UploadManagerNIC)
-			logger.Info("  ✅ POST /api/v1/lounge-owner/register/add-lounge")
-			loungeOwner.POST("/register/add-lounge", loungeHandler.AddLounge)
+			logger.Info("  ✅ POST /api/v1/lounge-owner/register/add-lounge (requires approval)")
+			loungeOwner.POST("/register/add-lounge", middleware.RequireApprovedLoungeOwner(loungeOwnerRepository), loungeHandler.AddLounge)
 			logger.Info("  ✅ GET /api/v1/lounge-owner/registration/progress")
 			loungeOwner.GET("/registration/progress", loungeOwnerHandler.GetRegistrationProgress)
 
@@ -589,25 +595,27 @@ func main() {
 			loungesProtected := lounges.Group("")
 			loungesProtected.Use(middleware.AuthMiddleware(jwtService))
 			{
-				logger.Info("  ✅ GET /api/v1/lounges/my-lounges")
+				logger.Info("  ✅ GET /api/v1/lounges/my-lounges (read-only, no approval needed)")
 				loungesProtected.GET("/my-lounges", loungeHandler.GetMyLounges)
-				logger.Info("  ✅ GET /api/v1/lounges/:id")
+				logger.Info("  ✅ GET /api/v1/lounges/:id (read-only, no approval needed)")
 				loungesProtected.GET("/:id", loungeHandler.GetLoungeByID)
-				logger.Info("  ✅ PUT /api/v1/lounges/:id")
-				loungesProtected.PUT("/:id", loungeHandler.UpdateLounge)
-				logger.Info("  ✅ DELETE /api/v1/lounges/:id")
-				loungesProtected.DELETE("/:id", loungeHandler.DeleteLounge)
 
-				// Staff management for specific lounge (use :id to match other lounge routes)
-				logger.Info("  ✅ POST /api/v1/lounges/:id/staff")
-				loungesProtected.POST("/:id/staff", loungeStaffHandler.AddStaff)
-				logger.Info("  ✅ GET /api/v1/lounges/:id/staff")
+				// Write operations require approval
+				logger.Info("  ✅ PUT /api/v1/lounges/:id (requires approval)")
+				loungesProtected.PUT("/:id", middleware.RequireApprovedLoungeOwner(loungeOwnerRepository), loungeHandler.UpdateLounge)
+				logger.Info("  ✅ DELETE /api/v1/lounges/:id (requires approval)")
+				loungesProtected.DELETE("/:id", middleware.RequireApprovedLoungeOwner(loungeOwnerRepository), loungeHandler.DeleteLounge)
+
+				// Staff management for specific lounge (requires approval)
+				logger.Info("  ✅ POST /api/v1/lounges/:id/staff (requires approval)")
+				loungesProtected.POST("/:id/staff", middleware.RequireApprovedLoungeOwner(loungeOwnerRepository), loungeStaffHandler.AddStaff)
+				logger.Info("  ✅ GET /api/v1/lounges/:id/staff (read-only, no approval needed)")
 				loungesProtected.GET("/:id/staff", loungeStaffHandler.GetStaffByLounge)
 				// Permission management moved to users.roles array - removed permission_type field
-				logger.Info("  ✅ PUT /api/v1/lounges/:id/staff/:staff_id/status")
-				loungesProtected.PUT("/:id/staff/:staff_id/status", loungeStaffHandler.UpdateStaffStatus)
-				logger.Info("  ✅ DELETE /api/v1/lounges/:id/staff/:staff_id")
-				loungesProtected.DELETE("/:id/staff/:staff_id", loungeStaffHandler.RemoveStaff)
+				logger.Info("  ✅ PUT /api/v1/lounges/:id/staff/:staff_id/status (requires approval)")
+				loungesProtected.PUT("/:id/staff/:staff_id/status", middleware.RequireApprovedLoungeOwner(loungeOwnerRepository), loungeStaffHandler.UpdateStaffStatus)
+				logger.Info("  ✅ DELETE /api/v1/lounges/:id/staff/:staff_id (requires approval)")
+				loungesProtected.DELETE("/:id/staff/:staff_id", middleware.RequireApprovedLoungeOwner(loungeOwnerRepository), loungeStaffHandler.RemoveStaff)
 			}
 		}
 		logger.Info("� Lounge routes registered successfully")
@@ -629,19 +637,19 @@ func main() {
 		loungesProtectedProducts.Use(middleware.AuthMiddleware(jwtService))
 		{
 			// Products for a lounge (anyone can view, owner can manage)
-			logger.Info("  ✅ GET /api/v1/lounges/:id/products")
+			logger.Info("  ✅ GET /api/v1/lounges/:id/products (read-only, no approval needed)")
 			loungesProtectedProducts.GET("/:id/products", loungeBookingHandler.GetLoungeProducts)
-			logger.Info("  ✅ POST /api/v1/lounges/:id/products (owner only)")
-			loungesProtectedProducts.POST("/:id/products", loungeBookingHandler.CreateProduct)
-			logger.Info("  ✅ PUT /api/v1/lounges/:id/products/:product_id (owner only)")
-			loungesProtectedProducts.PUT("/:id/products/:product_id", loungeBookingHandler.UpdateProduct)
-			logger.Info("  ✅ DELETE /api/v1/lounges/:id/products/:product_id (owner only)")
-			loungesProtectedProducts.DELETE("/:id/products/:product_id", loungeBookingHandler.DeleteProduct)
+			logger.Info("  ✅ POST /api/v1/lounges/:id/products (requires approval)")
+			loungesProtectedProducts.POST("/:id/products", middleware.RequireApprovedLoungeOwner(loungeOwnerRepository), loungeBookingHandler.CreateProduct)
+			logger.Info("  ✅ PUT /api/v1/lounges/:id/products/:product_id (requires approval)")
+			loungesProtectedProducts.PUT("/:id/products/:product_id", middleware.RequireApprovedLoungeOwner(loungeOwnerRepository), loungeBookingHandler.UpdateProduct)
+			logger.Info("  ✅ DELETE /api/v1/lounges/:id/products/:product_id (requires approval)")
+			loungesProtectedProducts.DELETE("/:id/products/:product_id", middleware.RequireApprovedLoungeOwner(loungeOwnerRepository), loungeBookingHandler.DeleteProduct)
 
-			// Bookings for a lounge (owner/staff view)
-			logger.Info("  ✅ GET /api/v1/lounges/:id/bookings (owner/staff)")
+			// Bookings for a lounge (owner/staff view - read-only, no approval needed)
+			logger.Info("  ✅ GET /api/v1/lounges/:id/bookings (owner/staff, read-only)")
 			loungesProtectedProducts.GET("/:id/bookings", loungeBookingHandler.GetLoungeBookingsForOwner)
-			logger.Info("  ✅ GET /api/v1/lounges/:id/bookings/today (owner/staff)")
+			logger.Info("  ✅ GET /api/v1/lounges/:id/bookings/today (owner/staff, read-only)")
 			loungesProtectedProducts.GET("/:id/bookings/today", loungeBookingHandler.GetTodaysBookings)
 		}
 
@@ -698,13 +706,16 @@ func main() {
 		permits := v1.Group("/permits")
 		permits.Use(middleware.AuthMiddleware(jwtService))
 		{
+			// Read endpoints (no verification needed)
 			permits.GET("", permitHandler.GetAllPermits)
 			permits.GET("/valid", permitHandler.GetValidPermits)
 			permits.GET("/:id", permitHandler.GetPermitByID)
 			permits.GET("/:id/route-details", permitHandler.GetRouteDetails)
-			permits.POST("", permitHandler.CreatePermit)
-			permits.PUT("/:id", permitHandler.UpdatePermit)
-			permits.DELETE("/:id", permitHandler.DeletePermit)
+
+			// Write endpoints (requires verification)
+			permits.POST("", middleware.RequireVerifiedBusOwner(ownerRepository), permitHandler.CreatePermit)
+			permits.PUT("/:id", middleware.RequireVerifiedBusOwner(ownerRepository), permitHandler.UpdatePermit)
+			permits.DELETE("/:id", middleware.RequireVerifiedBusOwner(ownerRepository), permitHandler.DeletePermit)
 		}
 
 		// Master Routes (all protected - for dropdown selection)
@@ -719,78 +730,93 @@ func main() {
 		buses := v1.Group("/buses")
 		buses.Use(middleware.AuthMiddleware(jwtService))
 		{
+			// Read endpoints (no verification needed)
 			buses.GET("", busHandler.GetAllBuses)
 			buses.GET("/:id", busHandler.GetBusByID)
-			buses.POST("", busHandler.CreateBus)
-			buses.PUT("/:id", busHandler.UpdateBus)
-			buses.DELETE("/:id", busHandler.DeleteBus)
 			buses.GET("/status/:status", busHandler.GetBusesByStatus)
+
+			// Write endpoints (requires verification)
+			buses.POST("", middleware.RequireVerifiedBusOwner(ownerRepository), busHandler.CreateBus)
+			buses.PUT("/:id", middleware.RequireVerifiedBusOwner(ownerRepository), busHandler.UpdateBus)
+			buses.DELETE("/:id", middleware.RequireVerifiedBusOwner(ownerRepository), busHandler.DeleteBus)
 		}
 
 		// Trip Schedule routes (all protected - bus owners only)
 		tripSchedules := v1.Group("/trip-schedules")
 		tripSchedules.Use(middleware.AuthMiddleware(jwtService))
 		{
+			// Read endpoints (no verification needed)
 			tripSchedules.GET("", tripScheduleHandler.GetAllSchedules)
-			tripSchedules.POST("", tripScheduleHandler.CreateSchedule)
 			tripSchedules.GET("/:id", tripScheduleHandler.GetScheduleByID)
-			tripSchedules.PUT("/:id", tripScheduleHandler.UpdateSchedule)
-			tripSchedules.DELETE("/:id", tripScheduleHandler.DeleteSchedule)
-			tripSchedules.POST("/:id/deactivate", tripScheduleHandler.DeactivateSchedule)
+
+			// Write endpoints (requires verification)
+			tripSchedules.POST("", middleware.RequireVerifiedBusOwner(ownerRepository), tripScheduleHandler.CreateSchedule)
+			tripSchedules.PUT("/:id", middleware.RequireVerifiedBusOwner(ownerRepository), tripScheduleHandler.UpdateSchedule)
+			tripSchedules.DELETE("/:id", middleware.RequireVerifiedBusOwner(ownerRepository), tripScheduleHandler.DeleteSchedule)
+			tripSchedules.POST("/:id/deactivate", middleware.RequireVerifiedBusOwner(ownerRepository), tripScheduleHandler.DeactivateSchedule)
 		}
 
 		// Timetable routes (new timetable system - all protected)
 		timetables := v1.Group("/timetables")
 		timetables.Use(middleware.AuthMiddleware(jwtService))
 		{
-			timetables.POST("", tripScheduleHandler.CreateTimetable)
+			// Write endpoints (requires verification)
+			timetables.POST("", middleware.RequireVerifiedBusOwner(ownerRepository), tripScheduleHandler.CreateTimetable)
 		}
 
 		// Special Trip routes (one-time trips, not from timetable - all protected)
 		specialTrips := v1.Group("/special-trips")
 		specialTrips.Use(middleware.AuthMiddleware(jwtService))
 		{
-			specialTrips.POST("", scheduledTripHandler.CreateSpecialTrip)
+			// Write endpoints (requires verification)
+			specialTrips.POST("", middleware.RequireVerifiedBusOwner(ownerRepository), scheduledTripHandler.CreateSpecialTrip)
 		}
 
 		// Scheduled Trip routes (all protected - bus owners only)
 		scheduledTrips := v1.Group("/scheduled-trips")
 		scheduledTrips.Use(middleware.AuthMiddleware(jwtService))
 		{
+			// Read endpoints (no verification needed)
 			scheduledTrips.GET("", scheduledTripHandler.GetTripsByDateRange)
 			scheduledTrips.GET("/:id", scheduledTripHandler.GetTripByID)
-			scheduledTrips.PATCH("/:id", scheduledTripHandler.UpdateTrip)
-			scheduledTrips.POST("/:id/cancel", scheduledTripHandler.CancelTrip)
 
-			// NEW: Publish/Unpublish endpoints
-			scheduledTrips.PUT("/:id/publish", scheduledTripHandler.PublishTrip)
-			scheduledTrips.PUT("/:id/unpublish", scheduledTripHandler.UnpublishTrip)
-			scheduledTrips.POST("/bulk-publish", scheduledTripHandler.BulkPublishTrips)
-			scheduledTrips.POST("/bulk-unpublish", scheduledTripHandler.BulkUnpublishTrips)
+			// Write endpoints (requires verification)
+			scheduledTrips.PATCH("/:id", middleware.RequireVerifiedBusOwner(ownerRepository), scheduledTripHandler.UpdateTrip)
+			scheduledTrips.POST("/:id/cancel", middleware.RequireVerifiedBusOwner(ownerRepository), scheduledTripHandler.CancelTrip)
 
-			// NEW: Assign staff and permit
-			scheduledTrips.PATCH("/:id/assign", scheduledTripHandler.AssignStaffAndPermit)
-			// NEW: Assign seat layout
-			scheduledTrips.PATCH("/:id/assign-seat-layout", scheduledTripHandler.AssignSeatLayout)
+			// NEW: Publish/Unpublish endpoints (requires verification)
+			scheduledTrips.PUT("/:id/publish", middleware.RequireVerifiedBusOwner(ownerRepository), scheduledTripHandler.PublishTrip)
+			scheduledTrips.PUT("/:id/unpublish", middleware.RequireVerifiedBusOwner(ownerRepository), scheduledTripHandler.UnpublishTrip)
+			scheduledTrips.POST("/bulk-publish", middleware.RequireVerifiedBusOwner(ownerRepository), scheduledTripHandler.BulkPublishTrips)
+			scheduledTrips.POST("/bulk-unpublish", middleware.RequireVerifiedBusOwner(ownerRepository), scheduledTripHandler.BulkUnpublishTrips)
+
+			// NEW: Assign staff and permit (requires verification)
+			scheduledTrips.PATCH("/:id/assign", middleware.RequireVerifiedBusOwner(ownerRepository), scheduledTripHandler.AssignStaffAndPermit)
+			// NEW: Assign seat layout (requires verification)
+			scheduledTrips.PATCH("/:id/assign-seat-layout", middleware.RequireVerifiedBusOwner(ownerRepository), scheduledTripHandler.AssignSeatLayout)
 
 			// ============================================================================
 			// TRIP SEATS ROUTES (Seat management for scheduled trips)
 			// ============================================================================
+			// Read endpoints (no verification needed)
 			scheduledTrips.GET("/:id/seats", tripSeatHandler.GetTripSeats)
 			scheduledTrips.GET("/:id/seats/summary", tripSeatHandler.GetTripSeatSummary)
-			scheduledTrips.POST("/:id/seats/create", tripSeatHandler.CreateTripSeats)
-			scheduledTrips.POST("/:id/seats/block", tripSeatHandler.BlockSeats)
-			scheduledTrips.POST("/:id/seats/unblock", tripSeatHandler.UnblockSeats)
-			scheduledTrips.PUT("/:id/seats/price", tripSeatHandler.UpdateSeatPrices)
-
-			// Route stops for manual booking dropdown
 			scheduledTrips.GET("/:id/route-stops", tripSeatHandler.GetTripRouteStops)
+
+			// Write endpoints (requires verification)
+			scheduledTrips.POST("/:id/seats/create", middleware.RequireVerifiedBusOwner(ownerRepository), tripSeatHandler.CreateTripSeats)
+			scheduledTrips.POST("/:id/seats/block", middleware.RequireVerifiedBusOwner(ownerRepository), tripSeatHandler.BlockSeats)
+			scheduledTrips.POST("/:id/seats/unblock", middleware.RequireVerifiedBusOwner(ownerRepository), tripSeatHandler.UnblockSeats)
+			scheduledTrips.PUT("/:id/seats/price", middleware.RequireVerifiedBusOwner(ownerRepository), tripSeatHandler.UpdateSeatPrices)
 
 			// ============================================================================
 			// MANUAL BOOKINGS ROUTES (Phone/Agent/Walk-in bookings)
 			// ============================================================================
+			// Read endpoints (no verification needed)
 			scheduledTrips.GET("/:id/manual-bookings", tripSeatHandler.GetManualBookings)
-			scheduledTrips.POST("/:id/manual-bookings", tripSeatHandler.CreateManualBooking)
+
+			// Write endpoints (requires verification)
+			scheduledTrips.POST("/:id/manual-bookings", middleware.RequireVerifiedBusOwner(ownerRepository), tripSeatHandler.CreateManualBooking)
 		}
 
 		// Manual Bookings standalone routes (for operations on existing bookings)
@@ -798,18 +824,21 @@ func main() {
 		manualBookings := v1.Group("/manual-bookings")
 		manualBookings.Use(middleware.AuthMiddleware(jwtService))
 		{
+			// Read endpoints (no verification needed)
 			logger.Info("  ✅ GET /api/v1/manual-bookings/:id")
 			manualBookings.GET("/:id", tripSeatHandler.GetManualBooking)
 			logger.Info("  ✅ GET /api/v1/manual-bookings/reference/:ref")
 			manualBookings.GET("/reference/:ref", tripSeatHandler.GetManualBookingByReference)
-			logger.Info("  ✅ PUT /api/v1/manual-bookings/:id/payment")
-			manualBookings.PUT("/:id/payment", tripSeatHandler.UpdateManualBookingPayment)
-			logger.Info("  ✅ PUT /api/v1/manual-bookings/:id/status")
-			manualBookings.PUT("/:id/status", tripSeatHandler.UpdateManualBookingStatus)
-			logger.Info("  ✅ DELETE /api/v1/manual-bookings/:id")
-			manualBookings.DELETE("/:id", tripSeatHandler.CancelManualBooking)
 			logger.Info("  ✅ GET /api/v1/manual-bookings/search")
 			manualBookings.GET("/search", tripSeatHandler.SearchManualBookingsByPhone)
+
+			// Write endpoints (requires verification)
+			logger.Info("  ✅ PUT /api/v1/manual-bookings/:id/payment (requires verification)")
+			manualBookings.PUT("/:id/payment", middleware.RequireVerifiedBusOwner(ownerRepository), tripSeatHandler.UpdateManualBookingPayment)
+			logger.Info("  ✅ PUT /api/v1/manual-bookings/:id/status (requires verification)")
+			manualBookings.PUT("/:id/status", middleware.RequireVerifiedBusOwner(ownerRepository), tripSeatHandler.UpdateManualBookingStatus)
+			logger.Info("  ✅ DELETE /api/v1/manual-bookings/:id (requires verification)")
+			manualBookings.DELETE("/:id", middleware.RequireVerifiedBusOwner(ownerRepository), tripSeatHandler.CancelManualBooking)
 		}
 		logger.Info("📋 Manual Booking routes registered successfully")
 
