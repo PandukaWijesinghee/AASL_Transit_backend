@@ -62,7 +62,16 @@ func (r *LoungeOwnerRepository) CreateLoungeOwner(userID uuid.UUID) (*models.Lou
 // GetLoungeOwnerByUserID retrieves a lounge owner by user ID
 func (r *LoungeOwnerRepository) GetLoungeOwnerByUserID(userID uuid.UUID) (*models.LoungeOwner, error) {
 	var owner models.LoungeOwner
-	query := `SELECT * FROM lounge_owners WHERE user_id = $1`
+	query := `
+		SELECT 
+			id, user_id, business_name, business_license, 
+			manager_full_name, manager_nic_number, manager_email,
+			registration_step, profile_completed,
+			verification_status, verification_notes, verified_at, verified_by,
+			created_at, updated_at
+		FROM lounge_owners 
+		WHERE user_id = $1
+	`
 	err := r.db.Get(&owner, query, userID)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -76,7 +85,16 @@ func (r *LoungeOwnerRepository) GetLoungeOwnerByUserID(userID uuid.UUID) (*model
 // GetLoungeOwnerByID retrieves a lounge owner by ID
 func (r *LoungeOwnerRepository) GetLoungeOwnerByID(id uuid.UUID) (*models.LoungeOwner, error) {
 	var owner models.LoungeOwner
-	query := `SELECT * FROM lounge_owners WHERE id = $1`
+	query := `
+		SELECT 
+			id, user_id, business_name, business_license, 
+			manager_full_name, manager_nic_number, manager_email,
+			registration_step, profile_completed,
+			verification_status, verification_notes, verified_at, verified_by,
+			created_at, updated_at
+		FROM lounge_owners 
+		WHERE id = $1
+	`
 	err := r.db.Get(&owner, query, id)
 	if err == sql.ErrNoRows {
 		return nil, nil

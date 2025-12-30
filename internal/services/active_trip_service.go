@@ -53,7 +53,7 @@ type StartTripResult struct {
 // StartTrip starts a scheduled trip - creates active_trip record and updates scheduled_trip status
 func (s *ActiveTripService) StartTrip(input *StartTripInput) (*StartTripResult, error) {
 	log.Printf("[StartTrip] === START TRIP DEBUG v2 ===")
-	log.Printf("[StartTrip] Input: ScheduledTripID=%s, StaffID=%s, Lat=%f, Lon=%f", 
+	log.Printf("[StartTrip] Input: ScheduledTripID=%s, StaffID=%s, Lat=%f, Lon=%f",
 		input.ScheduledTripID, input.StaffID, input.InitialLatitude, input.InitialLongitude)
 
 	// 1. Get the scheduled trip
@@ -116,7 +116,7 @@ func (s *ActiveTripService) StartTrip(input *StartTripInput) (*StartTripResult, 
 		return nil, errors.New("trip has no permit assigned")
 	}
 	log.Printf("[StartTrip] PermitID value: %s", *scheduledTrip.PermitID)
-	
+
 	// Validate that a driver is assigned (required for trip to start)
 	log.Printf("[StartTrip] Validating driver assignment...")
 	if scheduledTrip.AssignedDriverID == nil {
