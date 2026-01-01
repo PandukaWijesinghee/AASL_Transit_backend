@@ -201,6 +201,60 @@ func (r *ActiveTripRepository) UpdateStatus(tripID string, status models.ActiveT
 	return nil
 }
 
+// GetPassengersByScheduledTripID retrieves passengers by scheduled trip ID
+func (r *ActiveTripRepository) GetPassengersByScheduledTripID(scheduledTripID string) ([]models.PassengerInfo, error) {
+	var passengers []models.PassengerInfo
+
+	query := `
+		SELECT 
+			bb.id as booking_id,
+			b.booking_reference,
+			bb.status,
+			bb.boarded_at,
+			b.created_at,
+			COALESCE(b.passenger_name, '') as passenger_name,
+			COALESCE(b.passenger_phone, '') as passenger_phone,
+			COALESCE(bor.custom_route_name, mr.route_name, '') as route_name,
+			COALESCE(mrs_board.stop_name, '') as pickup_stop_name,
+			COALESCE(mrs_alight.stop_name, '') as dropoff_stop_name
+		FROM bus_bookings bb
+		INNER JOIN bookings b ON bb.booking_id = b.id
+		INNER JOIN scheduled_trips st ON bb.scheduled_trip_id = st.id
+		LEFT JOIN bus_owner_routes bor ON st.bus_owner_route_id = bor.id
+		LEFT JOIN master_routes mr ON bor.master_route_id = mr.id
+		LEFT JOIN master_route_stops mrs_board ON bb.boarding_stop_id = mrs_board.id
+		LEFT JOIN master_route_stops mrs_alight ON bb.alighting_stop_id = mrs_alight.id
+		WHERE bb.scheduled_trip_id = $1
+		AND bb.status NOT IN ('cancelled')
+		ORDER BY b.created_at DESC
+	`
+
+	rows, err := r.db.Query(query, scheduledTripID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var p models.PassengerInfo
+		err := rows.Scan(
+			&p.BookingID, &p.BookingReference, &p.Status, &p.BoardedAt, &p.CreatedAt,
+			&p.PassengerName, &p.PassengerPhone, &p.RouteName,
+			&p.PickupStopName, &p.DropoffStopName,
+		)
+		if err != nil {
+			return nil, err
+		}
+		passengers = append(passengers, p)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return passengers, nil
+}
+
 // scanTrip scans a single active trip
 func (r *ActiveTripRepository) scanTrip(row scanner) (*models.ActiveTrip, error) {
 	trip := &models.ActiveTrip{}

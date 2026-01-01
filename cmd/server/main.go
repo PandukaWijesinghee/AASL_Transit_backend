@@ -204,6 +204,9 @@ func main() {
 	// Initialize staff handler
 	staffHandler := handlers.NewStaffHandler(staffService, userRepository, staffRepository, scheduledTripRepo)
 
+	// Initialize app booking repository (needed for active trip service)
+	appBookingRepo := database.NewAppBookingRepository(sqlxDB.DB)
+
 	// Initialize active trip service and handler (for Start Trip / End Trip / Location tracking)
 	logger.Info("🚌 Initializing Active Trip tracking system...")
 	activeTripService := services.NewActiveTripService(
@@ -212,6 +215,7 @@ func main() {
 		staffRepository,
 		busRepository,
 		permitRepository,
+		appBookingRepo,
 	)
 	activeTripHandler := handlers.NewActiveTripHandler(activeTripService, staffRepository)
 	logger.Info("✓ Active Trip tracking system initialized")
@@ -310,9 +314,8 @@ func main() {
 	)
 	logger.Info("✓ Trip seat handler initialized")
 
-	// Initialize App Booking system (passenger app bookings)
-	logger.Info("Initializing app booking system...")
-	appBookingRepo := database.NewAppBookingRepository(sqlxDB.DB)
+	// Initialize App Booking handler (repository already initialized above for active trip service)
+	logger.Info("Initializing app booking handler...")
 	appBookingHandler := handlers.NewAppBookingHandler(
 		appBookingRepo,
 		scheduledTripRepo,
@@ -321,7 +324,7 @@ func main() {
 		logger,
 	)
 	staffBookingHandler := handlers.NewStaffBookingHandler(appBookingRepo)
-	logger.Info("✓ App booking system initialized")
+	logger.Info("✓ App booking handler initialized")
 
 	// ============================================================================
 	// BOOKING ORCHESTRATION SYSTEM (Intent → Payment → Confirm)
@@ -397,6 +400,39 @@ func main() {
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
+		// ============================================================================
+		// ACTIVE TRIP PASSENGER MANAGEMENT ROUTES
+		// ============================================================================
+		logger.Info("👥 Registering Active Trip Passenger Management routes...")
+		activeTripPassengers := v1.Group("/active-trips/passengers")
+		activeTripPassengers.Use(middleware.AuthMiddleware(jwtService))
+		{
+			logger.Info("  ✅ GET /api/v1/active-trips/passengers - Get passengers for active trip")
+			activeTripPassengers.GET("", activeTripHandler.GetPassengers)
+
+			logger.Info("  ✅ PUT /api/v1/active-trips/passengers/board - Board passenger")
+			activeTripPassengers.PUT("/board", activeTripHandler.BoardPassenger)
+
+			logger.Info("  ✅ PUT /api/v1/active-trips/passengers/pending - Set passenger to pending")
+			activeTripPassengers.PUT("/pending", activeTripHandler.UpdatePassengerStatusToPending)
+
+			logger.Info("  ✅ PUT /api/v1/active-trips/passengers/cancelled - Cancel passenger")
+			activeTripPassengers.PUT("/cancelled", activeTripHandler.CancelPassenger)
+
+			logger.Info("  ✅ POST /api/v1/active-trips/passengers/verify - Verify passenger booking")
+			activeTripPassengers.POST("/verify", activeTripHandler.VerifyPassenger)
+
+			logger.Info("  ✅ PUT /api/v1/active-trips/passengers/confirmed - Confirm passenger")
+			activeTripPassengers.PUT("/confirmed", activeTripHandler.UpdatePassengerStatusToConfirmed)
+
+			logger.Info("  ✅ PUT /api/v1/active-trips/passengers/in-transit - Set passenger to in-transit")
+			activeTripPassengers.PUT("/in-transit", activeTripHandler.UpdatePassengerStatusToInTransit)
+
+			logger.Info("  ✅ PUT /api/v1/active-trips/passengers/completed - Complete passenger journey")
+			activeTripPassengers.PUT("/completed", activeTripHandler.UpdatePassengerStatusToCompleted)
+		}
+		logger.Info("👥 Active Trip Passenger Management routes registered successfully")
+
 		// Debug endpoint - shows all request headers and IP detection (public)
 		v1.GET("/debug/headers", debugHeadersHandler())
 

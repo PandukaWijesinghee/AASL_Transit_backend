@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -9,13 +10,29 @@ import (
 	"github.com/smarttransit/sms-auth-backend/internal/models"
 )
 
-// ActiveTripService handles business logic for active trips (real-time trip tracking)
-type ActiveTripService struct {
+// ActiveTripService interface defines the service methods
+type ActiveTripService interface {
+	StartTrip(input *StartTripInput) (*StartTripResult, error)
+	UpdateLocation(input *UpdateLocationInput) error
+	EndTrip(input *EndTripInput) (*EndTripResult, error)
+	GetActiveTrip(activeTripID string) (*models.ActiveTrip, error)
+	GetActiveTripByScheduledTrip(scheduledTripID string) (*models.ActiveTrip, error)
+	GetMyActiveTrip(staffID string) (*models.ActiveTrip, error)
+	UpdatePassengerCount(activeTripID string, staffID string, count int) error
+	GetPassengersByScheduledTripID(scheduledTripID string) ([]models.PassengerInfo, error)
+	UpdatePassengerStatus(bookingID string, status string) error
+	BoardPassenger(bookingID string) error
+	VerifyPassengerBooking(reference string, scheduledTripID string) (*models.MasterBooking, error)
+}
+
+// activeTripService implements ActiveTripService
+type activeTripService struct {
 	activeTripRepo    *database.ActiveTripRepository
 	scheduledTripRepo *database.ScheduledTripRepository
 	staffRepo         *database.BusStaffRepository
 	busRepo           *database.BusRepository
 	permitRepo        *database.RoutePermitRepository
+	appBookingRepo    *database.AppBookingRepository
 }
 
 // NewActiveTripService creates a new ActiveTripService
@@ -25,13 +42,15 @@ func NewActiveTripService(
 	staffRepo *database.BusStaffRepository,
 	busRepo *database.BusRepository,
 	permitRepo *database.RoutePermitRepository,
-) *ActiveTripService {
-	return &ActiveTripService{
+	appBookingRepo *database.AppBookingRepository,
+) ActiveTripService {
+	return &activeTripService{
 		activeTripRepo:    activeTripRepo,
 		scheduledTripRepo: scheduledTripRepo,
 		staffRepo:         staffRepo,
 		busRepo:           busRepo,
 		permitRepo:        permitRepo,
+		appBookingRepo:    appBookingRepo,
 	}
 }
 
@@ -51,7 +70,7 @@ type StartTripResult struct {
 }
 
 // StartTrip starts a scheduled trip - creates active_trip record and updates scheduled_trip status
-func (s *ActiveTripService) StartTrip(input *StartTripInput) (*StartTripResult, error) {
+func (s *activeTripService) StartTrip(input *StartTripInput) (*StartTripResult, error) {
 	log.Printf("[StartTrip] === START TRIP DEBUG v2 ===")
 	log.Printf("[StartTrip] Input: ScheduledTripID=%s, StaffID=%s, Lat=%f, Lon=%f",
 		input.ScheduledTripID, input.StaffID, input.InitialLatitude, input.InitialLongitude)
@@ -199,7 +218,7 @@ type UpdateLocationInput struct {
 }
 
 // UpdateLocation updates the current location of an active trip
-func (s *ActiveTripService) UpdateLocation(input *UpdateLocationInput) error {
+func (s *activeTripService) UpdateLocation(input *UpdateLocationInput) error {
 	// 1. Get the active trip
 	activeTrip, err := s.activeTripRepo.GetByID(input.ActiveTripID)
 	if err != nil {
@@ -241,7 +260,7 @@ type EndTripResult struct {
 }
 
 // EndTrip completes an active trip
-func (s *ActiveTripService) EndTrip(input *EndTripInput) (*EndTripResult, error) {
+func (s *activeTripService) EndTrip(input *EndTripInput) (*EndTripResult, error) {
 	// 1. Get the active trip
 	activeTrip, err := s.activeTripRepo.GetByID(input.ActiveTripID)
 	if err != nil {
@@ -286,17 +305,17 @@ func (s *ActiveTripService) EndTrip(input *EndTripInput) (*EndTripResult, error)
 }
 
 // GetActiveTrip retrieves an active trip by ID
-func (s *ActiveTripService) GetActiveTrip(activeTripID string) (*models.ActiveTrip, error) {
+func (s *activeTripService) GetActiveTrip(activeTripID string) (*models.ActiveTrip, error) {
 	return s.activeTripRepo.GetByID(activeTripID)
 }
 
 // GetActiveTripByScheduledTrip retrieves an active trip by scheduled trip ID
-func (s *ActiveTripService) GetActiveTripByScheduledTrip(scheduledTripID string) (*models.ActiveTrip, error) {
+func (s *activeTripService) GetActiveTripByScheduledTrip(scheduledTripID string) (*models.ActiveTrip, error) {
 	return s.activeTripRepo.GetByScheduledTripID(scheduledTripID)
 }
 
 // GetMyActiveTrip gets the current active trip for a staff member
-func (s *ActiveTripService) GetMyActiveTrip(staffID string) (*models.ActiveTrip, error) {
+func (s *activeTripService) GetMyActiveTrip(staffID string) (*models.ActiveTrip, error) {
 	// Get all active trips and find one for this staff
 	activeTrips, err := s.activeTripRepo.GetAllActiveTrips()
 	if err != nil {
@@ -313,7 +332,7 @@ func (s *ActiveTripService) GetMyActiveTrip(staffID string) (*models.ActiveTrip,
 }
 
 // UpdatePassengerCount updates the current passenger count
-func (s *ActiveTripService) UpdatePassengerCount(activeTripID string, staffID string, count int) error {
+func (s *activeTripService) UpdatePassengerCount(activeTripID string, staffID string, count int) error {
 	// 1. Get the active trip
 	activeTrip, err := s.activeTripRepo.GetByID(activeTripID)
 	if err != nil {
@@ -338,4 +357,45 @@ func (s *ActiveTripService) UpdatePassengerCount(activeTripID string, staffID st
 	}
 
 	return nil
+}
+
+// GetPassengersByScheduledTripID gets the list of passengers for a scheduled trip
+func (s *activeTripService) GetPassengersByScheduledTripID(scheduledTripID string) ([]models.PassengerInfo, error) {
+	// Simply return the passengers for this scheduled trip
+	// No need to check if trip is active - staff should be able to see passengers before/during/after trip
+	return s.activeTripRepo.GetPassengersByScheduledTripID(scheduledTripID)
+}
+
+// UpdatePassengerStatus updates the status of a passenger booking
+func (s *activeTripService) UpdatePassengerStatus(bookingID string, status string) error {
+	// For now, just update the booking status directly
+	// In the future we could add more validation here
+	return s.appBookingRepo.UpdateBookingStatusByID(bookingID, status, nil)
+}
+
+// BoardPassenger marks a passenger as boarded
+func (s *activeTripService) BoardPassenger(bookingID string) error {
+	now := time.Now()
+	return s.appBookingRepo.UpdateBookingStatusByID(bookingID, "boarded", &now)
+}
+
+// VerifyPassengerBooking checks and verifies a passenger booking by reference number
+func (s *activeTripService) VerifyPassengerBooking(reference string, scheduledTripID string) (*models.MasterBooking, error) {
+	// Verify the scheduled trip is active
+	activeTrip, err := s.activeTripRepo.GetByScheduledTripID(scheduledTripID)
+	if err != nil {
+		return nil, fmt.Errorf("no active trip found: %w", err)
+	}
+
+	if !activeTrip.IsActive() {
+		return nil, fmt.Errorf("trip is not active")
+	}
+
+	// Find and verify booking
+	booking, err := s.appBookingRepo.VerifyBookingByReferenceAndTrip(reference, scheduledTripID)
+	if err != nil {
+		return nil, fmt.Errorf("booking not found or invalid: %w", err)
+	}
+
+	return booking, nil
 }
