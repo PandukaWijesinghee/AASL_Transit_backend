@@ -2,24 +2,22 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/smarttransit/sms-auth-backend/internal/database"
 	"github.com/smarttransit/sms-auth-backend/internal/middleware"
-	"github.com/smarttransit/sms-auth-backend/internal/models"
 	"github.com/smarttransit/sms-auth-backend/internal/services"
 )
 
 // ActiveTripHandler handles active trip HTTP requests
 type ActiveTripHandler struct {
-	activeTripService services.ActiveTripService
+	activeTripService *services.ActiveTripService
 	staffRepo         *database.BusStaffRepository
 }
 
 // NewActiveTripHandler creates a new ActiveTripHandler
 func NewActiveTripHandler(
-	activeTripService services.ActiveTripService,
+	activeTripService *services.ActiveTripService,
 	staffRepo *database.BusStaffRepository,
 ) *ActiveTripHandler {
 	return &ActiveTripHandler{
@@ -395,191 +393,5 @@ func (h *ActiveTripHandler) UpdatePassengerCount(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message":         "Passenger count updated successfully",
 		"passenger_count": req.PassengerCount,
-	})
-}
-
-// GetPassengers retrieves all passengers for an active trip
-func (h *ActiveTripHandler) GetPassengers(c *gin.Context) {
-	scheduledTripIDStr := c.Query("scheduled_trip_id")
-	if scheduledTripIDStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "scheduled_trip_id is required"})
-		return
-	}
-
-	passengers, err := h.activeTripService.GetPassengersByScheduledTripID(scheduledTripIDStr)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	if len(passengers) == 0 {
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "success",
-			"message": "No passengers found for this trip",
-			"data":    []models.PassengerInfo{},
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"data":   passengers,
-	})
-}
-
-// BoardPassenger updates a passenger's status to boarded
-func (h *ActiveTripHandler) BoardPassenger(c *gin.Context) {
-	var req struct {
-		BookingID uint `json:"booking_id" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := h.activeTripService.BoardPassenger(strconv.FormatUint(uint64(req.BookingID), 10)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Passenger boarded successfully",
-	})
-}
-
-// UpdatePassengerStatusToPending updates a passenger's status to pending/waiting
-func (h *ActiveTripHandler) UpdatePassengerStatusToPending(c *gin.Context) {
-	var req struct {
-		BookingID uint `json:"booking_id" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := h.activeTripService.UpdatePassengerStatus(strconv.FormatUint(uint64(req.BookingID), 10), "pending"); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Passenger status updated to pending",
-	})
-}
-
-// CancelPassenger cancels a passenger booking
-func (h *ActiveTripHandler) CancelPassenger(c *gin.Context) {
-	var req struct {
-		BookingID uint `json:"booking_id" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := h.activeTripService.UpdatePassengerStatus(strconv.FormatUint(uint64(req.BookingID), 10), "cancelled"); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Passenger booking cancelled successfully",
-	})
-}
-
-// VerifyPassenger verifies a booking using QR code
-func (h *ActiveTripHandler) VerifyPassenger(c *gin.Context) {
-	var req struct {
-		BookingReference string `json:"booking_reference" binding:"required"`
-		ScheduledTripID  uint   `json:"scheduled_trip_id" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	booking, err := h.activeTripService.VerifyPassengerBooking(req.BookingReference, strconv.FormatUint(uint64(req.ScheduledTripID), 10))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Booking verified successfully",
-		"data":    booking,
-	})
-}
-
-// UpdatePassengerStatusToConfirmed updates a passenger's status to confirmed
-func (h *ActiveTripHandler) UpdatePassengerStatusToConfirmed(c *gin.Context) {
-	var req struct {
-		BookingID uint `json:"booking_id" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := h.activeTripService.UpdatePassengerStatus(strconv.FormatUint(uint64(req.BookingID), 10), "confirmed"); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Passenger status updated to confirmed",
-	})
-}
-
-// UpdatePassengerStatusToInTransit updates a passenger's status to in-transit
-func (h *ActiveTripHandler) UpdatePassengerStatusToInTransit(c *gin.Context) {
-	var req struct {
-		BookingID uint `json:"booking_id" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := h.activeTripService.UpdatePassengerStatus(strconv.FormatUint(uint64(req.BookingID), 10), "in-transit"); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Passenger status updated to in-transit",
-	})
-}
-
-// UpdatePassengerStatusToCompleted updates a passenger's status to completed
-func (h *ActiveTripHandler) UpdatePassengerStatusToCompleted(c *gin.Context) {
-	var req struct {
-		BookingID uint `json:"booking_id" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := h.activeTripService.UpdatePassengerStatus(strconv.FormatUint(uint64(req.BookingID), 10), "completed"); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Passenger status updated to completed",
 	})
 }
