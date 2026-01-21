@@ -1247,6 +1247,8 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
+	var passengerProfileComplete bool
+
 	if isPassenger {
 		if _, _, err := h.passengerRepository.GetOrCreatePassenger(userCtx.UserID); err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -1272,11 +1274,11 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 			return
 		}
 
-		complete := strings.TrimSpace(req.FirstName) != "" &&
+		passengerProfileComplete = strings.TrimSpace(req.FirstName) != "" &&
 			strings.TrimSpace(req.LastName) != "" &&
 			strings.TrimSpace(req.Email) != ""
 
-		if err := h.passengerRepository.SetPassengerProfileCompleted(userCtx.UserID, complete); err != nil {
+		if err := h.passengerRepository.SetPassengerProfileCompleted(userCtx.UserID, passengerProfileComplete); err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "passenger_profile_completion_failed",
 				Message: "Failed to mark passenger profile completion",
@@ -1287,7 +1289,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 
 	// Update profile completion flag on users table (used for other roles/tokens)
 	if isPassenger {
-		if err := h.userRepository.SetProfileCompleted(userCtx.UserID, complete); err != nil {
+		if err := h.userRepository.SetProfileCompleted(userCtx.UserID, passengerProfileComplete); err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "profile_completion_update_failed",
 				Message: "Failed to update profile completion",
