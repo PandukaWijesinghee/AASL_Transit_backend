@@ -1274,8 +1274,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 
 		complete := strings.TrimSpace(req.FirstName) != "" &&
 			strings.TrimSpace(req.LastName) != "" &&
-			strings.TrimSpace(req.Email) != "" &&
-			strings.TrimSpace(req.Address) != ""
+			strings.TrimSpace(req.Email) != ""
 
 		if err := h.passengerRepository.SetPassengerProfileCompleted(userCtx.UserID, complete); err != nil {
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -1287,12 +1286,22 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	}
 
 	// Update profile completion flag on users table (used for other roles/tokens)
-	if err := h.userRepository.UpdateProfileCompletion(userCtx.UserID); err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error:   "profile_completion_check_failed",
-			Message: "Failed to check profile completion",
-		})
-		return
+	if isPassenger {
+		if err := h.userRepository.SetProfileCompleted(userCtx.UserID, complete); err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "profile_completion_update_failed",
+				Message: "Failed to update profile completion",
+			})
+			return
+		}
+	} else {
+		if err := h.userRepository.UpdateProfileCompletion(userCtx.UserID); err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "profile_completion_check_failed",
+				Message: "Failed to check profile completion",
+			})
+			return
+		}
 	}
 
 	// Refresh latest user data
