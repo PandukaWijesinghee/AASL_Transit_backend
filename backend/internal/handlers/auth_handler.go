@@ -1110,7 +1110,9 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 
 			// Handle nullable fields from passenger table
 			if passenger.Email.Valid {
-				response.Email = &passenger.Email.String
+				if trimmed := strings.TrimSpace(passenger.Email.String); trimmed != "" {
+					response.Email = &trimmed
+				}
 			}
 			if passenger.FirstName.Valid {
 				response.FirstName = &passenger.FirstName.String
@@ -1136,6 +1138,12 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 			}
 			if passenger.ProfilePhotoURL.Valid {
 				response.ProfilePhotoURL = &passenger.ProfilePhotoURL.String
+			}
+
+			if response.Email == nil && user.Email.Valid {
+				if trimmed := strings.TrimSpace(user.Email.String); trimmed != "" {
+					response.Email = &trimmed
+				}
 			}
 		} else {
 			// No passenger record yet, profile not completed
@@ -1326,7 +1334,9 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		}
 
 		if passenger.Email.Valid {
-			response.Email = &passenger.Email.String
+			if trimmed := strings.TrimSpace(passenger.Email.String); trimmed != "" {
+				response.Email = &trimmed
+			}
 		}
 		if passenger.FirstName.Valid {
 			response.FirstName = &passenger.FirstName.String
@@ -1352,6 +1362,12 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		}
 		if passenger.ProfilePhotoURL.Valid {
 			response.ProfilePhotoURL = &passenger.ProfilePhotoURL.String
+		}
+
+		if response.Email == nil && user.Email.Valid {
+			if trimmed := strings.TrimSpace(user.Email.String); trimmed != "" {
+				response.Email = &trimmed
+			}
 		}
 
 		c.JSON(http.StatusOK, gin.H{
