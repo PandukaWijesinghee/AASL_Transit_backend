@@ -3,6 +3,7 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -1201,8 +1202,28 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	// Update profile
-	err := h.userRepository.UpdateProfile(
+	// Determine user and roles to handle passenger-specific storage
+	user, err := h.userRepository.GetUserByID(userCtx.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "profile_retrieval_failed",
+			Message: "Failed to retrieve user",
+		})
+		return
+	}
+
+	if user == nil {
+		c.JSON(http.StatusNotFound, ErrorResponse{
+			Error:   "user_not_found",
+			Message: "User profile not found",
+		})
+		return
+	}
+
+	isPassenger := h.userRepository.HasRole(user, "passenger")
+
+	// Always keep base users table in sync
+	if err := h.userRepository.UpdateProfile(
 		userCtx.UserID,
 		req.FirstName,
 		req.LastName,
@@ -1210,8 +1231,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		req.Address,
 		req.City,
 		req.PostalCode,
-	)
-	if err != nil {
+	); err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "profile_update_failed",
 			Message: "Failed to update profile",
@@ -1219,9 +1239,47 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	// Update profile completion status
-	err = h.userRepository.UpdateProfileCompletion(userCtx.UserID)
-	if err != nil {
+	if isPassenger {
+		if _, _, err := h.passengerRepository.GetOrCreatePassenger(userCtx.UserID); err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "passenger_creation_failed",
+				Message: "Failed to ensure passenger profile",
+			})
+			return
+		}
+
+		if err := h.passengerRepository.UpdatePassengerProfile(
+			userCtx.UserID,
+			req.FirstName,
+			req.LastName,
+			req.Email,
+			req.Address,
+			req.City,
+			req.PostalCode,
+		); err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "passenger_profile_update_failed",
+				Message: "Failed to update passenger profile",
+			})
+			return
+		}
+
+		complete := strings.TrimSpace(req.FirstName) != "" &&
+			strings.TrimSpace(req.LastName) != "" &&
+			strings.TrimSpace(req.Email) != "" &&
+			strings.TrimSpace(req.Address) != ""
+
+		if err := h.passengerRepository.SetPassengerProfileCompleted(userCtx.UserID, complete); err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "passenger_profile_completion_failed",
+				Message: "Failed to mark passenger profile completion",
+			})
+			return
+		}
+	}
+
+	// Update profile completion flag on users table (used for other roles/tokens)
+	if err := h.userRepository.UpdateProfileCompletion(userCtx.UserID); err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "profile_completion_check_failed",
 			Message: "Failed to check profile completion",
@@ -1229,8 +1287,8 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	// Get updated user profile
-	user, err := h.userRepository.GetUserByID(userCtx.UserID)
+	// Refresh latest user data
+	user, err = h.userRepository.GetUserByID(userCtx.UserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "profile_retrieval_failed",
@@ -1239,7 +1297,71 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	// Convert to response format
+	if isPassenger {
+		passenger, err := h.passengerRepository.GetPassengerByUserID(userCtx.UserID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "passenger_profile_fetch_failed",
+				Message: "Failed to load passenger profile",
+			})
+			return
+		}
+
+		if passenger == nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "passenger_not_found",
+				Message: "Passenger profile not found",
+			})
+			return
+		}
+
+		response := ProfileResponse{
+			ID:               user.ID.String(),
+			Phone:            user.Phone,
+			Roles:            user.Roles,
+			ProfileCompleted: passenger.ProfileCompleted,
+			Status:           user.Status,
+			PhoneVerified:    user.PhoneVerified,
+			EmailVerified:    false,
+		}
+
+		if passenger.Email.Valid {
+			response.Email = &passenger.Email.String
+		}
+		if passenger.FirstName.Valid {
+			response.FirstName = &passenger.FirstName.String
+		}
+		if passenger.LastName.Valid {
+			response.LastName = &passenger.LastName.String
+		}
+		if passenger.NIC.Valid {
+			response.NIC = &passenger.NIC.String
+		}
+		if passenger.DateOfBirth.Valid {
+			dob := passenger.DateOfBirth.Time.Format("2006-01-02")
+			response.DateOfBirth = &dob
+		}
+		if passenger.Address.Valid {
+			response.Address = &passenger.Address.String
+		}
+		if passenger.City.Valid {
+			response.City = &passenger.City.String
+		}
+		if passenger.PostalCode.Valid {
+			response.PostalCode = &passenger.PostalCode.String
+		}
+		if passenger.ProfilePhotoURL.Valid {
+			response.ProfilePhotoURL = &passenger.ProfilePhotoURL.String
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Profile updated successfully",
+			"profile": response,
+		})
+		return
+	}
+
+	// Non-passenger users fall back to legacy users table data
 	response := ProfileResponse{
 		ID:               user.ID.String(),
 		Phone:            user.Phone,
@@ -1250,7 +1372,6 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		EmailVerified:    user.EmailVerified,
 	}
 
-	// Handle nullable fields
 	if user.Email.Valid {
 		response.Email = &user.Email.String
 	}
