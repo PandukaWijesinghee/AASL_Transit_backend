@@ -1,9 +1,9 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -176,18 +176,50 @@ func (h *AuthHandler) SendOTP(c *gin.Context) {
 	expiresAt, _ := h.otpService.GetOTPExpiry(phone)
 	expiresIn := int(time.Until(expiresAt).Seconds())
 
+	// Check SMS configuration before attempting to send
+	if h.config.SMS.Mode == "production" {
+		// Validate SMS configuration
+		if h.config.SMS.Method == "url" && h.config.SMS.ESMSQK == "" {
+			log.Printf("❌ ERROR: SMS API key (DIALOG_SMS_ESMSQK) is not configured")
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "sms_not_configured",
+				"message": "SMS gateway is not properly configured. Please contact support.",
+				"details": "Dialog API key not set",
+			})
+			return
+		}
+
+		if h.config.SMS.Mask == "" {
+			log.Printf("❌ ERROR: SMS Mask (DIALOG_SMS_MASK) is not configured")
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "sms_not_configured",
+				"message": "SMS gateway is not properly configured. Please contact support.",
+				"details": "SMS Mask not set",
+			})
+			return
+		}
+	}
+
 	// Send SMS based on mode
 	if h.config.SMS.Mode == "production" {
 		// Production mode: Send actual SMS via Dialog gateway
 		log.Printf("🔵 Attempting to send SMS to %s via Dialog gateway (App: %s)...", phone, req.AppType)
+		log.Printf("📝 SMS Method: %s", h.config.SMS.Method)
+		if h.config.SMS.Method == "url" {
+			log.Printf("📝 Using API Key: %s****", h.config.SMS.ESMSQK[:3])
+		}
+		log.Printf("📝 SMS Mask: %s", h.config.SMS.Mask)
+
 		transactionID, err := h.smsGateway.SendOTP(phone, otp, req.AppType)
 		if err != nil {
 			log.Printf("❌ ERROR: Failed to send SMS to %s: %v", phone, err)
 			log.Printf("❌ Error type: %T", err)
 			log.Printf("❌ Full error details: %+v", err)
-			c.JSON(http.StatusInternalServerError, ErrorResponse{
-				Error:   "sms_send_failed",
-				Message: "Failed to send OTP via SMS. Please try again.",
+			errorMsg := fmt.Sprintf("Failed to send OTP: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "sms_send_failed",
+				"message": "Failed to send OTP via SMS. Please try again.",
+				"details": errorMsg,
 			})
 			return
 		}
@@ -195,11 +227,12 @@ func (h *AuthHandler) SendOTP(c *gin.Context) {
 		log.Printf("✅ SMS sent successfully to %s, transaction_id: %d", phone, transactionID)
 
 		// Production response (without OTP)
-		c.JSON(http.StatusOK, SendOTPResponse{
-			Message:   "OTP sent successfully to your phone",
-			Phone:     phone,
-			ExpiresAt: expiresAt,
-			ExpiresIn: expiresIn,
+		c.JSON(http.StatusOK, gin.H{
+			"message":    "OTP sent successfully to your phone",
+			"phone":      phone,
+			"expires_at": expiresAt,
+			"expires_in": expiresIn,
+			"mode":       "production",
 		})
 		return
 	}
@@ -938,7 +971,7 @@ type UpdateProfileRequest struct {
 	FirstName  string `json:"first_name" binding:"required"`
 	LastName   string `json:"last_name" binding:"required"`
 	Email      string `json:"email" binding:"required,email"`
-	Address    string `json:"address"`
+	Address    string `json:"address" binding:"required"`
 	City       string `json:"city"`
 	PostalCode string `json:"postal_code"`
 }
@@ -1110,9 +1143,7 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 
 			// Handle nullable fields from passenger table
 			if passenger.Email.Valid {
-				if trimmed := strings.TrimSpace(passenger.Email.String); trimmed != "" {
-					response.Email = &trimmed
-				}
+				response.Email = &passenger.Email.String
 			}
 			if passenger.FirstName.Valid {
 				response.FirstName = &passenger.FirstName.String
@@ -1138,12 +1169,6 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 			}
 			if passenger.ProfilePhotoURL.Valid {
 				response.ProfilePhotoURL = &passenger.ProfilePhotoURL.String
-			}
-
-			if response.Email == nil && user.Email.Valid {
-				if trimmed := strings.TrimSpace(user.Email.String); trimmed != "" {
-					response.Email = &trimmed
-				}
 			}
 		} else {
 			// No passenger record yet, profile not completed
@@ -1210,28 +1235,8 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	// Determine user and roles to handle passenger-specific storage
-	user, err := h.userRepository.GetUserByID(userCtx.UserID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error:   "profile_retrieval_failed",
-			Message: "Failed to retrieve user",
-		})
-		return
-	}
-
-	if user == nil {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Error:   "user_not_found",
-			Message: "User profile not found",
-		})
-		return
-	}
-
-	isPassenger := h.userRepository.HasRole(user, "passenger")
-
-	// Always keep base users table in sync
-	if err := h.userRepository.UpdateProfile(
+	// Update profile
+	err := h.userRepository.UpdateProfile(
 		userCtx.UserID,
 		req.FirstName,
 		req.LastName,
@@ -1239,7 +1244,8 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		req.Address,
 		req.City,
 		req.PostalCode,
-	); err != nil {
+	)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "profile_update_failed",
 			Message: "Failed to update profile",
@@ -1247,67 +1253,18 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	var passengerProfileComplete bool
-
-	if isPassenger {
-		if _, _, err := h.passengerRepository.GetOrCreatePassenger(userCtx.UserID); err != nil {
-			c.JSON(http.StatusInternalServerError, ErrorResponse{
-				Error:   "passenger_creation_failed",
-				Message: "Failed to ensure passenger profile",
-			})
-			return
-		}
-
-		if err := h.passengerRepository.UpdatePassengerProfile(
-			userCtx.UserID,
-			req.FirstName,
-			req.LastName,
-			req.Email,
-			req.Address,
-			req.City,
-			req.PostalCode,
-		); err != nil {
-			c.JSON(http.StatusInternalServerError, ErrorResponse{
-				Error:   "passenger_profile_update_failed",
-				Message: "Failed to update passenger profile",
-			})
-			return
-		}
-
-		passengerProfileComplete = strings.TrimSpace(req.FirstName) != "" &&
-			strings.TrimSpace(req.LastName) != "" &&
-			strings.TrimSpace(req.Email) != ""
-
-		if err := h.passengerRepository.SetPassengerProfileCompleted(userCtx.UserID, passengerProfileComplete); err != nil {
-			c.JSON(http.StatusInternalServerError, ErrorResponse{
-				Error:   "passenger_profile_completion_failed",
-				Message: "Failed to mark passenger profile completion",
-			})
-			return
-		}
+	// Update profile completion status
+	err = h.userRepository.UpdateProfileCompletion(userCtx.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "profile_completion_check_failed",
+			Message: "Failed to check profile completion",
+		})
+		return
 	}
 
-	// Update profile completion flag on users table (used for other roles/tokens)
-	if isPassenger {
-		if err := h.userRepository.SetProfileCompleted(userCtx.UserID, passengerProfileComplete); err != nil {
-			c.JSON(http.StatusInternalServerError, ErrorResponse{
-				Error:   "profile_completion_update_failed",
-				Message: "Failed to update profile completion",
-			})
-			return
-		}
-	} else {
-		if err := h.userRepository.UpdateProfileCompletion(userCtx.UserID); err != nil {
-			c.JSON(http.StatusInternalServerError, ErrorResponse{
-				Error:   "profile_completion_check_failed",
-				Message: "Failed to check profile completion",
-			})
-			return
-		}
-	}
-
-	// Refresh latest user data
-	user, err = h.userRepository.GetUserByID(userCtx.UserID)
+	// Get updated user profile
+	user, err := h.userRepository.GetUserByID(userCtx.UserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "profile_retrieval_failed",
@@ -1316,79 +1273,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	if isPassenger {
-		passenger, err := h.passengerRepository.GetPassengerByUserID(userCtx.UserID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, ErrorResponse{
-				Error:   "passenger_profile_fetch_failed",
-				Message: "Failed to load passenger profile",
-			})
-			return
-		}
-
-		if passenger == nil {
-			c.JSON(http.StatusInternalServerError, ErrorResponse{
-				Error:   "passenger_not_found",
-				Message: "Passenger profile not found",
-			})
-			return
-		}
-
-		response := ProfileResponse{
-			ID:               user.ID.String(),
-			Phone:            user.Phone,
-			Roles:            user.Roles,
-			ProfileCompleted: passenger.ProfileCompleted,
-			Status:           user.Status,
-			PhoneVerified:    user.PhoneVerified,
-			EmailVerified:    false,
-		}
-
-		if passenger.Email.Valid {
-			if trimmed := strings.TrimSpace(passenger.Email.String); trimmed != "" {
-				response.Email = &trimmed
-			}
-		}
-		if passenger.FirstName.Valid {
-			response.FirstName = &passenger.FirstName.String
-		}
-		if passenger.LastName.Valid {
-			response.LastName = &passenger.LastName.String
-		}
-		if passenger.NIC.Valid {
-			response.NIC = &passenger.NIC.String
-		}
-		if passenger.DateOfBirth.Valid {
-			dob := passenger.DateOfBirth.Time.Format("2006-01-02")
-			response.DateOfBirth = &dob
-		}
-		if passenger.Address.Valid {
-			response.Address = &passenger.Address.String
-		}
-		if passenger.City.Valid {
-			response.City = &passenger.City.String
-		}
-		if passenger.PostalCode.Valid {
-			response.PostalCode = &passenger.PostalCode.String
-		}
-		if passenger.ProfilePhotoURL.Valid {
-			response.ProfilePhotoURL = &passenger.ProfilePhotoURL.String
-		}
-
-		if response.Email == nil && user.Email.Valid {
-			if trimmed := strings.TrimSpace(user.Email.String); trimmed != "" {
-				response.Email = &trimmed
-			}
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Profile updated successfully",
-			"user":    response,
-		})
-		return
-	}
-
-	// Non-passenger users fall back to legacy users table data
+	// Convert to response format
 	response := ProfileResponse{
 		ID:               user.ID.String(),
 		Phone:            user.Phone,
@@ -1399,6 +1284,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		EmailVerified:    user.EmailVerified,
 	}
 
+	// Handle nullable fields
 	if user.Email.Valid {
 		response.Email = &user.Email.String
 	}
@@ -1430,7 +1316,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Profile updated successfully",
-		"user":    response,
+		"profile": response,
 	})
 }
 

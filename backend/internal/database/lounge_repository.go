@@ -146,6 +146,26 @@ func (r *LoungeRepository) GetAllActiveLounges() ([]models.Lounge, error) {
 	return lounges, nil
 }
 
+// GetAllLounges retrieves all lounges regardless of status or operational flag
+func (r *LoungeRepository) GetAllLounges() ([]models.Lounge, error) {
+	var lounges []models.Lounge
+	query := `
+		SELECT id, lounge_owner_id, lounge_name, description, address, state, country, 
+			   postal_code, latitude, longitude, contact_phone, capacity, 
+			   price_1_hour, price_2_hours, price_3_hours, price_until_bus, 
+			   amenities, images, status, is_operational, average_rating, 
+			   created_at, updated_at
+		FROM lounges 
+		ORDER BY lounge_name
+	`
+
+	err := r.db.Select(&lounges, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get lounges: %w", err)
+	}
+	return lounges, nil
+}
+
 // GetLoungesByStatus retrieves all lounges with a specific status
 func (r *LoungeRepository) GetLoungesByStatus(status string) ([]models.Lounge, error) {
 	var lounges []models.Lounge
@@ -197,6 +217,42 @@ func (r *LoungeRepository) SearchActiveLounges(state string, limit int) ([]model
 	err := r.db.Select(&lounges, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search active lounges: %w", err)
+	}
+	return lounges, nil
+}
+
+// SearchLounges retrieves lounges with optional state filter and limit without status filtering
+func (r *LoungeRepository) SearchLounges(state string, limit int) ([]models.Lounge, error) {
+	var lounges []models.Lounge
+	var args []interface{}
+	argNum := 1
+
+	query := `
+		SELECT id, lounge_owner_id, lounge_name, description, address, state, country, 
+			   postal_code, latitude, longitude, contact_phone, capacity, 
+			   price_1_hour, price_2_hours, price_3_hours, price_until_bus, 
+			   amenities, images, status, is_operational, average_rating, 
+			   created_at, updated_at
+		FROM lounges
+	`
+
+	if state != "" {
+		query += fmt.Sprintf(" WHERE LOWER(state) = LOWER($%d)", argNum)
+		args = append(args, state)
+		argNum++
+	}
+
+	if limit > 0 {
+		query += " ORDER BY RANDOM()"
+		query += fmt.Sprintf(" LIMIT $%d", argNum)
+		args = append(args, limit)
+	} else {
+		query += " ORDER BY lounge_name"
+	}
+
+	err := r.db.Select(&lounges, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search lounges: %w", err)
 	}
 	return lounges, nil
 }
