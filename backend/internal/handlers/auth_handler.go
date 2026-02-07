@@ -1283,7 +1283,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		)
 		if err != nil {
 			log.Printf("WARNING: Failed to update passenger profile for user %s: %v", user.ID, err)
-			// We don't return error here because the main user record was updated, 
+			// We don't return error here because the main user record was updated,
 			// but this is why users see old data in the app
 		}
 	}
