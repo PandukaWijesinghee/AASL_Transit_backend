@@ -1022,9 +1022,15 @@ func (h *AuthHandler) CompleteBasicProfile(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "profile_update_failed",
-			Message: "Failed to update profile",
+			Message: "Failed to update passenger record",
 		})
 		return
+	}
+
+	// Also update first_name and last_name in users table for synchronization
+	err = h.userRepository.UpdateUserNames(userCtx.UserID, req.FirstName, req.LastName)
+	if err != nil {
+		log.Printf("WARNING: Failed to update user names for synchronization (user %s): %v", userCtx.UserID, err)
 	}
 
 	// Set profile as completed in passengers table
@@ -1235,7 +1241,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	// Update profile
+	// Update profile in users table
 	err := h.userRepository.UpdateProfile(
 		userCtx.UserID,
 		req.FirstName,
@@ -1248,9 +1254,38 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "profile_update_failed",
-			Message: "Failed to update profile",
+			Message: "Failed to update user profile",
 		})
 		return
+	}
+
+	// Get user to check roles
+	user, err := h.userRepository.GetUserByID(userCtx.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "profile_retrieval_failed",
+			Message: "Failed to retrieve user profile for role checking",
+		})
+		return
+	}
+
+	// If user is a passenger, update the passengers table too
+	isPassenger := h.userRepository.HasRole(user, "passenger")
+	if isPassenger {
+		err = h.passengerRepository.UpdatePassengerProfile(
+			user.ID,
+			req.FirstName,
+			req.LastName,
+			req.Email,
+			req.Address,
+			req.City,
+			req.PostalCode,
+		)
+		if err != nil {
+			log.Printf("WARNING: Failed to update passenger profile for user %s: %v", user.ID, err)
+			// We don't return error here because the main user record was updated, 
+			// but this is why users see old data in the app
+		}
 	}
 
 	// Update profile completion status
@@ -1263,8 +1298,20 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
+	// If passenger, sync the profile_completed status to passengers table
+	if isPassenger {
+		// Re-fetch user to get the newly updated profile_completed status from users table
+		updatedUser, err := h.userRepository.GetUserByID(userCtx.UserID)
+		if err == nil {
+			err = h.passengerRepository.SetPassengerProfileCompleted(updatedUser.ID, updatedUser.ProfileCompleted)
+			if err != nil {
+				log.Printf("WARNING: Failed to sync passenger profile completion status for user %s: %v", updatedUser.ID, err)
+			}
+		}
+	}
+
 	// Get updated user profile
-	user, err := h.userRepository.GetUserByID(userCtx.UserID)
+	user, err = h.userRepository.GetUserByID(userCtx.UserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "profile_retrieval_failed",
