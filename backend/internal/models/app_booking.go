@@ -163,8 +163,8 @@ type MasterBooking struct {
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 
 	// Related data (not in DB, populated by queries)
-	BusBooking *BusBooking `json:"bus_booking,omitempty" db:"-"`
-	// LoungeBookings   []LoungeBooking     `json:"lounge_bookings,omitempty" db:"-"` // Future
+	BusBooking     *BusBooking      `json:"bus_booking,omitempty" db:"-"`
+	LoungeBookings []LoungeBooking  `json:"lounge_bookings,omitempty" db:"-"`
 }
 
 // ============================================================================
