@@ -557,7 +557,7 @@ func (r *AppBookingRepository) GetLoungeBookingsByBookingID(bookingID string) ([
 			lb.primary_guest_name, lb.primary_guest_phone, lb.promo_code, lb.special_requests,
 			lb.internal_notes, lb.cancelled_at, lb.cancellation_reason, lb.created_at, lb.updated_at,
 			lb.qr_code_data,
-			l.lounge_name, l.address
+			l.lounge_name, l.address as lounge_address
 		FROM lounge_bookings lb
 		JOIN lounges l ON lb.lounge_id = l.id
 		WHERE lb.master_booking_id = $1
