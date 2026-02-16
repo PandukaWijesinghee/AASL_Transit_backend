@@ -219,7 +219,7 @@ type LoungePromotion struct {
 
 // LoungeBooking represents a lounge reservation
 type LoungeBooking struct {
-	ID               uuid.UUID         `db:"id" json:"id"`
+	ID               uuid.UUID         `db:"lounge_booking_id" json:"id"`
 	BookingReference string            `db:"booking_reference" json:"booking_reference"`
 	UserID           uuid.UUID         `db:"user_id" json:"user_id"`
 	LoungeID         uuid.UUID         `db:"lounge_id" json:"lounge_id"`
