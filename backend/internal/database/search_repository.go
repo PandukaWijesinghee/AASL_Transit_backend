@@ -175,6 +175,30 @@ func (r *SearchRepository) FindDirectTrips(
 	fmt.Printf("After Time: %s\n", afterTime.Format(time.RFC3339))
 	fmt.Printf("Limit: %d\n", limit)
 
+	// Check how many scheduled trips exist that match basic criteria
+	var debugCounts struct {
+		TotalTrips     int `db:"total_trips"`
+		BookableTrips  int `db:"bookable_trips"`
+		FutureTrips    int `db:"future_trips"`
+		ValidStatus    int `db:"valid_status"`
+		WithBORRoute   int `db:"with_bor_route"`
+	}
+	debugQuery := `
+		SELECT 
+			COUNT(*) as total_trips,
+			COUNT(*) FILTER (WHERE is_bookable = true) as bookable_trips,
+			COUNT(*) FILTER (WHERE departure_datetime > $1) as future_trips,
+			COUNT(*) FILTER (WHERE status IN ('scheduled', 'confirmed')) as valid_status,
+			COUNT(*) FILTER (WHERE bus_owner_route_id IS NOT NULL) as with_bor_route
+		FROM scheduled_trips
+	`
+	if err := r.db.Get(&debugCounts, debugQuery, afterTime); err == nil {
+		fmt.Printf("📊 Scheduled Trips Stats:\n")
+		fmt.Printf("   Total: %d | Bookable: %d | Future: %d | Valid Status: %d | With Custom Route: %d\n",
+			debugCounts.TotalTrips, debugCounts.BookableTrips, debugCounts.FutureTrips,
+			debugCounts.ValidStatus, debugCounts.WithBORRoute)
+	}
+
 	query := `
 		SELECT DISTINCT ON (st.id)
 			st.id as trip_id,
@@ -271,6 +295,85 @@ func (r *SearchRepository) FindDirectTrips(
 	}
 
 	fmt.Printf("✅ SQL Query successful - Found %d trips\n", len(tempTrips))
+
+	// If no trips found, run diagnostic query to see why
+	if len(tempTrips) == 0 {
+		fmt.Printf("\n⚠️  NO TRIPS FOUND - Running diagnostics...\n")
+		
+		type diagnostic struct {
+			TripID          uuid.UUID `db:"trip_id"`
+			Departure       time.Time `db:"departure"`
+			IsBookable      bool      `db:"is_bookable"`
+			Status          string    `db:"status"`
+			IsFuture        bool      `db:"is_future"`
+			HasBORRoute     bool      `db:"has_bor_route"`
+			FromInSelected  *bool     `db:"from_in_selected"`
+			ToInSelected    *bool     `db:"to_in_selected"`
+			StopsConnected  bool      `db:"stops_connected"`
+		}
+		
+		diagQuery := `
+			SELECT 
+				st.id as trip_id,
+				st.departure_datetime as departure,
+				st.is_bookable,
+				st.status,
+				st.departure_datetime > $3 as is_future,
+				st.bus_owner_route_id IS NOT NULL as has_bor_route,
+				CASE WHEN bor.id IS NOT NULL THEN $1 = ANY(bor.selected_stop_ids) END as from_in_selected,
+				CASE WHEN bor.id IS NOT NULL THEN $2 = ANY(bor.selected_stop_ids) END as to_in_selected,
+				EXISTS (
+					SELECT 1 
+					FROM master_route_stops check_from
+					JOIN master_route_stops check_to 
+						ON check_from.master_route_id = check_to.master_route_id
+					WHERE check_from.id = $1 
+						AND check_to.id = $2
+						AND check_from.stop_order < check_to.stop_order
+						AND check_from.master_route_id = COALESCE(bor.master_route_id, st.permit_id)
+				) as stops_connected
+			FROM scheduled_trips st
+			LEFT JOIN bus_owner_routes bor ON st.bus_owner_route_id = bor.id
+			WHERE st.departure_datetime > $3 - INTERVAL '24 hours'
+			ORDER BY st.departure_datetime
+			LIMIT 10
+		`
+		
+		var diags []diagnostic
+		if err := r.db.Select(&diags, diagQuery, fromStopID, toStopID, afterTime); err == nil {
+			for _, d := range diags {
+				reasons := []string{}
+				if !d.IsBookable {
+					reasons = append(reasons, "❌ NOT BOOKABLE")
+				}
+				if d.Status != "scheduled" && d.Status != "confirmed" {
+					reasons = append(reasons, fmt.Sprintf("❌ WRONG STATUS: %s", d.Status))
+				}
+				if !d.IsFuture {
+					reasons = append(reasons, "❌ PAST DEPARTURE")
+				}
+				if d.HasBORRoute && (d.FromInSelected != nil && !*d.FromInSelected) {
+					reasons = append(reasons, "❌ FROM STOP NOT IN selected_stop_ids")
+				}
+				if d.HasBORRoute && (d.ToInSelected != nil && !*d.ToInSelected) {
+					reasons = append(reasons, "❌ TO STOP NOT IN selected_stop_ids")
+				}
+				if !d.StopsConnected {
+					reasons = append(reasons, "❌ STOPS NOT ON SAME ROUTE OR WRONG ORDER")
+				}
+				
+				if len(reasons) == 0 {
+					reasons = append(reasons, "✅ Should have matched!")
+				}
+				
+				fmt.Printf("   Trip %s: %s | %s\n", 
+					d.TripID.String()[:8], 
+					d.Departure.Format("2006-01-02 15:04"),
+					strings.Join(reasons, ", "))
+			}
+		}
+		fmt.Printf("\n")
+	}
 
 	// Log each trip found for debugging
 	for i, trip := range tempTrips {
