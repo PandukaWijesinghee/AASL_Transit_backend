@@ -263,6 +263,12 @@ func (r *AppBookingRepository) GetBookingByID(bookingID string) (*models.MasterB
 		booking.BusBooking = busBooking
 	}
 
+	// Get lounge bookings if exists
+	loungeBookings, err := r.GetLoungeBookingsByBookingID(bookingID)
+	if err == nil && len(loungeBookings) > 0 {
+		booking.LoungeBookings = loungeBookings
+	}
+
 	return booking, nil
 }
 
@@ -290,6 +296,12 @@ func (r *AppBookingRepository) GetBookingByReference(reference string) (*models.
 	busBooking, err := r.GetBusBookingByBookingID(booking.ID)
 	if err == nil {
 		booking.BusBooking = busBooking
+	}
+
+	// Get lounge bookings if exists
+	loungeBookings, err := r.GetLoungeBookingsByBookingID(booking.ID)
+	if err == nil && len(loungeBookings) > 0 {
+		booking.LoungeBookings = loungeBookings
 	}
 
 	return booking, nil
@@ -531,6 +543,80 @@ func (r *AppBookingRepository) GetBusBookingByQRCode(qrCode string) (*models.Bus
 	}
 
 	return busBooking, nil
+}
+
+// GetLoungeBookingsByBookingID retrieves all lounge bookings for a master booking ID
+func (r *AppBookingRepository) GetLoungeBookingsByBookingID(bookingID string) ([]models.LoungeBooking, error) {
+	var bookings []models.LoungeBooking
+	query := `
+		SELECT 
+			lb.lounge_booking_id, lb.booking_reference, lb.user_id, lb.lounge_id, lb.master_booking_id, lb.bus_booking_id,
+			lb.booking_type, lb.scheduled_arrival, lb.scheduled_departure, lb.actual_arrival, lb.actual_departure,
+			lb.number_of_guests, lb.pricing_type, lb.base_price, lb.pre_order_total,
+			lb.discount_amount, lb.total_amount, lb.status, lb.payment_status,
+			lb.primary_guest_name, lb.primary_guest_phone, lb.promo_code, lb.special_requests,
+			lb.internal_notes, lb.cancelled_at, lb.cancellation_reason, lb.created_at, lb.updated_at,
+			lb.qr_code_data,
+			l.lounge_name, l.address
+		FROM lounge_bookings lb
+		JOIN lounges l ON lb.lounge_id = l.id
+		WHERE lb.master_booking_id = $1
+		ORDER BY lb.booking_type ASC, lb.created_at ASC
+	`
+
+	rows, err := r.db.Query(query, bookingID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var booking models.LoungeBooking
+		err := rows.Scan(
+			&booking.ID, &booking.BookingReference, &booking.UserID, &booking.LoungeID,
+			&booking.MasterBookingID, &booking.BusBookingID, &booking.BookingType,
+			&booking.ScheduledArrival, &booking.ScheduledDeparture, &booking.ActualArrival, &booking.ActualDeparture,
+			&booking.NumberOfGuests, &booking.PricingType, &booking.BasePrice, &booking.PreOrderTotal,
+			&booking.DiscountAmount, &booking.TotalAmount, &booking.Status, &booking.PaymentStatus,
+			&booking.PrimaryGuestName, &booking.PrimaryGuestPhone, &booking.PromoCode, &booking.SpecialRequests,
+			&booking.InternalNotes, &booking.CancelledAt, &booking.CancellationReason, &booking.CreatedAt, &booking.UpdatedAt,
+			&booking.QRCodeData,
+			&booking.LoungeName, &booking.LoungeAddress,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Get guests
+		var guests []models.LoungeBookingGuest
+		guestQuery := `
+			SELECT id, lounge_booking_id, guest_name, guest_phone, is_primary_guest, checked_in_at, created_at
+			FROM lounge_booking_guests
+			WHERE lounge_booking_id = $1
+			ORDER BY is_primary_guest DESC, created_at ASC
+		`
+		err = r.db.Select(&guests, guestQuery, booking.ID)
+		if err == nil {
+			booking.Guests = guests
+		}
+
+		// Get pre-orders
+		var preOrders []models.LoungeBookingPreOrder
+		preOrderQuery := `
+			SELECT id, lounge_booking_id, product_id, product_name, product_type, product_image_url, quantity, unit_price, total_price, created_at
+			FROM lounge_booking_pre_orders
+			WHERE lounge_booking_id = $1
+			ORDER BY created_at ASC
+		`
+		err = r.db.Select(&preOrders, preOrderQuery, booking.ID)
+		if err == nil {
+			booking.PreOrders = preOrders
+		}
+
+		bookings = append(bookings, booking)
+	}
+
+	return bookings, rows.Err()
 }
 
 // GetBusBookingsByTripID retrieves all bus bookings for a scheduled trip
