@@ -227,12 +227,14 @@ func (r *SearchRepository) FindDirectTrips(
 			AND st.departure_datetime > $3
 			-- Stops must be in correct order
 			AND check_from.stop_order < check_to.stop_order
-			-- For bus owner routes, check if stops are selected
+			-- For bus owner routes, check if stops are selected (cast UUID to text for comparison)
 			AND (
 				bor.id IS NULL
+				OR bor.selected_stop_ids IS NULL
+				OR array_length(bor.selected_stop_ids, 1) IS NULL
 				OR (
-					$1 = ANY(bor.selected_stop_ids)
-					AND $2 = ANY(bor.selected_stop_ids)
+					$1::text = ANY(bor.selected_stop_ids)
+					AND $2::text = ANY(bor.selected_stop_ids)
 				)
 			)
 		ORDER BY st.id, st.departure_datetime
@@ -469,7 +471,7 @@ func (r *SearchRepository) GetRouteStopsForTrip(masterRouteID string, busOwnerRo
 			FROM master_route_stops mrs
 			JOIN bus_owner_routes bor ON bor.id = $1
 			WHERE mrs.master_route_id = $2
-			  AND mrs.id = ANY(bor.selected_stop_ids)
+			  AND mrs.id::text = ANY(bor.selected_stop_ids)
 			ORDER BY mrs.stop_order ASC
 		`
 		err := r.db.Select(&stops, query, *busOwnerRouteID, masterRouteID)
