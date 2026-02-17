@@ -625,10 +625,11 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 	// 7. Create actual bookings in a transaction
 	var busBookingID, preLoungeBookingID, postLoungeBookingID *uuid.UUID
 	var masterRef string
+	var masterBookingID *uuid.UUID
 
 	// Create bus booking if present
 	if intent.BusIntent != nil {
-		busBooking, bookingRef, err := s.createBusBookingFromIntent(intent)
+		busBooking, bookingRef, masterID, err := s.createBusBookingFromIntent(intent)
 		if err != nil {
 			// Mark as confirmation failed
 			s.intentRepo.UpdateIntentConfirmationFailed(intent.ID)
@@ -637,6 +638,7 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 		busBookingUUID, _ := uuid.Parse(busBooking.ID)
 		busBookingID = &busBookingUUID
 		masterRef = bookingRef
+		masterBookingID = masterID
 	}
 
 	// Create pre-trip lounge booking if present
@@ -655,7 +657,7 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 			"booking_type": loungeBookingType,
 		}).Info("Creating lounge booking from intent")
 
-		preLoungeBooking, err := s.createLoungeBookingFromIntent(intent, intent.PreTripLoungeIntent, loungeBookingType, busBookingID)
+		preLoungeBooking, err := s.createLoungeBookingFromIntent(intent, intent.PreTripLoungeIntent, loungeBookingType, masterBookingID, busBookingID)
 		if err != nil {
 			s.logger.WithFields(logrus.Fields{
 				"error":        err.Error(),
@@ -687,7 +689,7 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 
 	// Create post-trip lounge booking if present
 	if intent.PostTripLoungeIntent != nil {
-		postLoungeBooking, err := s.createLoungeBookingFromIntent(intent, intent.PostTripLoungeIntent, "post_trip", busBookingID)
+		postLoungeBooking, err := s.createLoungeBookingFromIntent(intent, intent.PostTripLoungeIntent, "post_trip", masterBookingID, busBookingID)
 		if err != nil {
 			s.logger.WithFields(logrus.Fields{
 				"error":     err.Error(),
@@ -744,16 +746,24 @@ func (s *BookingOrchestratorService) ConfirmBooking(
 }
 
 // createBusBookingFromIntent creates a bus booking from intent data
-func (s *BookingOrchestratorService) createBusBookingFromIntent(intent *models.BookingIntent) (*models.BusBooking, string, error) {
+func (s *BookingOrchestratorService) createBusBookingFromIntent(intent *models.BookingIntent) (*models.BusBooking, string, *uuid.UUID, error) {
 	busIntent := intent.BusIntent
+
+	// Determine booking type based on lounge intents
+	bookingType := models.BookingTypeBusOnly
+	totalAmount := intent.BusFare
+	if intent.PreTripLoungeIntent != nil || intent.PostTripLoungeIntent != nil {
+		bookingType = models.BookingTypeBusWithLounge
+		totalAmount = intent.TotalAmount
+	}
 
 	// Build master booking
 	masterBooking := &models.MasterBooking{
 		UserID:         intent.UserID.String(),
-		BookingType:    models.BookingTypeBusOnly,
+		BookingType:    bookingType,
 		BusTotal:       intent.BusFare,
-		Subtotal:       intent.BusFare,
-		TotalAmount:    intent.BusFare,
+		Subtotal:       totalAmount,
+		TotalAmount:    totalAmount,
 		PaymentStatus:  models.MasterPaymentPaid, // Paid via intent
 		BookingStatus:  models.MasterBookingConfirmed,
 		PassengerName:  busIntent.PassengerName,
@@ -795,13 +805,16 @@ func (s *BookingOrchestratorService) createBusBookingFromIntent(intent *models.B
 	// Create booking
 	response, err := s.appBookingRepo.CreateBooking(masterBooking, busBooking, seats, s.tripSeatRepo)
 	if err != nil {
-		return nil, "", err
+		return nil, "", nil, err
 	}
 
 	// Clear seat holds (they are now booked)
 	s.intentRepo.ReleaseSeatHoldsForIntent(intent.ID)
 
-	return response.BusBooking, response.Booking.BookingReference, nil
+	// Parse master booking ID
+	masterID, _ := uuid.Parse(response.Booking.ID)
+
+	return response.BusBooking, response.Booking.BookingReference, &masterID, nil
 }
 
 // createLoungeBookingFromIntent creates a lounge booking from intent data
@@ -809,6 +822,7 @@ func (s *BookingOrchestratorService) createLoungeBookingFromIntent(
 	intent *models.BookingIntent,
 	loungeIntent *models.LoungeIntentPayload,
 	bookingType string,
+	masterBookingID *uuid.UUID,
 	busBookingID *uuid.UUID,
 ) (*models.LoungeBooking, error) {
 	// Validate guests array
@@ -832,19 +846,20 @@ func (s *BookingOrchestratorService) createLoungeBookingFromIntent(
 
 	// Build lounge booking
 	booking := &models.LoungeBooking{
-		UserID:           intent.UserID,
-		LoungeID:         loungeID,
-		BusBookingID:     busBookingID,
-		ScheduledArrival: scheduledArrival,
-		NumberOfGuests:   loungeIntent.GuestCount,
-		PricingType:      loungeIntent.PricingType,
-		PricePerGuest:    fmt.Sprintf("%.2f", loungeIntent.PricePerGuest),
-		BasePrice:        fmt.Sprintf("%.2f", loungeIntent.BasePrice),
-		PreOrderTotal:    fmt.Sprintf("%.2f", loungeIntent.PreOrderTotal),
-		DiscountAmount:   "0.00", // Default to zero discount
-		TotalAmount:      fmt.Sprintf("%.2f", loungeIntent.TotalPrice),
-		LoungeName:       loungeIntent.LoungeName,
-		PrimaryGuestName: loungeIntent.Guests[0].GuestName,
+		UserID:            intent.UserID,
+		LoungeID:          loungeID,
+		MasterBookingID:   masterBookingID,
+		BusBookingID:      busBookingID,
+		ScheduledArrival:  scheduledArrival,
+		NumberOfGuests:    loungeIntent.GuestCount,
+		PricingType:       loungeIntent.PricingType,
+		PricePerGuest:     fmt.Sprintf("%.2f", loungeIntent.PricePerGuest),
+		BasePrice:         fmt.Sprintf("%.2f", loungeIntent.BasePrice),
+		PreOrderTotal:     fmt.Sprintf("%.2f", loungeIntent.PreOrderTotal),
+		DiscountAmount:    "0.00", // Default to zero discount
+		TotalAmount:       fmt.Sprintf("%.2f", loungeIntent.TotalPrice),
+		LoungeName:        loungeIntent.LoungeName,
+		PrimaryGuestName:  loungeIntent.Guests[0].GuestName,
 	}
 
 	if loungeIntent.Guests[0].GuestPhone != nil {
