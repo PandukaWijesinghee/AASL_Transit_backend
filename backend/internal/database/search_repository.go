@@ -252,8 +252,12 @@ func (r *SearchRepository) FindDirectTrips(
 			-- Stops must be in correct order
 			AND check_from.stop_order < check_to.stop_order
 			-- For bus owner routes, check if stops are selected
+			-- If selected_stop_ids is NULL or empty, treat as "all stops available"
 			AND (
 				bor.id IS NULL
+				OR bor.selected_stop_ids IS NULL
+				OR array_length(bor.selected_stop_ids, 1) IS NULL
+				OR array_length(bor.selected_stop_ids, 1) = 0
 				OR (
 					$1 = ANY(bor.selected_stop_ids)
 					AND $2 = ANY(bor.selected_stop_ids)
@@ -307,6 +311,7 @@ func (r *SearchRepository) FindDirectTrips(
 			Status          string    `db:"status"`
 			IsFuture        bool      `db:"is_future"`
 			HasBORRoute     bool      `db:"has_bor_route"`
+			SelectedStopsCount *int   `db:"selected_stops_count"`
 			FromInSelected  *bool     `db:"from_in_selected"`
 			ToInSelected    *bool     `db:"to_in_selected"`
 			StopsConnected  bool      `db:"stops_connected"`
@@ -320,8 +325,11 @@ func (r *SearchRepository) FindDirectTrips(
 				st.status,
 				st.departure_datetime > $3 as is_future,
 				st.bus_owner_route_id IS NOT NULL as has_bor_route,
-				CASE WHEN bor.id IS NOT NULL THEN $1 = ANY(bor.selected_stop_ids) END as from_in_selected,
-				CASE WHEN bor.id IS NOT NULL THEN $2 = ANY(bor.selected_stop_ids) END as to_in_selected,
+				CASE WHEN bor.id IS NOT NULL THEN array_length(bor.selected_stop_ids, 1) END as selected_stops_count,
+				CASE WHEN bor.id IS NOT NULL AND bor.selected_stop_ids IS NOT NULL 
+					THEN $1 = ANY(bor.selected_stop_ids) END as from_in_selected,
+				CASE WHEN bor.id IS NOT NULL AND bor.selected_stop_ids IS NOT NULL 
+					THEN $2 = ANY(bor.selected_stop_ids) END as to_in_selected,
 				EXISTS (
 					SELECT 1 
 					FROM master_route_stops check_from
@@ -352,11 +360,15 @@ func (r *SearchRepository) FindDirectTrips(
 				if !d.IsFuture {
 					reasons = append(reasons, "❌ PAST DEPARTURE")
 				}
-				if d.HasBORRoute && (d.FromInSelected != nil && !*d.FromInSelected) {
-					reasons = append(reasons, "❌ FROM STOP NOT IN selected_stop_ids")
-				}
-				if d.HasBORRoute && (d.ToInSelected != nil && !*d.ToInSelected) {
-					reasons = append(reasons, "❌ TO STOP NOT IN selected_stop_ids")
+				// Check selected_stop_ids for custom routes
+				if d.HasBORRoute {
+					if d.SelectedStopsCount == nil || *d.SelectedStopsCount == 0 {
+						reasons = append(reasons, "⚠️  selected_stop_ids is NULL/empty (now allowed)")
+					} else if d.FromInSelected != nil && !*d.FromInSelected {
+						reasons = append(reasons, "❌ FROM STOP NOT IN selected_stop_ids")
+					} else if d.ToInSelected != nil && !*d.ToInSelected {
+						reasons = append(reasons, "❌ TO STOP NOT IN selected_stop_ids")
+					}
 				}
 				if !d.StopsConnected {
 					reasons = append(reasons, "❌ STOPS NOT ON SAME ROUTE OR WRONG ORDER")
