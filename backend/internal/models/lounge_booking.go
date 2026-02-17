@@ -572,7 +572,7 @@ type LoungeBookingResponse struct {
 
 // LoungeBookingListItem is a summary for listing bookings
 type LoungeBookingListItem struct {
-	ID               uuid.UUID           `json:"id" db:"id"`
+	ID               uuid.UUID           `json:"id" db:"lounge_booking_id"`
 	BookingReference string              `json:"booking_reference" db:"booking_reference"`
 	LoungeID         uuid.UUID           `json:"lounge_id" db:"lounge_id"`
 	LoungeName       string              `json:"lounge_name" db:"lounge_name"`
