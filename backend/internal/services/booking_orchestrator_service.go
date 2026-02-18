@@ -846,20 +846,20 @@ func (s *BookingOrchestratorService) createLoungeBookingFromIntent(
 
 	// Build lounge booking
 	booking := &models.LoungeBooking{
-		UserID:            intent.UserID,
-		LoungeID:          loungeID,
-		MasterBookingID:   masterBookingID,
-		BusBookingID:      busBookingID,
-		ScheduledArrival:  scheduledArrival,
-		NumberOfGuests:    loungeIntent.GuestCount,
-		PricingType:       loungeIntent.PricingType,
-		PricePerGuest:     fmt.Sprintf("%.2f", loungeIntent.PricePerGuest),
-		BasePrice:         fmt.Sprintf("%.2f", loungeIntent.BasePrice),
-		PreOrderTotal:     fmt.Sprintf("%.2f", loungeIntent.PreOrderTotal),
-		DiscountAmount:    "0.00", // Default to zero discount
-		TotalAmount:       fmt.Sprintf("%.2f", loungeIntent.TotalPrice),
-		LoungeName:        loungeIntent.LoungeName,
-		PrimaryGuestName:  loungeIntent.Guests[0].GuestName,
+		UserID:           intent.UserID,
+		LoungeID:         loungeID,
+		MasterBookingID:  masterBookingID,
+		BusBookingID:     busBookingID,
+		ScheduledArrival: scheduledArrival,
+		NumberOfGuests:   loungeIntent.GuestCount,
+		PricingType:      loungeIntent.PricingType,
+		PricePerGuest:    fmt.Sprintf("%.2f", loungeIntent.PricePerGuest),
+		BasePrice:        fmt.Sprintf("%.2f", loungeIntent.BasePrice),
+		PreOrderTotal:    fmt.Sprintf("%.2f", loungeIntent.PreOrderTotal),
+		DiscountAmount:   "0.00", // Default to zero discount
+		TotalAmount:      fmt.Sprintf("%.2f", loungeIntent.TotalPrice),
+		LoungeName:       loungeIntent.LoungeName,
+		PrimaryGuestName: loungeIntent.Guests[0].GuestName,
 	}
 
 	if loungeIntent.Guests[0].GuestPhone != nil {

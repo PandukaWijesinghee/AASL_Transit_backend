@@ -177,11 +177,11 @@ func (r *SearchRepository) FindDirectTrips(
 
 	// Check how many scheduled trips exist that match basic criteria
 	var debugCounts struct {
-		TotalTrips     int `db:"total_trips"`
-		BookableTrips  int `db:"bookable_trips"`
-		FutureTrips    int `db:"future_trips"`
-		ValidStatus    int `db:"valid_status"`
-		WithBORRoute   int `db:"with_bor_route"`
+		TotalTrips    int `db:"total_trips"`
+		BookableTrips int `db:"bookable_trips"`
+		FutureTrips   int `db:"future_trips"`
+		ValidStatus   int `db:"valid_status"`
+		WithBORRoute  int `db:"with_bor_route"`
 	}
 	debugQuery := `
 		SELECT 
@@ -303,20 +303,20 @@ func (r *SearchRepository) FindDirectTrips(
 	// If no trips found, run diagnostic query to see why
 	if len(tempTrips) == 0 {
 		fmt.Printf("\n⚠️  NO TRIPS FOUND - Running diagnostics...\n")
-		
+
 		type diagnostic struct {
-			TripID          uuid.UUID `db:"trip_id"`
-			Departure       time.Time `db:"departure"`
-			IsBookable      bool      `db:"is_bookable"`
-			Status          string    `db:"status"`
-			IsFuture        bool      `db:"is_future"`
-			HasBORRoute     bool      `db:"has_bor_route"`
-			SelectedStopsCount *int   `db:"selected_stops_count"`
-			FromInSelected  *bool     `db:"from_in_selected"`
-			ToInSelected    *bool     `db:"to_in_selected"`
-			StopsConnected  bool      `db:"stops_connected"`
+			TripID             uuid.UUID `db:"trip_id"`
+			Departure          time.Time `db:"departure"`
+			IsBookable         bool      `db:"is_bookable"`
+			Status             string    `db:"status"`
+			IsFuture           bool      `db:"is_future"`
+			HasBORRoute        bool      `db:"has_bor_route"`
+			SelectedStopsCount *int      `db:"selected_stops_count"`
+			FromInSelected     *bool     `db:"from_in_selected"`
+			ToInSelected       *bool     `db:"to_in_selected"`
+			StopsConnected     bool      `db:"stops_connected"`
 		}
-		
+
 		diagQuery := `
 			SELECT 
 				st.id as trip_id,
@@ -346,7 +346,7 @@ func (r *SearchRepository) FindDirectTrips(
 			ORDER BY st.departure_datetime
 			LIMIT 10
 		`
-		
+
 		var diags []diagnostic
 		if err := r.db.Select(&diags, diagQuery, fromStopID, toStopID, afterTime); err == nil {
 			for _, d := range diags {
@@ -373,13 +373,13 @@ func (r *SearchRepository) FindDirectTrips(
 				if !d.StopsConnected {
 					reasons = append(reasons, "❌ STOPS NOT ON SAME ROUTE OR WRONG ORDER")
 				}
-				
+
 				if len(reasons) == 0 {
 					reasons = append(reasons, "✅ Should have matched!")
 				}
-				
-				fmt.Printf("   Trip %s: %s | %s\n", 
-					d.TripID.String()[:8], 
+
+				fmt.Printf("   Trip %s: %s | %s\n",
+					d.TripID.String()[:8],
 					d.Departure.Format("2006-01-02 15:04"),
 					strings.Join(reasons, ", "))
 			}
