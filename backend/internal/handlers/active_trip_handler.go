@@ -330,6 +330,37 @@ func (h *ActiveTripHandler) GetMyActiveTrip(c *gin.Context) {
 	})
 }
 
+// GetActiveTripByScheduledTripID retrieves active trip by scheduled trip ID (for passenger tracking)
+// GET /api/v1/active-trips/by-scheduled-trip/:scheduled_trip_id
+func (h *ActiveTripHandler) GetActiveTripByScheduledTripID(c *gin.Context) {
+	// Get scheduled trip ID from URL
+	scheduledTripID := c.Param("scheduled_trip_id")
+	if scheduledTripID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "missing_id",
+			"message": "Scheduled trip ID is required",
+		})
+		return
+	}
+
+	// Get the active trip
+	activeTrip, err := h.activeTripService.GetActiveTripByScheduledTripID(scheduledTripID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":              "not_found",
+			"message":            err.Error(),
+			"has_active_trip":    false,
+			"scheduled_trip_id": scheduledTripID,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"has_active_trip": true,
+		"active_trip":     activeTrip,
+	})
+}
+
 // UpdatePassengerCountRequest represents the request body for updating passenger count
 type UpdatePassengerCountRequest struct {
 	PassengerCount int `json:"passenger_count" binding:"required,min=0"`

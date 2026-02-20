@@ -869,6 +869,18 @@ func main() {
 		logger.Info("📱 App Booking routes registered successfully")
 
 		// ============================================================================
+		// ACTIVE TRIP TRACKING ROUTES (Passenger bus tracking)
+		// ============================================================================
+		logger.Info("🚌 Registering Active Trip Tracking routes...")
+		activeTrips := v1.Group("/active-trips")
+		activeTrips.Use(middleware.AuthMiddleware(jwtService))
+		{
+			logger.Info("  ✅ GET /api/v1/active-trips/by-scheduled-trip/:scheduled_trip_id - Track bus by scheduled trip ID")
+			activeTrips.GET("/by-scheduled-trip/:scheduled_trip_id", activeTripHandler.GetActiveTripByScheduledTripID)
+		}
+		logger.Info("🚌 Active Trip Tracking routes registered successfully")
+
+		// ============================================================================
 		// BOOKING ORCHESTRATION ROUTES (Intent → Payment → Confirm)
 		// ============================================================================
 		logger.Info("🎯 Registering Booking Orchestration routes...")

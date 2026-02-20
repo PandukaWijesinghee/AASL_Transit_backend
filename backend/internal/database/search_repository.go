@@ -202,8 +202,8 @@ func (r *SearchRepository) FindDirectTrips(
 	query := `
 		SELECT DISTINCT ON (st.id)
 			st.id as trip_id,
-			COALESCE(bor.custom_route_name, mr.route_name) as route_name,
-			mr.route_number,
+			COALESCE(bor.custom_route_name, mr_bor.route_name, mr_permit.route_name) as route_name,
+			COALESCE(mr_bor.route_number, mr_permit.route_number) as route_number,
 			b.bus_type,
 			st.departure_datetime as departure_time,
 			-- Calculate arrival time: departure + duration
@@ -223,25 +223,30 @@ func (r *SearchRepository) FindDirectTrips(
 			st.is_bookable,
 			-- Route info for fetching stops
 			bor.id as bus_owner_route_id,
-			COALESCE(bor.master_route_id, check_from.master_route_id)::text as master_route_id
+			-- Use bor.master_route_id first, fall back to permit's master_route_id
+			COALESCE(bor.master_route_id, rp.master_route_id)::text as master_route_id
 		FROM scheduled_trips st
 		-- Join bus owner route
 		LEFT JOIN bus_owner_routes bor ON st.bus_owner_route_id = bor.id
-		LEFT JOIN master_routes mr ON bor.master_route_id = mr.id
+		-- Route name/number via bus_owner_route path
+		LEFT JOIN master_routes mr_bor ON bor.master_route_id = mr_bor.id
 		-- Join permit for fare and bus
 		LEFT JOIN route_permits rp ON st.permit_id = rp.id
+		-- Route name/number fallback via permit path (used when bus_owner_route_id is NULL)
+		LEFT JOIN master_routes mr_permit ON rp.master_route_id = mr_permit.id
 		LEFT JOIN buses b ON rp.bus_registration_number = b.license_plate
 		-- Join seat layout template to get total_seats
 		LEFT JOIN bus_seat_layout_templates bslt ON b.seat_layout_id = bslt.id
 		-- Get stop information
 		JOIN master_route_stops from_stop ON from_stop.id = $1
 		JOIN master_route_stops to_stop ON to_stop.id = $2
-		-- Verify stops are on the same route
+		-- Verify stops are on the same route as the trip
+		-- COALESCE: prefer bus_owner_route's master_route_id, fall back to permit's master_route_id
 		JOIN master_route_stops check_from ON
-			check_from.master_route_id = COALESCE(bor.master_route_id, mr.id)
+			check_from.master_route_id = COALESCE(bor.master_route_id, rp.master_route_id)
 			AND check_from.id = $1
 		JOIN master_route_stops check_to ON
-			check_to.master_route_id = COALESCE(bor.master_route_id, mr.id)
+			check_to.master_route_id = COALESCE(bor.master_route_id, rp.master_route_id)
 			AND check_to.id = $2
 		WHERE
 			-- Trip must be bookable and in valid status
@@ -335,10 +340,11 @@ func (r *SearchRepository) FindDirectTrips(
 					FROM master_route_stops check_from
 					JOIN master_route_stops check_to 
 						ON check_from.master_route_id = check_to.master_route_id
+					LEFT JOIN route_permits rp2 ON rp2.id = st.permit_id
 					WHERE check_from.id = $1 
 						AND check_to.id = $2
 						AND check_from.stop_order < check_to.stop_order
-						AND check_from.master_route_id = COALESCE(bor.master_route_id, st.permit_id)
+						AND check_from.master_route_id = COALESCE(bor.master_route_id, rp2.master_route_id)
 				) as stops_connected
 			FROM scheduled_trips st
 			LEFT JOIN bus_owner_routes bor ON st.bus_owner_route_id = bor.id

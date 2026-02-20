@@ -240,6 +240,21 @@ type EndTripResult struct {
 	Duration   string             `json:"duration"`
 }
 
+// GetActiveTripByScheduledTripID retrieves active trip by scheduled trip ID (for passenger tracking)
+func (s *ActiveTripService) GetActiveTripByScheduledTripID(scheduledTripID string) (*models.ActiveTrip, error) {
+	activeTrip, err := s.activeTripRepo.GetByScheduledTripID(scheduledTripID)
+	if err != nil {
+		return nil, errors.New("no active trip found for this scheduled trip")
+	}
+
+	// Only return if trip is actually active
+	if !activeTrip.IsActive() {
+		return nil, errors.New("trip is not currently active")
+	}
+
+	return activeTrip, nil
+}
+
 // EndTrip completes an active trip
 func (s *ActiveTripService) EndTrip(input *EndTripInput) (*EndTripResult, error) {
 	// 1. Get the active trip
