@@ -104,8 +104,20 @@ func (r *SearchRepository) FindStopPairOnSameRoute(fromName, toName string) (*St
 			AND from_stop.stop_order < to_stop.stop_order
 			AND mr.is_active = true
 		ORDER BY
+			-- Exact stop name match first
 			CASE WHEN LOWER(from_stop.stop_name) = LOWER($1) THEN 0 ELSE 1 END,
 			CASE WHEN LOWER(to_stop.stop_name) = LOWER($2) THEN 0 ELSE 1 END,
+			-- Prefer routes whose name or destination city contains the destination term.
+			-- This ensures "Colombo - Kandy" beats "Colombo - Batticaloa" when searching for Kandy,
+			-- because both routes share a "Kandy" stop but only the first is a Kandy route.
+			CASE WHEN LOWER(mr.route_name) LIKE LOWER('%' || $2 || '%')
+			          OR LOWER(mr.destination_city) LIKE LOWER('%' || $2 || '%')
+			     THEN 0 ELSE 1 END,
+			-- Also prefer routes whose origin matches from-term
+			CASE WHEN LOWER(mr.route_name) LIKE LOWER('%' || $1 || '%')
+			          OR LOWER(mr.origin_city) LIKE LOWER('%' || $1 || '%')
+			     THEN 0 ELSE 1 END,
+			-- Fall back to route with most stops (highest coverage)
 			(SELECT COUNT(*) FROM master_route_stops WHERE master_route_id = mr.id) DESC
 		LIMIT 1
 	`
