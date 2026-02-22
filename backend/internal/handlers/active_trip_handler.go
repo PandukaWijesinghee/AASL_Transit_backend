@@ -347,9 +347,9 @@ func (h *ActiveTripHandler) GetActiveTripByScheduledTripID(c *gin.Context) {
 	activeTrip, err := h.activeTripService.GetActiveTripByScheduledTripID(scheduledTripID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"error":              "not_found",
-			"message":            err.Error(),
-			"has_active_trip":    false,
+			"error":             "not_found",
+			"message":           err.Error(),
+			"has_active_trip":   false,
 			"scheduled_trip_id": scheduledTripID,
 		})
 		return
