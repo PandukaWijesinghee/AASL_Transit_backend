@@ -8887,6 +8887,59 @@ paths:
         "401":
           description: Unauthorized
 
+  /api/v1/active-trips/by-scheduled-trip/{scheduled_trip_id}:
+    get:
+      summary: Get active trip by scheduled trip ID (passenger tracking)
+      description: |
+        Retrieves the currently active trip for a given scheduled trip ID.
+        Used by the passenger app to track live bus location.
+        Only returns trips with status in_transit or at_stop.
+      operationId: getActiveTripByScheduledTripID
+      tags:
+        - Active Trip Tracking
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: scheduled_trip_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The scheduled trip ID from the booking
+      responses:
+        "200":
+          description: Active trip found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  has_active_trip:
+                    type: boolean
+                    example: true
+                  active_trip:
+                    $ref: "#/components/schemas/ActiveTrip"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: No active trip found for this scheduled trip
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: not_found
+                  message:
+                    type: string
+                  has_active_trip:
+                    type: boolean
+                    example: false
+                  scheduled_trip_id:
+                    type: string
+
 # ============================================================================
 # Components (Schemas, Responses, SecuritySchemes)
 # ============================================================================
