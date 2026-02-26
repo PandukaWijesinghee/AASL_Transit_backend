@@ -188,6 +188,7 @@ func Load() (*Config, error) {
 	}
 
 	// Validate required configuration
+	// Validate required configuration
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
