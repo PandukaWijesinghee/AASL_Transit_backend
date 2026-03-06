@@ -110,8 +110,6 @@ func (r *TripSeatRepository) GetByScheduledTripID(scheduledTripID string) ([]mod
 
 // GetByScheduledTripIDWithBookingInfo returns seats with booking details
 func (r *TripSeatRepository) GetByScheduledTripIDWithBookingInfo(scheduledTripID string) ([]models.TripSeatWithBookingInfo, error) {
-	fmt.Printf("🔍 Repository: GetByScheduledTripIDWithBookingInfo called with tripID: %s\n", scheduledTripID)
-	
 	query := `
 		SELECT 
 			ts.id, ts.scheduled_trip_id, ts.seat_number, ts.seat_type, ts.row_number, ts.position,
@@ -120,24 +118,16 @@ func (r *TripSeatRepository) GetByScheduledTripIDWithBookingInfo(scheduledTripID
 			mb.passenger_name, mb.passenger_phone, mb.booking_reference, mb.payment_status
 		FROM trip_seats ts
 		LEFT JOIN manual_seat_bookings mb ON ts.manual_booking_id = mb.id
-		WHERE ts.scheduled_trip_id = $1::uuid
+		WHERE ts.scheduled_trip_id = $1
 		ORDER BY ts.row_number, ts.position
 	`
 
 	var seats []models.TripSeatWithBookingInfo
 	err := r.db.Select(&seats, query, scheduledTripID)
 	if err != nil {
-		fmt.Printf("❌ Repository: Query error: %v\n", err)
 		return nil, err
 	}
 
-	// Ensure we return empty slice, not nil
-	if seats == nil {
-		fmt.Printf("⚠️ Repository: seats is nil, initializing to empty slice\n")
-		seats = []models.TripSeatWithBookingInfo{}
-	}
-
-	fmt.Printf("✅ Repository: Found %d seats for trip %s\n", len(seats), scheduledTripID)
 	return seats, nil
 }
 

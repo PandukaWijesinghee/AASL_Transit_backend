@@ -801,7 +801,6 @@ func main() {
 			// Read endpoints (no verification needed)
 			scheduledTrips.GET("/:id/seats", tripSeatHandler.GetTripSeats)
 			scheduledTrips.GET("/:id/seats/summary", tripSeatHandler.GetTripSeatSummary)
-			scheduledTrips.GET("/:id/seats/diagnostic", tripSeatHandler.DiagnosticTripSeats) // Diagnostic endpoint
 			scheduledTrips.GET("/:id/route-stops", tripSeatHandler.GetTripRouteStops)
 
 			// Write endpoints (requires verification)

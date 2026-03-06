@@ -65,45 +65,24 @@ func (h *TripSeatHandler) GetTripSeats(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("🔍 GetTripSeats called with tripID: %s\n", tripID)
-
 	// Get seats with booking info
 	seats, err := h.tripSeatRepo.GetByScheduledTripIDWithBookingInfo(tripID)
 	if err != nil {
-		fmt.Printf("❌ Error getting trip seats: %v\n", err)
+		fmt.Printf("Error getting trip seats: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get trip seats"})
 		return
-	}
-
-	fmt.Printf("✅ Retrieved %d seats\n", len(seats))
-	for i, seat := range seats {
-		fmt.Printf("   [%d] ID=%s, Seat=%s (row:%d, col:%d), Status=%s\n",
-			i, seat.ID, seat.SeatNumber, seat.RowNumber, seat.Position, seat.Status)
-	}
-
-	// Ensure seats is never null
-	if seats == nil {
-		fmt.Printf("⚠️ seats is nil, converting to empty array\n")
-		seats = []models.TripSeatWithBookingInfo{}
 	}
 
 	// Get summary
 	summary, err := h.tripSeatRepo.GetSummary(tripID)
 	if err != nil {
-		fmt.Printf("⚠️ Error getting seat summary: %v\n", err)
-		summary = nil
-	} else if summary != nil {
-		fmt.Printf("✅ Summary: total=%d, available=%d, booked=%d\n",
-			summary.TotalSeats, summary.AvailableSeats, summary.BookedSeats)
+		fmt.Printf("Error getting seat summary: %v\n", err)
 	}
 
-	response := gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"seats":   seats,
 		"summary": summary,
-	}
-	fmt.Printf("📤 Sending response with %d seats, summary=%v\n", len(seats), summary != nil)
-
-	c.JSON(http.StatusOK, response)
+	})
 }
 
 // GetTripSeatSummary returns seat availability summary for a trip
